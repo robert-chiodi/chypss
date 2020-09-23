@@ -33,47 +33,46 @@
 #include <cfloat>
 #include <fstream>
 #include <iostream>
+
 #include "mfem.hpp"
 
-using namespace mfem;
-
-static ODESolver* ODESolverSelect(const int a_ode_solver_type) {
+static mfem::ODESolver* ODESolverSelect(const int a_ode_solver_type) {
   switch (a_ode_solver_type) {
     // Implicit L-stable methods
     case 1:
-      return new BackwardEulerSolver();
+      return new mfem::BackwardEulerSolver();
       break;
     case 2:
-      return new SDIRK23Solver(2);
+      return new mfem::SDIRK23Solver(2);
       break;
     case 3:
-      return new SDIRK33Solver();
+      return new mfem::SDIRK33Solver();
       break;
     // Explicit methods
     case 11:
-      return new ForwardEulerSolver();
+      return new mfem::ForwardEulerSolver();
       break;
     case 12:
-      return new RK2Solver(0.5);
+      return new mfem::RK2Solver(0.5);
       break;  // midpoint method
     case 13:
-      return new RK3SSPSolver();
+      return new mfem::RK3SSPSolver();
       break;
     case 14:
-      return new RK4Solver();
+      return new mfem::RK4Solver();
       break;
     case 15:
-      return new GeneralizedAlphaSolver(0.5);
+      return new mfem::GeneralizedAlphaSolver(0.5);
       break;
     // Implicit A-stable methods (not L-stable)
     case 22:
-      return new ImplicitMidpointSolver();
+      return new mfem::ImplicitMidpointSolver();
       break;
     case 23:
-      return new SDIRK23Solver();
+      return new mfem::SDIRK23Solver();
       break;
     case 24:
-      return new SDIRK34Solver();
+      return new mfem::SDIRK34Solver();
       break;
     default:
       std::cout << "Unknown ODE solver type: " << a_ode_solver_type << '\n';
@@ -91,52 +90,55 @@ static ODESolver* ODESolverSelect(const int a_ode_solver_type) {
  *
  *  Class ConductionOperator represents the right-hand side of the above ODE.
  */
-class ConductionOperatorBase : public TimeDependentOperator {
+class ConductionOperatorBase : public mfem::TimeDependentOperator {
  protected:
-  ParFiniteElementSpace& fespace;
-  Array<int> ess_tdof_list;  // this list remains empty for pure Neumann b.c.
+  mfem::ParFiniteElementSpace& fespace;
+  mfem::Array<int>
+      ess_tdof_list;  // this list remains empty for pure Neumann b.c.
 
-  ParBilinearForm* M;
-  ParBilinearForm* K;
+  mfem::ParBilinearForm* M;
+  mfem::ParBilinearForm* K;
 
   double current_dt;
 
-  CGSolver M_solver;  // Krylov solver for inverting the mass matrix M
+  mfem::CGSolver M_solver;  // Krylov solver for inverting the mass matrix M
 
   double alpha, kappa;
 
-  mutable Vector z;  // auxiliary vector
+  mutable mfem::Vector z;  // auxiliary vector
  public:
-  ConductionOperatorBase(ParFiniteElementSpace& f, double alpha, double kappa,
-                         const Vector& u);
+  ConductionOperatorBase(mfem::ParFiniteElementSpace& f, double alpha,
+                         double kappa, const mfem::Vector& u);
 
-  virtual void Mult(const Vector& u, Vector& du_dt) const = 0;
-  virtual void ImplicitSolve(const double dt, const Vector& u, Vector& k) = 0;
-  virtual void SetParameters(const Vector& u) = 0;
+  virtual void Mult(const mfem::Vector& u, mfem::Vector& du_dt) const = 0;
+  virtual void ImplicitSolve(const double dt, const mfem::Vector& u,
+                             mfem::Vector& k) = 0;
+  virtual void SetParameters(const mfem::Vector& u) = 0;
 
   virtual ~ConductionOperatorBase();
 };
 
 class ConductionOperator : public ConductionOperatorBase {
  protected:
-  HypreParMatrix Mmat;
-  HypreParMatrix Kmat;
-  HypreParMatrix* T;     // T = M + dt K
-  HypreSmoother M_prec;  // Preconditioner for the mass matrix M
-  CGSolver T_solver;     // Implicit solver for T = M + dt K
-  HypreSmoother T_prec;  // Preconditioner for the implicit solver
+  mfem::HypreParMatrix Mmat;
+  mfem::HypreParMatrix Kmat;
+  mfem::HypreParMatrix* T;     // T = M + dt K
+  mfem::HypreSmoother M_prec;  // Preconditioner for the mass matrix M
+  mfem::CGSolver T_solver;     // Implicit solver for T = M + dt K
+  mfem::HypreSmoother T_prec;  // Preconditioner for the implicit solver
  public:
-  ConductionOperator(ParFiniteElementSpace& f, double alpha, double kappa,
-                     const Vector& u);
+  ConductionOperator(mfem::ParFiniteElementSpace& f, double alpha, double kappa,
+                     const mfem::Vector& u);
 
-  virtual void Mult(const Vector& u, Vector& du_dt) const override final;
+  virtual void Mult(const mfem::Vector& u,
+                    mfem::Vector& du_dt) const override final;
   /** Solve the Backward-Euler equation: k = f(u + dt*k, t), for the unknown k.
       This is the only requirement for high-order SDIRK implicit integration.*/
-  virtual void ImplicitSolve(const double dt, const Vector& u,
-                             Vector& k) override final;
+  virtual void ImplicitSolve(const double dt, const mfem::Vector& u,
+                             mfem::Vector& k) override final;
 
   /// Update the diffusion BilinearForm K using the given true-dof vector `u`.
-  virtual void SetParameters(const Vector& u) override final;
+  virtual void SetParameters(const mfem::Vector& u) override final;
 
   virtual ~ConductionOperator() override final;
 };
@@ -149,30 +151,31 @@ class ConductionOperator : public ConductionOperatorBase {
  */
 class ConductionOperatorPartial : public ConductionOperatorBase {
  protected:
-  ParBilinearForm* PForm;
-  CGSolver P_solver;  // Krylov solver for inverting the mass matrix M
-  OperatorPtr P_op, M_op, K_op;
-  OperatorJacobiSmoother* jacobi_smooth_p;
-  OperatorJacobiSmoother* jacobi_smooth_m;
-  ParGridFunction u_alpha_gf, dt_k_gf;
+  mfem::ParBilinearForm* PForm;
+  mfem::CGSolver P_solver;  // Krylov solver for inverting the mass matrix M
+  mfem::OperatorPtr P_op, M_op, K_op;
+  mfem::OperatorJacobiSmoother* jacobi_smooth_p;
+  mfem::OperatorJacobiSmoother* jacobi_smooth_m;
+  mfem::ParGridFunction u_alpha_gf, dt_k_gf;
 
  public:
-  ConductionOperatorPartial(ParFiniteElementSpace& f, double alpha,
-                            double kappa, const Vector& u);
+  ConductionOperatorPartial(mfem::ParFiniteElementSpace& f, double alpha,
+                            double kappa, const mfem::Vector& u);
 
-  virtual void Mult(const Vector& u, Vector& du_dt) const override final;
+  virtual void Mult(const mfem::Vector& u,
+                    mfem::Vector& du_dt) const override final;
   /** Solve the Backward-Euler equation: k = f(u + dt*k, t), for the unknown k.
       This is the only requirement for high-order SDIRK implicit integration.*/
-  virtual void ImplicitSolve(const double dt, const Vector& u,
-                             Vector& k) override final;
+  virtual void ImplicitSolve(const double dt, const mfem::Vector& u,
+                             mfem::Vector& k) override final;
 
   /// Update the diffusion BilinearForm K using the given true-dof vector `u`.
-  virtual void SetParameters(const Vector& u) override final;
+  virtual void SetParameters(const mfem::Vector& u) override final;
 
   virtual ~ConductionOperatorPartial() override final;
 };
 
-double InitialTemperature(const Vector& x);
+double InitialTemperature(const mfem::Vector& x);
 
 int main(int argc, char* argv[]) {
   // 1. Initialize MPI.
@@ -201,7 +204,7 @@ int main(int argc, char* argv[]) {
   int precision = 8;
   std::cout.precision(precision);
 
-  OptionsParser args(argc, argv);
+  mfem::OptionsParser args(argc, argv);
   args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
   args.AddOption(&total_ref_levels, "-rt", "--refine-total",
                  "Number of times to refine the mesh uniformly.");
@@ -247,42 +250,42 @@ int main(int argc, char* argv[]) {
   // 4. Define the ODE solver used for time integration. Several implicit
   //    singly diagonal implicit Runge-Kutta (SDIRK) methods, as well as
   //    explicit Runge-Kutta methods are available.
-  ODESolver* ode_solver = ODESolverSelect(ode_solver_type);
+  mfem::ODESolver* ode_solver = ODESolverSelect(ode_solver_type);
   if (ode_solver == nullptr) {
     return 3;
   }
 
   // Create and refine mesh
-  Mesh mesh(mesh_file, 1, 1);
+  mfem::Mesh mesh(mesh_file, 1, 1);
   int dim = mesh.Dimension();
   auto refinements_to_go = total_ref_levels;
   while (refinements_to_go != 0 && mesh.GetNE() < num_procs * 100) {
     --refinements_to_go;
     mesh.UniformRefinement();
   }
-  ParMesh pmesh(MPI_COMM_WORLD, mesh);
+  mfem::ParMesh pmesh(MPI_COMM_WORLD, mesh);
   mesh.Clear();
   for (int lev = 0; lev < refinements_to_go; lev++) {
     pmesh.UniformRefinement();
   }
 
-  StopWatch timer_init;
+  mfem::StopWatch timer_init;
   timer_init.Start();
 
   // 7. Define the vector finite element space representing the current and the
   //    initial temperature, u_ref.
-  H1_FECollection fe_coll(order, dim);
-  ParFiniteElementSpace fespace(&pmesh, &fe_coll);
+  mfem::H1_FECollection fe_coll(order, dim);
+  mfem::ParFiniteElementSpace fespace(&pmesh, &fe_coll);
 
   // 8. Set the initial conditions for u. All boundaries are considered
   //    natural.
-  FunctionCoefficient u_0(InitialTemperature);
+  mfem::FunctionCoefficient u_0(InitialTemperature);
 
-  Vector u;
-  ParGridFunction u_gf(&fespace);
+  mfem::Vector u;
+  mfem::ParGridFunction u_gf(&fespace);
   u_gf.ProjectCoefficient(u_0);
   u_gf.GetTrueDofs(u);
-  Vector u_comp = u;
+  mfem::Vector u_comp = u;
 
   // 9. Initialize the conduction operator and the VisIt visualization.
   ConductionOperatorBase* oper = nullptr;
@@ -298,12 +301,12 @@ int main(int argc, char* argv[]) {
     comp_oper = new ConductionOperator(fespace, alpha, kappa, u_comp);
   }
 
-  VisItDataCollection* visit_dc = nullptr;
+  mfem::VisItDataCollection* visit_dc = nullptr;
   if (visit) {
     // Setup mesh/variable for export
     u_gf.SetFromTrueDofs(u);
     // Visit specific database for export
-    visit_dc = new VisItDataCollection("Example16-Parallel", &pmesh);
+    visit_dc = new mfem::VisItDataCollection("Example16-Parallel", &pmesh);
     visit_dc->RegisterField("temperature", &u_gf);
     visit_dc->SetCycle(0);
     visit_dc->SetTime(0.0);
@@ -312,7 +315,7 @@ int main(int argc, char* argv[]) {
 
   // 10. Perform time-integration (looping over the time iterations, ti, with a
   //     time-step dt).
-  ODESolver* comp_solver = nullptr;
+  mfem::ODESolver* comp_solver = nullptr;
   if (comp) {
     comp_solver = ODESolverSelect(ode_solver_type);
     comp_solver->Init(*comp_oper);
@@ -326,7 +329,7 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
   timer_init.Stop();
 
-  StopWatch inner_timer;
+  mfem::StopWatch inner_timer;
   inner_timer.Start();
   double old_t, old_dt;
   for (int ti = 1; !last_step; ti++) {
@@ -402,7 +405,7 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
   inner_timer.Stop();
 
-  StopWatch end_timer;
+  mfem::StopWatch end_timer;
   end_timer.Start();
 
   // Delete heap allocated objects
@@ -432,9 +435,9 @@ int main(int argc, char* argv[]) {
   return 0;
 }
 
-ConductionOperatorBase::ConductionOperatorBase(ParFiniteElementSpace& f,
+ConductionOperatorBase::ConductionOperatorBase(mfem::ParFiniteElementSpace& f,
                                                double al, double kap,
-                                               const Vector& u)
+                                               const mfem::Vector& u)
     : TimeDependentOperator(f.GetTrueVSize(), 0.0),
       fespace(f),
       M(NULL),
@@ -448,12 +451,13 @@ ConductionOperatorBase::~ConductionOperatorBase() {
   delete K;
 }
 
-ConductionOperator::ConductionOperator(ParFiniteElementSpace& f, double al,
-                                       double kap, const Vector& u)
+ConductionOperator::ConductionOperator(mfem::ParFiniteElementSpace& f,
+                                       double al, double kap,
+                                       const mfem::Vector& u)
     : ConductionOperatorBase(f, al, kap, u), T(NULL), T_solver(f.GetComm()) {
   const double rel_tol = 1.0e-10;
-  M = new ParBilinearForm(&fespace);
-  M->AddDomainIntegrator(new MassIntegrator());
+  M = new mfem::ParBilinearForm(&fespace);
+  M->AddDomainIntegrator(new mfem::MassIntegrator());
   M->Assemble(0);  // keep sparsity pattern of M and K the same
   M->FormSystemMatrix(ess_tdof_list, Mmat);
 
@@ -462,7 +466,7 @@ ConductionOperator::ConductionOperator(ParFiniteElementSpace& f, double al,
   M_solver.SetAbsTol(0.0);
   M_solver.SetMaxIter(100);
   M_solver.SetPrintLevel(0);
-  M_prec.SetType(HypreSmoother::Jacobi);
+  M_prec.SetType(mfem::HypreSmoother::Jacobi);
   M_solver.SetPreconditioner(M_prec);
   M_solver.SetOperator(Mmat);
 
@@ -479,7 +483,8 @@ ConductionOperator::ConductionOperator(ParFiniteElementSpace& f, double al,
   SetParameters(u);
 }
 
-void ConductionOperator::Mult(const Vector& u, Vector& du_dt) const {
+void ConductionOperator::Mult(const mfem::Vector& u,
+                              mfem::Vector& du_dt) const {
   // Compute:
   //    du_dt = M^{-1}*-K(u)
   // for du_dt
@@ -488,8 +493,8 @@ void ConductionOperator::Mult(const Vector& u, Vector& du_dt) const {
   M_solver.Mult(z, du_dt);
 }
 
-void ConductionOperator::ImplicitSolve(const double dt, const Vector& u,
-                                       Vector& du_dt) {
+void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
+                                       mfem::Vector& du_dt) {
   // Solve the equation:
   //    du_dt = M^{-1}*[-K(u + dt*du_dt)]
   // for du_dt
@@ -504,19 +509,19 @@ void ConductionOperator::ImplicitSolve(const double dt, const Vector& u,
   T_solver.Mult(z, du_dt);
 }
 
-void ConductionOperator::SetParameters(const Vector& u) {
-  ParGridFunction u_alpha_gf(&fespace);
+void ConductionOperator::SetParameters(const mfem::Vector& u) {
+  mfem::ParGridFunction u_alpha_gf(&fespace);
   u_alpha_gf.SetFromTrueDofs(u);
   for (int i = 0; i < u_alpha_gf.Size(); i++) {
     u_alpha_gf(i) = kappa + alpha * u_alpha_gf(i);
   }
 
   delete K;
-  K = new ParBilinearForm(&fespace);
+  K = new mfem::ParBilinearForm(&fespace);
 
-  GridFunctionCoefficient u_coeff(&u_alpha_gf);
+  mfem::GridFunctionCoefficient u_coeff(&u_alpha_gf);
 
-  K->AddDomainIntegrator(new DiffusionIntegrator(u_coeff));
+  K->AddDomainIntegrator(new mfem::DiffusionIntegrator(u_coeff));
   K->Assemble(0);  // keep sparsity pattern of M and K the same
   K->FormSystemMatrix(ess_tdof_list, Kmat);
   delete T;
@@ -525,9 +530,9 @@ void ConductionOperator::SetParameters(const Vector& u) {
 
 ConductionOperator::~ConductionOperator(void) { delete T; }
 
-ConductionOperatorPartial::ConductionOperatorPartial(ParFiniteElementSpace& f,
-                                                     double al, double kap,
-                                                     const Vector& u)
+ConductionOperatorPartial::ConductionOperatorPartial(
+    mfem::ParFiniteElementSpace& f, double al, double kap,
+    const mfem::Vector& u)
     : ConductionOperatorBase(f, al, kap, u),
       PForm(nullptr),
       P_solver(f.GetComm()),
@@ -536,9 +541,9 @@ ConductionOperatorPartial::ConductionOperatorPartial(ParFiniteElementSpace& f,
       u_alpha_gf(&fespace),
       dt_k_gf(&fespace) {
   const double rel_tol = 1.0e-10;
-  M = new ParBilinearForm(&fespace);
-  M->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  M->AddDomainIntegrator(new MassIntegrator());
+  M = new mfem::ParBilinearForm(&fespace);
+  M->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+  M->AddDomainIntegrator(new mfem::MassIntegrator());
   M->Assemble(0);  // keep sparsity pattern of M and K the same
   M->FormSystemMatrix(ess_tdof_list, M_op);
 
@@ -547,7 +552,7 @@ ConductionOperatorPartial::ConductionOperatorPartial(ParFiniteElementSpace& f,
   M_solver.SetAbsTol(0.0);
   M_solver.SetMaxIter(100);
   M_solver.SetPrintLevel(0);
-  jacobi_smooth_m = new OperatorJacobiSmoother(*M, ess_tdof_list);
+  jacobi_smooth_m = new mfem::OperatorJacobiSmoother(*M, ess_tdof_list);
   M_solver.SetPreconditioner(*jacobi_smooth_m);
   M_solver.SetOperator(*M_op);
 
@@ -562,7 +567,8 @@ ConductionOperatorPartial::ConductionOperatorPartial(ParFiniteElementSpace& f,
   SetParameters(u);
 }
 
-void ConductionOperatorPartial::Mult(const Vector& u, Vector& du_dt) const {
+void ConductionOperatorPartial::Mult(const mfem::Vector& u,
+                                     mfem::Vector& du_dt) const {
   // Compute:
   //    du_dt = M^{-1}*-K(u)
   // for du_dt
@@ -571,26 +577,27 @@ void ConductionOperatorPartial::Mult(const Vector& u, Vector& du_dt) const {
   M_solver.Mult(z, du_dt);
 }
 
-void ConductionOperatorPartial::ImplicitSolve(const double dt, const Vector& u,
-                                              Vector& du_dt) {
+void ConductionOperatorPartial::ImplicitSolve(const double dt,
+                                              const mfem::Vector& u,
+                                              mfem::Vector& du_dt) {
   // Solve the equation:
   //    du_dt = M^{-1}*[-K(u + dt*du_dt)]
   // for du_dt
   if (PForm == nullptr) {
-    PForm = new ParBilinearForm(&fespace);
-    PForm->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-    PForm->AddDomainIntegrator(new MassIntegrator());
+    PForm = new mfem::ParBilinearForm(&fespace);
+    PForm->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+    PForm->AddDomainIntegrator(new mfem::MassIntegrator());
     dt_k_gf.Distribute(u_alpha_gf);
     for (int i = 0; i < dt_k_gf.Size(); i++) {
       dt_k_gf(i) *= dt;
     }
-    GridFunctionCoefficient coef_dt_kappa(&dt_k_gf);
-    PForm->AddDomainIntegrator(new DiffusionIntegrator(coef_dt_kappa));
+    mfem::GridFunctionCoefficient coef_dt_kappa(&dt_k_gf);
+    PForm->AddDomainIntegrator(new mfem::DiffusionIntegrator(coef_dt_kappa));
     PForm->Assemble(0);
     PForm->FormSystemMatrix(ess_tdof_list, P_op);
     if (UsesTensorBasis(fespace)) {
       delete jacobi_smooth_p;
-      jacobi_smooth_p = new OperatorJacobiSmoother(*PForm, ess_tdof_list);
+      jacobi_smooth_p = new mfem::OperatorJacobiSmoother(*PForm, ess_tdof_list);
       P_solver.SetPreconditioner(*jacobi_smooth_p);
     }
     P_solver.SetOperator(*P_op);
@@ -602,17 +609,17 @@ void ConductionOperatorPartial::ImplicitSolve(const double dt, const Vector& u,
   P_solver.Mult(z, du_dt);
 }
 
-void ConductionOperatorPartial::SetParameters(const Vector& u) {
+void ConductionOperatorPartial::SetParameters(const mfem::Vector& u) {
   u_alpha_gf.SetFromTrueDofs(u);
   for (int i = 0; i < u_alpha_gf.Size(); i++) {
     u_alpha_gf(i) = kappa + alpha * u_alpha_gf(i);
   }
 
   delete K;
-  K = new ParBilinearForm(&fespace);
-  K->SetAssemblyLevel(AssemblyLevel::PARTIAL);
-  GridFunctionCoefficient grid_coeff(&u_alpha_gf);
-  K->AddDomainIntegrator(new DiffusionIntegrator(grid_coeff));
+  K = new mfem::ParBilinearForm(&fespace);
+  K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+  mfem::GridFunctionCoefficient grid_coeff(&u_alpha_gf);
+  K->AddDomainIntegrator(new mfem::DiffusionIntegrator(grid_coeff));
   K->Assemble(0);  // keep sparsity pattern of M and K the same
   K->FormSystemMatrix(ess_tdof_list, K_op);
 
@@ -627,8 +634,8 @@ ConductionOperatorPartial::~ConductionOperatorPartial(void) {
   delete jacobi_smooth_m;
 }
 
-double InitialTemperature(const Vector& x) {
-  Vector x_center = x;
+double InitialTemperature(const mfem::Vector& x) {
+  mfem::Vector x_center = x;
   x_center -= 0.5;
   if (x_center.Norml2() < 0.25) {
     return 2.0;
