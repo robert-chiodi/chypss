@@ -30,6 +30,13 @@
 //               We recommend viewing examples 2, 9 and 10 before viewing this
 //               example.
 
+//                     CHyPSS Heat Equation Example
+// This file serves as an example and platform for testing MFEM weak and strong
+// scaling. It borrows heavily from MFEM's parallel example 16, ex16p, which
+// solves a heat equation with temperature depenent diffusivity. The original
+// operator, ConductionOperator, was kept and ConductionOperatorPartial was
+// added, which uses Partial Assembly of the bilinear operators.
+
 #include <cfloat>
 #include <fstream>
 #include <iostream>
@@ -224,11 +231,9 @@ int main(int argc, char* argv[]) {
                  "Enable or disable GLVis visualization.");
   args.AddOption(&visit, "-visit", "--visit-datafiles", "-no-visit",
                  "--no-visit-datafiles",
-                 "Save data files for VisIt (visit.l1lnl.gov) visualization.");
+                 "Save data files for VisIt (visit.llnl.gov) visualization.");
   args.AddOption(&vis_steps, "-vs", "--visualization-steps",
                  "Visualize every n-th timestep.");
-  args.AddOption(&adios2, "-adios2", "--adios2-streams", "-no-adios2",
-                 "--no-adios2-streams", "Save data using adios2 streams.");
   args.AddOption(&use_partial_assembly, "-use-pa", "--use-partial-assembly",
                  "-no-pa", "--no_partial_assembly",
                  "Construct operator using Partial Assembly from MFEM.");
