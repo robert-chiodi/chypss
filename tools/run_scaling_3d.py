@@ -16,10 +16,10 @@ import subprocess
 # with t refinement level (and 0 being no refinement)
 
 print("Running job creation and submission script for scaling.\n")
-cores_per_node = 56
+cores_per_node = 32
 
 strong_starting_cores = 32
-strong_scaling_num_elem = 16777216
+strong_scaling_num_elem = 262144
 strong_scaling_growth = 8 # Cores at level is strong_starting_cores*(2**t)
 print("Planned strong scaling study:")
 print("NumElem".center(10)+"Cores".center(10)+"Nodes".center(10)+"Elem/Core".center(10))
@@ -36,7 +36,7 @@ for t in range(0,strong_scaling_growth):
 print("\n")
 
 weak_starting_cores = 1
-weak_scaling_num_elem_start = 32768
+weak_scaling_num_elem_start = 4096
 weak_scaling_growth = 5 # Cores at level is weak_starting_cores*(2**((t+3)*3))
 print("Planned weak scaling study:\n")
 print("NumElem".center(10)+"Cores".center(10)+"Nodes".center(10)+"Elem/Core".center(10))
@@ -53,7 +53,7 @@ for t in range(0,weak_scaling_growth):
 print("\n")
 
 print("Options: ")
-print("Enter R to run scaling test (via submitting jobs with sbatch")
+print("Enter R to run scaling test (via submitting jobs with sbatch)")
 print("Enter D to generate all files but not submit jobs")
 user_input = input()
 if(user_input != "R" and user_input != "r" \
@@ -70,12 +70,11 @@ strong_scale_dir = "strong_scaling"
 os.mkdir(strong_scale_dir)
 os.chdir("./"+strong_scale_dir)
 
-for t in range(2,strong_scaling_growth): # 7 is max for flex queue on Frontera, ends with 2340 cells per core
+for t in range(1,strong_scaling_growth): # 7 is max for flex queue on Frontera, ends with 2340 cells per core
   dir = "simdir"+str(t)
   os.mkdir(dir)
   os.chdir("./"+dir)
-  execute_command = "../../scale_test -m ../../inline-hex.mesh -rs
-  6" # This is 16,777,216 Elements
+  execute_command = "../../scale_test -m ../../inline-hex.mesh -rt 4 -o 2 -use-pa" # This is 262144 Elements
   r = open("run","w")
   r.write("#!/bin/bash \n")
   r.write("#SBATCH -p flex \n")
@@ -109,7 +108,7 @@ for t in range(0,weak_scaling_growth):
   dir = "simdir"+str(t+3)
   os.mkdir(dir)
   os.chdir("./"+dir)
-  execute_command = "../../scale_test -m ../../inline-hex.mesh -rs "+str(t+3) # 64*(2^(3*(t+3)))
+  execute_command = "../../scale_test -m ../../inline-hex.mesh -rt "+str(t+2)+" -o 2 -use-pa" # 64*(2^(3*(t+3)))
   r = open("run","w")
   r.write("#!/bin/bash \n")
   r.write("#SBATCH -p flex \n")
