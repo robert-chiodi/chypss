@@ -73,6 +73,29 @@ class DomainIntegrator : public BilinearFormIntegrator {
 };
 
 // Interior face term: <F.n(u),[w]>
+class BdrFaceIntegrator : public NonlinearFormIntegrator {
+ private:
+  RiemannSolver rsolver;
+  Vector shape1;
+  Vector shape2;
+  Vector funval1;
+  Vector funval2;
+  Vector nor;
+  Vector fluxN;
+  Vector cFlux;
+  int side;
+
+ public:
+  BdrFaceIntegrator(RiemannSolver& rsolver_, const int dim,
+                    const Vector& sol_vector, const int wall);
+
+  virtual void AssembleFaceVector(const FiniteElement& el1,
+                                  const FiniteElement& el2,
+                                  FaceElementTransformations& Tr,
+                                  const Vector& elfun, Vector& elvect);
+};
+
+// Interior face term: <F.n(u),[w]>
 class FaceIntegrator : public NonlinearFormIntegrator {
  private:
   RiemannSolver rsolver;
@@ -120,7 +143,7 @@ FE_Evolution::FE_Evolution(FiniteElementSpace& _vfes, Operator& _A,
 
 void FE_Evolution::Mult(const Vector& x, Vector& y) const {
   // 0. Reset wavespeed computation before operator application.
-  max_char_speed = 0.;
+  max_char_speed = 0.0;
 
   // 1. Create the vector z with the face terms -<F.n(u), [w]>.
   A.Mult(x, z);
@@ -350,6 +373,96 @@ void DomainIntegrator::AssembleElementMatrix2(const FiniteElement& trial_fe,
 }
 
 // Implementation of class FaceIntegrator
+BdrFaceIntegrator::BdrFaceIntegrator(RiemannSolver& rsolver_, const int dim,
+                                     const Vector& sol_vector, const int wall)
+    : rsolver(rsolver_),
+      funval1(num_equation),
+      funval2(num_equation),
+      nor(dim),
+      fluxN(num_equation),
+      cFlux(sol_vector),
+      side(wall) {}
+
+void BdrFaceIntegrator::AssembleFaceVector(const FiniteElement& el1,
+                                           const FiniteElement& el2,
+                                           FaceElementTransformations& Tr,
+                                           const Vector& elfun,
+                                           Vector& elvect) {
+  // Compute the term <F.n(u),[w]> on the interior faces.
+  const int dof1 = el1.GetDof();
+  const int dof2 = el2.GetDof();
+
+  shape1.SetSize(dof1);
+  shape2.SetSize(dof2);
+
+  elvect.SetSize((dof1 + dof2) * num_equation);
+  elvect = 0.0;
+
+  DenseMatrix elfun1_mat(elfun.GetData(), dof1, num_equation);
+  DenseMatrix elfun2_mat(elfun.GetData() + dof1 * num_equation, dof2,
+                         num_equation);
+
+  DenseMatrix elvect1_mat(elvect.GetData(), dof1, num_equation);
+  DenseMatrix elvect2_mat(elvect.GetData() + dof1 * num_equation, dof2,
+                          num_equation);
+
+  // Integration order calculation from DGTraceIntegrator
+  int intorder;
+  if (Tr.Elem2No >= 0)
+    intorder = (min(Tr.Elem1->OrderW(), Tr.Elem2->OrderW()) +
+                2 * max(el1.GetOrder(), el2.GetOrder()));
+  else {
+    intorder = Tr.Elem1->OrderW() + 2 * el1.GetOrder();
+  }
+  if (el1.Space() == FunctionSpace::Pk) {
+    intorder++;
+  }
+  const IntegrationRule* ir = &IntRules.Get(Tr.GetGeometryType(), intorder);
+
+  for (int i = 0; i < ir->GetNPoints(); i++) {
+    const IntegrationPoint& ip = ir->IntPoint(i);
+
+    Tr.SetAllIntPoints(&ip);  // set face and element int. points
+
+    // Calculate basis functions on both elements at the face
+    el1.CalcShape(Tr.GetElement1IntPoint(), shape1);
+    el2.CalcShape(Tr.GetElement2IntPoint(), shape2);
+
+    // Interpolate elfun at the point
+    elfun1_mat.MultTranspose(shape1, funval1);
+    elfun2_mat.MultTranspose(shape2, funval2);
+
+    // Get the normal vector and the flux on the face
+    CalcOrtho(Tr.Jacobian(), nor);
+    if (side == 0) {
+      // Left side
+      add(cFlux, cFlux, funval1);
+      subtract(funval1, funval2, funval1);
+    } else if (side == 1) {
+      // Right Side
+      add(cFlux, cFlux, funval2);
+      subtract(funval2, funval1, funval2);
+    }
+    const double mcs = rsolver.Eval(funval1, funval2, nor, fluxN);
+
+    // Update max char speed
+    if (mcs > max_char_speed) {
+      max_char_speed = mcs;
+    }
+
+    fluxN *= ip.weight;
+    for (int k = 0; k < num_equation; k++) {
+      for (int s = 0; s < dof1; s++) {
+        elvect1_mat(s, k) -= fluxN(k) * shape1(s);
+      }
+      for (int s = 0; s < dof2; s++) {
+        elvect2_mat(s, k) += fluxN(k) * shape2(s);
+      }
+    }
+  }
+}
+
+// Implementation of class FaceIntegrator
 FaceIntegrator::FaceIntegrator(RiemannSolver& rsolver_, const int dim)
     : rsolver(rsolver_),
       funval1(num_equation),
@@ -470,7 +583,10 @@ bool StateIsPhysical(const Vector& state, const int dim) {
 }
 
 // Initial condition
-void InitialCondition(const Vector& x, Vector& y) {
+inline void Sod2D_x(const Vector& x, Vector& y);
+inline void Sod2D_diag(const Vector& x, Vector& y);
+inline void PressurePulse(const Vector& x, Vector& y);
+inline void InitialCondition(const Vector& x, Vector& y) {
   MFEM_ASSERT(x.Size() == 2, "");
 
   double radius = 0, Minf = 0, beta = 0;
@@ -484,10 +600,20 @@ void InitialCondition(const Vector& x, Vector& y) {
     radius = 0.2;
     Minf = 0.05;
     beta = 1. / 50.;
+  } else if (problem == 3) {
+    Sod2D_x(x, y);
+    return;
+  } else if (problem == 4) {
+    Sod2D_diag(x, y);
+    return;
+  } else if (problem == 5) {
+    PressurePulse(x, y);
+    return;
   } else {
     mfem_error(
         "Cannot recognize problem."
-        "Options are: 1 - fast vortex, 2 - slow vortex");
+        "Options are: 1 - fast vortex, 2 - slow vortex, 3 - Sod2D_x, 4 - "
+        "Sod2D_diag, 5 - Pressure Pulse");
   }
 
   const double xc = 0.0, yc = 0.0;
@@ -520,6 +646,66 @@ void InitialCondition(const Vector& x, Vector& y) {
   const double den = den_inf * pow(temp / temp_inf, shrinv1);
   const double pres = den * gas_constant * temp;
   const double energy = shrinv1 * pres / den + 0.5 * vel2;
+
+  y(0) = den;
+  y(1) = den * velX;
+  y(2) = den * velY;
+  y(3) = den * energy;
+}
+
+inline void Sod2D_x(const Vector& x, Vector& y) {
+  double xc = 0.0;
+  double den, velX, velY, pres;
+  if (x(0) < xc) {
+    den = 1.0;
+    pres = 1.0;
+    velX = 0.0;
+    velY = 0.0;
+  } else {
+    den = 0.125;
+    pres = 0.1;
+    velX = 0.0;
+    velY = 0.0;
+  }
+  // pres += 1.0;
+  const double vel2 = velX * velX + velY * velY;
+  const double shrinv1 = 1.0 / (specific_heat_ratio - 1.0);
+  const double energy = shrinv1 * pres / den + 0.5 * vel2;
+  y(0) = den;
+  y(1) = den * velX;
+  y(2) = den * velY;
+  y(3) = den * energy;
+}
+
+inline void Sod2D_diag(const Vector& x, Vector& y) {
+  MFEM_VERIFY(false, "Not yet implemented");
+}
+
+inline void PressurePulse(const Vector& x, Vector& y) {
+  double xc = 0.0;
+  Vector c(2);
+  c(0) = xc;
+  c(1) = xc;
+  double den, velX, velY, pres;
+  double mag = 8.0;  // 8 is too high
+  den = 1.0;
+  velX = 0.0;
+  velY = 0.0;
+  Vector d = x;
+  d(0) -= c(0);
+  d(1) -= c(1);
+  const double dist = d.Norml2();
+  const double rad = 0.15;
+  const double pres_inf = (1.0 / specific_heat_ratio);
+  pres = mag * std::exp(-(dist * dist) / (2.0 * rad * rad)) + pres_inf;
+
+  const double vel2 = velX * velX + velY * velY;
+  const double shrinv1 = 1.0 / (specific_heat_ratio - 1.0);
+  double energy = shrinv1 * pres / den + 0.5 * vel2;
+  if (energy < 0.0) {
+    std::cout << shrinv1 << " " << pres << " " << den;
+    energy = 0.0;
+  }
 
   y(0) = den;
   y(1) = den * velX;

@@ -42,6 +42,7 @@
 // shared between the serial and parallel version of the example.
 #include "euler.hpp"
 
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <iostream>
@@ -60,6 +61,86 @@ const double gas_constant = 1.0;
 // Maximum characteristic speed (updated by integrators)
 double max_char_speed;
 
+// Generate quad mesh of a rectangular domain.
+Mesh* GenerateQuadMesh(
+    const std::array<std::array<double, 2>, 2>& a_bounding_box, const int a_nx,
+    const int a_ny, bool periodic = false);
+Mesh* GenerateQuadMesh(
+    const std::array<std::array<double, 2>, 2>& a_bounding_box, const int a_nx,
+    const int a_ny, bool periodic) {
+  const int nvert = (a_nx + 1) * (a_ny + 1);
+  const int nelem = a_nx * a_ny;
+  double* vertices = new double[nvert * 3];
+
+  int* elem_indices = new int[4 * nelem];
+
+  int* elem_attrib = new int[nelem];
+  std::fill(elem_attrib, elem_attrib + nelem, 1);
+
+  const int nboundary = 2 * a_nx + 2 * a_ny;
+  int* boundary_indices = new int[2 * nboundary];
+  int* boundary_attrib = new int[nboundary];
+  int nbi = 0;
+  for (int j = 0; j < a_ny; ++j) {
+    for (int i = 0; i < a_nx; ++i) {
+      const int elem_index = j * a_nx + i;
+      elem_indices[4 * elem_index] = i + j * (a_nx + 1);
+      elem_indices[4 * elem_index + 1] = elem_indices[4 * elem_index] + 1;
+      elem_indices[4 * elem_index + 2] =
+          elem_indices[4 * elem_index] + (a_nx + 1) + 1;
+      elem_indices[4 * elem_index + 3] =
+          elem_indices[4 * elem_index] + (a_nx + 1);
+      if (i == 0) {
+        boundary_attrib[nbi] = 1;
+        boundary_indices[2 * nbi] = i + j * (a_nx + 1);
+        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + (a_nx + 1);
+        ++nbi;
+      }
+      if (i == a_nx - 1) {
+        boundary_attrib[nbi] = 2;
+        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + 1;
+        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + (a_nx + 1);
+        ++nbi;
+      }
+      if (j == 0) {
+        boundary_attrib[nbi] = 3;
+        boundary_indices[2 * nbi] = i + j * (a_nx + 1);
+        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + 1;
+        ++nbi;
+      }
+      if (j == a_ny - 1) {
+        boundary_attrib[nbi] = 4;
+        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + (a_nx + 1);
+        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + 1;
+        ++nbi;
+      }
+    }
+  }
+
+  const double dx =
+      (a_bounding_box[1][0] - a_bounding_box[0][0]) / static_cast<double>(a_nx);
+  const double dy =
+      (a_bounding_box[1][1] - a_bounding_box[0][1]) / static_cast<double>(a_ny);
+  // Apparently a vertex is always 3D in MFEM but they ignore the third
+  // dimension of each vertex
+  for (int j = 0; j < a_ny + 1; ++j) {
+    for (int i = 0; i < a_nx + 1; ++i) {
+      const int node_index = j * (a_nx + 1) + i;
+      const double x_loc = a_bounding_box[0][0] + static_cast<double>(i) * dx;
+      const double y_loc = a_bounding_box[0][1] + static_cast<double>(j) * dy;
+      vertices[3 * node_index] = x_loc;
+      vertices[3 * node_index + 1] = y_loc;
+      vertices[3 * node_index + 3] = 0.0;
+    }
+  }
+
+  // AS OF RIGHT NOW< THIS WILL LEAK VERTICES SINCE IT IS NOT TAKEN BY MESH OR
+  // DELETED
+  return new Mesh(vertices, nvert, elem_indices, Geometry::Type::SQUARE,
+                  elem_attrib, nelem, boundary_indices, Geometry::Type::SEGMENT,
+                  boundary_attrib, nboundary, 2, -1);
+}
+
 int main(int argc, char* argv[]) {
   // 1. Initialize MPI.
   MPI_Session mpi(argc, argv);
@@ -67,8 +148,7 @@ int main(int argc, char* argv[]) {
   // 2. Parse command-line options.
   problem = 1;
   const char* mesh_file = "../data/periodic-square.mesh";
-  int ser_ref_levels = 0;
-  int par_ref_levels = 1;
+  int total_ref_levels = 0;
   int order = 3;
   int ode_solver_type = 4;
   double t_final = 2.0;
@@ -82,14 +162,10 @@ int main(int argc, char* argv[]) {
 
   OptionsParser args(argc, argv);
   args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
+  args.AddOption(&total_ref_levels, "-rt", "--refine-total",
+                 "Number of times to refine the mesh uniformly.");
   args.AddOption(&problem, "-p", "--problem",
                  "Problem setup to use. See options in velocity_function().");
-  args.AddOption(&ser_ref_levels, "-rs", "--refine-serial",
-                 "Number of times to refine the mesh uniformly before parallel"
-                 " partitioning, -1 for auto.");
-  args.AddOption(&par_ref_levels, "-rp", "--refine-parallel",
-                 "Number of times to refine the mesh uniformly after parallel"
-                 " partitioning.");
   args.AddOption(&order, "-o", "--order",
                  "Order (degree) of the finite elements.");
   args.AddOption(&ode_solver_type, "-s", "--ode-solver",
@@ -122,8 +198,20 @@ int main(int argc, char* argv[]) {
 
   // 3. Read the mesh from the given mesh file. This example requires a 2D
   //    periodic mesh, such as ../data/periodic-square.mesh.
-  Mesh mesh(mesh_file, 1, 1);
-  const int dim = mesh.Dimension();
+  Mesh* mesh = nullptr;
+  if (std::string(mesh_file) != "generate") {
+    mesh = new Mesh(mesh_file, 1, 1);
+  } else {
+    std::array<std::array<double, 2>, 2> bounding_box;
+    bounding_box[0][0] = -1.0;
+    bounding_box[0][1] = -1.0;
+    bounding_box[1][0] = 1.0;
+    bounding_box[1][1] = 1.0;
+    const int nx = 3;
+    const int ny = 3;
+    mesh = GenerateQuadMesh(bounding_box, nx, ny);
+  }
+  const int dim = mesh->Dimension();
 
   MFEM_ASSERT(dim == 2,
               "Need a two-dimensional mesh for the problem definition");
@@ -154,19 +242,14 @@ int main(int argc, char* argv[]) {
       return 3;
   }
 
-  // 5. Refine the mesh in serial to increase the resolution. In this example
-  //    we do 'ser_ref_levels' of uniform refinement, where 'ser_ref_levels' is
-  //    a command-line parameter.
-  for (int lev = 0; lev < ser_ref_levels; lev++) {
-    mesh.UniformRefinement();
+  auto refinements_to_go = total_ref_levels;
+  while (refinements_to_go != 0 && mesh->GetNE() < mpi.WorldSize() * 100) {
+    --refinements_to_go;
+    mesh->UniformRefinement();
   }
-
-  // 6. Define a parallel mesh by a partitioning of the serial mesh. Refine
-  //    this mesh further in parallel to increase the resolution. Once the
-  //    parallel mesh is defined, the serial mesh can be deleted.
-  ParMesh pmesh(MPI_COMM_WORLD, mesh);
-  mesh.Clear();
-  for (int lev = 0; lev < par_ref_levels; lev++) {
+  mfem::ParMesh pmesh(MPI_COMM_WORLD, *mesh);
+  delete mesh;
+  for (int lev = 0; lev < refinements_to_go; lev++) {
     pmesh.UniformRefinement();
   }
 
@@ -184,12 +267,17 @@ int main(int argc, char* argv[]) {
   MFEM_ASSERT(fes.GetOrdering() == Ordering::byNODES, "");
 
   HYPRE_Int glob_size = vfes.GlobalTrueVSize();
+  int local_number_of_elements = pmesh.GetNE();
+  int global_number_of_elements;
+  MPI_Allreduce(&local_number_of_elements, &global_number_of_elements, 1,
+                MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   if (mpi.Root()) {
     cout << "Number of unknowns: " << glob_size << endl;
+    cout << "Number of elements: " << global_number_of_elements << std::endl;
   }
 
   // 8. Define the initial conditions, save the corresponding mesh and grid
-  //    functions to a file. This can be opened with GLVis with the -gc option.
+  //    functions to a file.
 
   // The solution u has components {density, x-momentum, y-momentum, energy}.
   // These are stored contiguously in the BlockVector u_block.
@@ -213,7 +301,7 @@ int main(int argc, char* argv[]) {
   if (visit) {
     visit_dc = new mfem::VisItDataCollection(fes.GetComm(), "Euler", &pmesh);
     std::array<std::string, num_equation> names{
-        {"density", "x-momentum", "y_momentum", "energy"}};
+        {"density", "x-momentum", "y-momentum", "energy"}};
     for (int k = 0; k < num_equation; ++k) {
       // Setup mesh/variable for export
       uk_num[k].SetSpace(&fes);
@@ -237,6 +325,61 @@ int main(int argc, char* argv[]) {
   ParNonlinearForm A(&vfes);
   RiemannSolver rsolver;
   A.AddInteriorFaceIntegrator(new FaceIntegrator(rsolver, dim));
+  // if (problem == 3) {
+  //   MFEM_ASSERT(std::string(mesh_file) == "gen",
+  //               "Mesh should be generated for Sod problem");
+  //   // Create BC list
+  //   Array<int> attr = pmesh.bdr_attributes;
+  //   for (int i = 0; i < attr.Size(); ++i) {
+  //     std::cout << attr[i] << std::endl;
+  //   }
+
+  //   // Dirichlet BC for Sod Test Tube
+  //   Vector Ul(4), Ur(4);
+  //   double den, velX, velY, pres;
+  //   den = 1.0;
+  //   velX = 1.0;
+  //   velY = 0.0;
+  //   pres = 1.0;
+  //   double vel2 = velX * velX + velY * velY;
+  //   double shrinv1 = 1.0 / (specific_heat_ratio - 1.0);
+  //   double energy = shrinv1 * pres / den + 0.5 * vel2;
+  //   Ul(0) = den;
+  //   Ul(1) = den * velX;
+  //   Ul(2) = den * velY;
+  //   Ul(3) = den * energy;
+
+  //   den = 0.125;
+  //   velX = 0.0;
+  //   velY = 0.0;
+  //   pres = 0.1;
+  //   vel2 = velX * velX + velY * velY;
+  //   shrinv1 = 1.0 / (specific_heat_ratio - 1.0);
+  //   energy = shrinv1 * pres / den + 0.5 * vel2;
+  //   Ur(0) = den;
+  //   Ur(1) = den * velX;
+  //   Ur(2) = den * velY;
+  //   Ur(3) = den * energy;
+
+  //   Array<int> ess_bdr(pmesh.bdr_attributes.Max());
+  //   ess_bdr = 0;
+  //   ess_bdr[0] = 1;
+  //   Array<int> ess_tdof_list;
+
+  //   vfes.GetEssentialVDofs(ess_bdr, ess_tdof_list);
+  //   std::cout << "Wrote" << ess_tdof_list.Size() << std::endl;
+  //   std::cout << "NB " << pmesh.GetNBE() << std::endl;
+  //   // for (int i = 0; i < ess_tdof_list.Size(); ++i) {
+  //   //   std::cout << ess_tdof_list[i] << std::endl;
+  //   // }
+  //   A.AddBdrFaceIntegrator(new BdrFaceIntegrator(rsolver, dim, Ul, 0),
+  //                          ess_tdof_list);
+  //   ess_bdr = 0;
+  //   ess_bdr[1] = 1;
+  //   vfes.GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
+  //   A.AddBdrFaceIntegrator(new BdrFaceIntegrator(rsolver, dim, Ur, 1),
+  //                          ess_tdof_list);
+  // }
 
   // 10. Define the time-dependent evolution operator describing the ODE
   //     right-hand side, and perform time-integration (looping over the time
@@ -315,6 +458,7 @@ int main(int argc, char* argv[]) {
   }
 
   tic_toc.Stop();
+  MPI_Barrier(pmesh.GetComm());
   if (mpi.Root()) {
     cout << " done, " << tic_toc.RealTime() << "s." << endl;
   }
@@ -329,6 +473,7 @@ int main(int argc, char* argv[]) {
 
   // Free the used memory.
   delete ode_solver;
+  delete visit_dc;
 
   return 0;
 }
