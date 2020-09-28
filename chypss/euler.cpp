@@ -148,6 +148,7 @@ int main(int argc, char* argv[]) {
   // 2. Parse command-line options.
   problem = 1;
   const char* mesh_file = "../data/periodic-square.mesh";
+  int step_max = -1;  // Will not be used if -1
   int total_ref_levels = 0;
   int order = 3;
   int ode_solver_type = 4;
@@ -164,6 +165,8 @@ int main(int argc, char* argv[]) {
   args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
   args.AddOption(&total_ref_levels, "-rt", "--refine-total",
                  "Number of times to refine the mesh uniformly.");
+  args.AddOption(&step_max, "-sm", "--step-max",
+                 "Number of steps to compute. Stops at t_final or step_max");
   args.AddOption(&problem, "-p", "--problem",
                  "Problem setup to use. See options in velocity_function().");
   args.AddOption(&order, "-o", "--order",
@@ -423,7 +426,8 @@ int main(int argc, char* argv[]) {
 
   // Integrate in time.
   bool done = false;
-  for (int ti = 0; !done;) {
+  int ti;
+  for (ti = 0; !done;) {
     double dt_real = min(dt, t_final - t);
 
     ode_solver->Step(sol, t, dt_real);
@@ -437,9 +441,11 @@ int main(int argc, char* argv[]) {
       }
       dt = cfl * hmin / max_char_speed / (2 * order + 1);
     }
+
     ti++;
 
     done = (t >= t_final - 1e-8 * dt);
+    done = done || (ti == step_max);
 
     if (visit) {
       if (done || ti % vis_steps == 0) {
@@ -461,6 +467,7 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(pmesh.GetComm());
   if (mpi.Root()) {
     cout << " done, " << tic_toc.RealTime() << "s." << endl;
+    cout << "Steps : " << ti << endl;
   }
 
   // 12. Compute the L2 solution error summed for all components.
