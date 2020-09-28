@@ -108,7 +108,7 @@ for t in range(0,weak_scaling_growth):
   dir = "simdir"+str(t+3)
   os.mkdir(dir)
   os.chdir("./"+dir)
-  execute_command = "../../scale_test -m ../../inline-hex.mesh -rt "+str(t+5)+" -o 2" # 9*(2^(2*(t+5)))
+  execute_command = "../../scale_test -m ../../periodic_square.mesh -rt "+str(t+5)+" -o 2" # 9*(2^(2*(t+5)))
   r = open("run","w")
   r.write("#!/bin/bash \n")
   r.write("#SBATCH -p flex \n")
