@@ -216,19 +216,17 @@ int main(int argc, char* argv[]) {
         {"density", "x-momentum", "y_momentum", "energy"}};
     for (int k = 0; k < num_equation; ++k) {
       // Setup mesh/variable for export
-      std::cout << "make pargrid" << std::endl;
-      uk_num[k] = ParGridFunction(&fes, u_block.GetBlock(k));
+      uk_num[k].SetSpace(&fes);
+      // Fun fact, this copy assignment only copies the data, not the space!
+      // That is why we need to set the space above
+      uk_num[k].SetFromTrueDofs(u_block.GetBlock(k));
       // Visit specific database for export
-      std::cout << "Register field " << std::endl;
       visit_dc->RegisterField(names[k], &(uk_num[k]));
-      std::cout << "Through " << k << std::endl;
     }
     visit_dc->SetCycle(0);
     visit_dc->SetTime(0.0);
     visit_dc->Save();
-    std::cout << "Saved " << std::endl;
   }
-  std::cout << "Past" << std::endl;
 
   // 9. Set up the nonlinear form corresponding to the DG discretization of the
   //    flux divergence, and assemble the corresponding mass matrix.
@@ -305,7 +303,10 @@ int main(int argc, char* argv[]) {
         if (mpi.Root()) {
           cout << "time step: " << ti << ", time: " << t << endl;
         }
-
+        // Update ParGridFunction from u_block data.
+        for (int k = 0; k < num_equation; ++k) {
+          uk_num[k].SetFromTrueDofs(u_block.GetBlock(k));
+        }
         visit_dc->SetCycle(ti);
         visit_dc->SetTime(t);
         visit_dc->Save();
@@ -316,18 +317,6 @@ int main(int argc, char* argv[]) {
   tic_toc.Stop();
   if (mpi.Root()) {
     cout << " done, " << tic_toc.RealTime() << "s." << endl;
-  }
-
-  // 11. Save the final solution. This output can be viewed later using GLVis:
-  //     "glvis -np 4 -m vortex-mesh -g vortex-1-final".
-  for (int k = 0; k < num_equation; k++) {
-    ParGridFunction uk(&fes, u_block.GetBlock(k));
-    ostringstream sol_name;
-    sol_name << "vortex-" << k << "-final." << setfill('0') << setw(6)
-             << mpi.WorldRank();
-    ofstream sol_ofs(sol_name.str().c_str());
-    sol_ofs.precision(precision);
-    sol_ofs << uk;
   }
 
   // 12. Compute the L2 solution error summed for all components.
