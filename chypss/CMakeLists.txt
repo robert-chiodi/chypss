@@ -1,3 +1,3 @@
-target_sources(heat PRIVATE heat.cpp)
-target_sources(euler PRIVATE euler.hpp)
-target_sources(euler PRIVATE euler.cpp)
+target_sources(chyps_heat PRIVATE precice_adapter.hpp)
+target_sources(chyps_heat PRIVATE precice_adapter.cpp)
+target_sources(chyps_heat PRIVATE main.cpp)
