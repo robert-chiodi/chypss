@@ -8,7 +8,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include "chypss/precice_adapter.hpp"
+#include "chyps/precice_adapter.hpp"
 
 #include <cassert>
 
@@ -46,6 +46,10 @@ void PreciceAdapter::SetVertexPositions(
                               a_positions.data(), vertex_ids_m.data());
 }
 
+int PreciceAdapter::NumberOfVertices(void) const {
+  return static_cast<int>(vertex_ids_m.size());
+}
+
 void PreciceAdapter::AddData(const std::string& a_name,
                              const DataOperation a_operation) {
   assert(data_m.find(a_name) ==
@@ -72,10 +76,6 @@ void PreciceAdapter::ReadBlockVectorData(const std::string& a_name,
   interface_m.readBlockVectorData(data_details.GetDataID(),
                                   this->NumberOfVertices(), vertex_ids_m.data(),
                                   a_data);
-}
-
-int PreciceAdapter::NumberOfVertices(void) const {
-  return static_cast<int>(vertex_ids_m.size());
 }
 
 PreciceAdapter::~PreciceAdapter(void) { interface_m.finalize(); }

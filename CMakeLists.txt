@@ -22,17 +22,17 @@ find_package(Boost 1.65.1 REQUIRED
 find_package(PETSC REQUIRED)
 
 
-set(CHYPS_SOURCE "./chypss")
+set(CHYPS_SOURCE "./chyps")
 
-add_executable(chyps_heat)
-set_property(TARGET chyps_heat PROPERTY CXX_STANDARD 11)
-target_include_directories(chyps_heat PUBLIC "./")
-target_link_libraries(chyps_heat PUBLIC MPI::MPI_CXX)
-target_link_libraries(chyps_heat PUBLIC Hypre::Hypre)
-target_link_libraries(chyps_heat PUBLIC Metis::Metis)
-target_link_libraries(chyps_heat PUBLIC Mfem::Mfem)
-target_link_libraries(chyps_heat PUBLIC Precice::Precice)
-target_link_libraries(chyps_heat PUBLIC
+add_library(chyps STATIC)
+set_property(TARGET chyps PROPERTY CXX_STANDARD 11)
+target_include_directories(chyps PUBLIC "./")
+target_link_libraries(chyps PUBLIC MPI::MPI_CXX)
+target_link_libraries(chyps PUBLIC Hypre::Hypre)
+target_link_libraries(chyps PUBLIC Metis::Metis)
+target_link_libraries(chyps PUBLIC Mfem::Mfem)
+target_link_libraries(chyps PUBLIC Precice::Precice)
+target_link_libraries(chyps PUBLIC
   Boost::boost
   Boost::filesystem
   Boost::log
@@ -42,5 +42,20 @@ target_link_libraries(chyps_heat PUBLIC
   Boost::thread
   Boost::unit_test_framework
 )
-target_link_libraries(chyps_heat PUBLIC Petsc::Petsc)
+target_link_libraries(chyps PUBLIC Petsc::Petsc)
+
+
+add_executable(chyps_heat)
+target_link_libraries(chyps_heat PRIVATE chyps)
+set_property(TARGET chyps_heat PROPERTY CXX_STANDARD 11)
+
 add_subdirectory("${CHYPS_SOURCE}")
+
+# Directory for test files
+# Will automatically download GoogleTest and compile it to
+# use for the testing framework.
+if("${BUILD_TESTING}" MATCHES "ON")
+  include(CTest)
+  enable_testing()
+  add_subdirectory(./tests)
+endif()

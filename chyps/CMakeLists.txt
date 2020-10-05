@@ -1,0 +1,6 @@
+target_sources(chyps_heat PRIVATE main.cpp)
+target_sources(chyps PRIVATE precice_adapter.hpp)
+target_sources(chyps PRIVATE precice_adapter.cpp)
+target_sources(chyps PRIVATE input_parser.hpp)
+target_sources(chyps PRIVATE input_parser.tpp)
+target_sources(chyps PRIVATE input_parser.cpp)
