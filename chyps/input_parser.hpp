@@ -11,8 +11,8 @@
 /// \file input_parser.hpp
 /// \brief File containing the InputParser class and helper classes.
 
-#ifndef CHYPS_INPUT_PARSER_H_
-#define CHYPS_INPUT_PARSER_H_
+#ifndef CHYPS_INPUT_PARSER_HPP_
+#define CHYPS_INPUT_PARSER_HPP_
 
 #include <array>
 #include <string>
@@ -25,10 +25,25 @@ namespace chyps {
 /// \brief Enum storing the type of input to set flag for CommonType union.
 enum class InputType { INVALID = -1, BOOL = 0, INT, DOUBLE, STRING };
 
+/// \function TypeToInputType input_parser.hpp chyps/input_parser.hpp
+/// \brief Given a value type, responds the correct InputType enum value.
+///
+/// Only ValueTypes valid are bool, int, double, and std::string, which
+/// correspond to the types in InputType.
+template <class ValueType>
+InputType TypeToInputType(void);
+
 /// \enum OptionType input_parser.hpp chyps/input_parser.hpp
 /// \brief Enum storing the type of option added to the parser.
 ///
-/// Required options are to have values >= 10, and should be aligned
+/// Users should only use the options ANY, COMMAND_LINE, and INPUT_FILE.
+/// Whether or not they are required are determined via supply of a
+/// default value in InputParser::AddOption. Including a default value
+/// makes the Option NOT required. Lack of default value makes the
+/// option required, and the OptionType will be updated to reflect that
+/// in the InputParser class object.
+///
+///  Required options are to have values >= 10, and should be aligned
 /// with their non-required equivalent so that ``required_type =
 /// non_required_type+10``.
 enum class OptionType {
@@ -39,6 +54,11 @@ enum class OptionType {
   COMMAND_LINE_REQUIRED,
   INPUT_FILE_REQUIRED
 };
+
+/// \function MakeOptionRequired
+/// \brief Takes the OptionType stored in a_option and returns the _REQUIRED
+/// equivalent.
+OptionType MakeOptionRequired(const OptionType a_option);
 
 /// \class CommonType input_parser.hpp chyps/input_parser.hpp
 /// \brief A base type capable of storing a boolean, integer, double, or
@@ -71,9 +91,6 @@ class CommonType {
   };
 
  public:
-  /// \brief Maximum length of string accepted as option.
-  static constexpr int MAX_STRING_LENGTH = 128;
-
   /// \brief Default constructor. Sets type to InputType::INVALID.
   CommonType(void);
 
@@ -140,6 +157,9 @@ class CommonType {
   ///
   /// This method has template specializations for each member in
   /// the InputType enum, with the exception of InputType::INVALID.
+  /// Calling this method will change CommonType to be Type. This means
+  /// if GetPointer is called when type_id_m is not for Type, the current
+  /// object will be invalid according to the returned pointer.
   template <class Type>
   Type GetPointer(void);
 
@@ -161,7 +181,7 @@ class InputParser {
   InputParser(void) = default;
 
   /// \brief Look for command-line arguments (supplied via argc and argv)
-  /// that match added options. Allows options to letter be checked with their
+  /// that match added options. Allows options to after be checked with their
   /// given name.
   void ParseCL(int argc, char** argv);
 
@@ -175,7 +195,7 @@ class InputParser {
                  const std::string& a_long_flag,
                  const std::string& a_description,
                  const ValueType& a_default_value,
-                 const OptionType a_input_type);
+                 const OptionType a_input_type = OptionType::ANY);
 
   /// \brief Add an option to be looked for when parsing. OptionType must be
   /// a *_REQUIRED kind.
@@ -183,7 +203,11 @@ class InputParser {
   void AddOption(const std::string& a_name, const std::string& a_short_flag,
                  const std::string& a_long_flag,
                  const std::string& a_description,
-                 const OptionType a_input_type);
+                 const OptionType a_input_type = OptionType::ANY);
+
+  /// \brief Checks that all options added have been specified or have an
+  /// available default value.
+  bool AllOptionsSet(void) const;
 
   /// \brief Remove all option storage to save space. Parsed values will still
   /// be available through operator[].
@@ -197,11 +221,12 @@ class InputParser {
   std::unordered_map<std::string, std::size_t> parsed_input_m;
   std::vector<std::array<std::string, 4>> option_description_m;
   std::vector<OptionType> option_type_m;
-  std::vector<CommonType> default_value_m;
-};  // namespace chyps
+  std::vector<InputType> type_m;
+  std::vector<std::array<std::string, 2>> negative_bool_statement_m;
+};
 
 }  // namespace chyps
 
 #include "chyps/input_parser.tpp"
 
-#endif  // CHYPS_INPUT_PARSER_H_
+#endif  // CHYPS_INPUT_PARSER_HPP_

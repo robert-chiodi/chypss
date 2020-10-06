@@ -17,6 +17,23 @@
 
 namespace chyps {
 
+// template <class ValueType>
+// InputType TypeToInputType(void) {
+//   static_assert(
+//       false,
+//       "Invalid type supplied to TypeToInputType. Verify type has existing "
+//       "implementation in input_parser.tpp\n");
+//   return InputType::INVALID;
+// }
+
+// template <class ValueType>
+// ValueType CommonType::GetPointer(void) {
+//   static_assert(false,
+//                 "Invalid type supplied to CommonType::GetPointer. Verify type
+//                 " "has existing " "implementation in input_parser.tpp\n");
+//   return nullptr;
+// }
+
 template <class ValueType>
 void InputParser::AddOption(const std::string& a_name,
                             const std::string& a_short_flag,
@@ -26,12 +43,13 @@ void InputParser::AddOption(const std::string& a_name,
                             const OptionType a_option_type) {
   option_description_m.push_back(std::array<std::string, 4>{
       {a_name, a_short_flag, a_long_flag, a_description}});
-  default_value_m.push_back(CommonType(a_default_value));
-  input_storage_m.push_back(CommonType());
-  parsed_input_m[a_name] = input_storage_m.size() - 1;
+  input_storage_m.push_back(CommonType(a_default_value));
+  type_m.push_back(TypeToInputType<ValueType>());
   // FIXME: Make an exception
-  assert(static_cast<int>(a_option_type) < 10);  // Not Required
+  assert(parsed_input_m.find(a_name) == parsed_input_m.end());
+  parsed_input_m[a_name] = input_storage_m.size() - 1;
   option_type_m.push_back(a_option_type);
+  negative_bool_statement_m.push_back(std::array<std::string, 2>());
 }
 
 template <class ValueType>
@@ -42,12 +60,13 @@ void InputParser::AddOption(const std::string& a_name,
                             const OptionType a_option_type) {
   option_description_m.push_back(std::array<std::string, 4>{
       {a_name, a_short_flag, a_long_flag, a_description}});
-  default_value_m.push_back(CommonType());
   input_storage_m.push_back(CommonType());
-  parsed_input_m[a_name] = input_storage_m.size() - 1;
+  type_m.push_back(TypeToInputType<ValueType>());
   // FIXME: Make an exception
-  assert(static_cast<int>(a_option_type) >= 10);  // Required
-  option_type_m.push_back(a_option_type);
+  assert(parsed_input_m.find(a_name) == parsed_input_m.end());
+  parsed_input_m[a_name] = input_storage_m.size() - 1;
+  option_type_m.push_back(MakeOptionRequired(a_option_type));
+  negative_bool_statement_m.push_back(std::array<std::string, 2>());
 }
 
 }  // namespace chyps

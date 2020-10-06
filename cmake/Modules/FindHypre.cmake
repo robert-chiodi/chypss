@@ -50,15 +50,29 @@ The path to the Hypre library.
 find_package(PkgConfig)
 pkg_check_modules(PC_Hypre QUIET Hypre)
 
-find_path(Hypre_INCLUDE_DIR
-NAMES HYPRE.h
-PATHS ${PC_Hypre_INCLUDE_DIRS} ${Hypre_DIR}/include
-PATH_SUFFIXES Hypre
-)
-find_library(Hypre_LIBRARY
-NAMES HYPRE
-PATHS ${PC_Hypre_LIBRARY_DIRS} ${Hypre_DIR}/lib
-)
+if(NOT Hypre_DIR)
+  find_path(Hypre_INCLUDE_DIR
+  NAMES HYPRE.h
+  PATHS ${PC_Hypre_INCLUDE_DIRS}
+  PATH_SUFFIXES hypre
+  )
+  find_library(Hypre_LIBRARY
+  NAMES HYPRE
+  PATHS ${PC_Hypre_LIBRARY_DIRS}
+  )
+else()
+  find_path(Hypre_INCLUDE_DIR
+  NAMES HYPRE.h
+  PATHS ${Hypre_DIR}/include
+  PATH_SUFFIXES hypre
+  NO_DEFAULT_PATH
+  )
+  find_library(Hypre_LIBRARY
+  NAMES HYPRE
+  PATHS ${Hypre_DIR}/lib
+  NO_DEFAULT_PATH
+  )
+endif()
 
 set(Hypre_VERSION ${PC_Hypre_VERSION})
 

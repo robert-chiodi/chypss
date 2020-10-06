@@ -50,15 +50,29 @@ The path to the Mfem library.
 find_package(PkgConfig)
 pkg_check_modules(PC_Mfem QUIET Mfem)
 
-find_path(Mfem_INCLUDE_DIR
-NAMES mfem.hpp
-PATHS ${PC_Mfem_INCLUDE_DIRS} ${Mfem_DIR}/include
-PATH_SUFFIXES Mfem
-)
-find_library(Mfem_LIBRARY
-NAMES mfem
-PATHS ${PC_Mfem_LIBRARY_DIRS} ${Mfem_DIR}/lib
-)
+if(NOT Mfem_DIR)
+  find_path(Mfem_INCLUDE_DIR
+  NAMES mfem.hpp
+  PATHS ${PC_Mfem_INCLUDE_DIRS}
+  PATH_SUFFIXES mfem
+  )
+  find_library(Mfem_LIBRARY
+  NAMES mfem
+  PATHS ${PC_Mfem_LIBRARY_DIRS}
+  )
+else()
+  find_path(Mfem_INCLUDE_DIR
+  NAMES mfem.hpp
+  PATHS ${Mfem_DIR}/include
+  PATH_SUFFIXES mfem
+  NO_DEFAULT_PATH
+  )
+  find_library(Mfem_LIBRARY
+  NAMES mfem
+  PATHS ${Mfem_DIR}/lib
+  NO_DEFAULT_PATH
+  )
+endif()
 
 set(Mfem_VERSION ${PC_Mfem_VERSION})
 

@@ -50,15 +50,29 @@ The path to the Petsc library.
 find_package(PkgConfig)
 pkg_check_modules(PC_Petsc QUIET Petsc)
 
-find_path(Petsc_INCLUDE_DIR
-NAMES petsc.h
-PATHS ${PC_Petsc_INCLUDE_DIRS} ${Petsc_DIR}/include
-PATH_SUFFIXES Petsc
-)
-find_library(Petsc_LIBRARY
-NAMES petsc
-PATHS ${PC_Petsc_LIBRARY_DIRS} ${Petsc_DIR}/lib
-)
+if(NOT Petsc_DIR)
+  find_path(Petsc_INCLUDE_DIR
+  NAMES petsc.h
+  PATHS ${PC_Petsc_INCLUDE_DIRS}
+  PATH_SUFFIXES petsc
+  )
+  find_library(Petsc_LIBRARY
+  NAMES petsc
+  PATHS ${PC_Petsc_LIBRARY_DIRS}
+  NO_DEFAULT_PATH
+  )
+else()
+  find_path(Petsc_INCLUDE_DIR
+  NAMES petsc.h
+  PATHS  ${Petsc_DIR}/include
+  PATH_SUFFIXES petsc
+  )
+  find_library(Petsc_LIBRARY
+  NAMES petsc
+  PATHS ${Petsc_DIR}/lib
+  NO_DEFAULT_PATH
+  )
+endif()
 
 set(Petsc_VERSION ${PC_Petsc_VERSION})
 

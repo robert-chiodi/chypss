@@ -11,8 +11,8 @@
 /// \file precice_adapter.hpp
 /// \brief File handling all use of Precice for coupling between codes.
 
-#ifndef CHYPS_PRECICE_ADAPTER_H_
-#define CHYPS_PRECICE_ADAPTER_H_
+#ifndef CHYPS_PRECICE_ADAPTER_HPP_
+#define CHYPS_PRECICE_ADAPTER_HPP_
 
 #include <string>
 #include <unordered_map>
@@ -116,4 +116,4 @@ class PreciceAdapter {
 
 }  // namespace chyps
 
-#endif  // CHYPS_PRECICE_ADAPTER_H_
+#endif  // CHYPS_PRECICE_ADAPTER_HPP_

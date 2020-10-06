@@ -50,15 +50,29 @@ The path to the Metis library.
 find_package(PkgConfig)
 pkg_check_modules(PC_Metis QUIET Metis)
 
-find_path(Metis_INCLUDE_DIR
-NAMES metis.h
-PATHS ${PC_Metis_INCLUDE_DIRS} ${Metis_DIR}/include
-PATH_SUFFIXES Metis
-)
-find_library(Metis_LIBRARY
-NAMES metis
-PATHS ${PC_Metis_LIBRARY_DIRS} ${Metis_DIR}/lib
-)
+if(NOT Metis_DIR)
+  find_path(Metis_INCLUDE_DIR
+  NAMES metis.h
+  PATHS ${PC_Metis_INCLUDE_DIRS}
+  PATH_SUFFIXES metis
+  )
+  find_library(Metis_LIBRARY
+  NAMES metis
+  PATHS ${PC_Metis_LIBRARY_DIRS}
+  )
+else()
+  find_path(Metis_INCLUDE_DIR
+  NAMES metis.h
+  PATHS ${Metis_DIR}/include
+  PATH_SUFFIXES metis
+  NO_DEFAULT_PATH
+  )
+  find_library(Metis_LIBRARY
+  NAMES metis
+  PATHS  ${Metis_DIR}/lib
+  NO_DEFAULT_PATH
+  )
+endif()
 
 set(Metis_VERSION ${PC_Metis_VERSION})
 

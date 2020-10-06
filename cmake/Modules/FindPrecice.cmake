@@ -50,15 +50,29 @@ The path to the Precice library.
 find_package(PkgConfig)
 pkg_check_modules(PC_Precice QUIET Precice)
 
-find_path(Precice_INCLUDE_DIR
-NAMES precice/SolverInterface.hpp
-PATHS ${PC_Precice_INCLUDE_DIRS} ${Precice_DIR}/include
-PATH_SUFFIXES Precice
-)
-find_library(Precice_LIBRARY
-NAMES precice
-PATHS ${PC_Precice_LIBRARY_DIRS} ${Precice_DIR}/lib
-)
+if(NOT Precice_DIR)
+  find_path(Precice_INCLUDE_DIR
+  NAMES precice/SolverInterface.hpp
+  PATHS ${PC_Precice_INCLUDE_DIRS}
+  PATH_SUFFIXES precice
+  )
+  find_library(Precice_LIBRARY
+  NAMES precice
+  PATHS ${PC_Precice_LIBRARY_DIRS}
+  )
+else()
+  find_path(Precice_INCLUDE_DIR
+  NAMES precice/SolverInterface.hpp
+  PATHS ${Precice_DIR}/include
+  PATH_SUFFIXES precice
+  NO_DEFAULT_PATH
+  )
+  find_library(Precice_LIBRARY
+  NAMES precice
+  PATHS  ${Precice_DIR}/lib
+  NO_DEFAULT_PATH
+  )
+endif()
 
 set(Precice_VERSION ${PC_Precice_VERSION})
 
