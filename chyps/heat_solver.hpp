@@ -101,7 +101,7 @@ class HeatSolver : public SolverInterface {
   mfem::FiniteElementCollection* element_collection_m;
   mfem::ParFiniteElementSpace* element_space_m;
   ConductionOperatorBase* operator_m;
-  mfem::ParGridFunction temperature_m;
+  mfem::Vector temperature_m;
   std::vector<BoundaryCondition> boundary_conditions_m;
 };
 

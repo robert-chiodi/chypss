@@ -35,7 +35,8 @@ class ConductionOperator : public ConductionOperatorBase {
   void SetParameters(const mfem::Vector& u) override final;
 
   /// \brief Return a vector of the Thermal Coefficient for each element.
-  virtual const mfem::Vector& GetThermalCoefficient(void) const;
+  virtual const mfem::ParGridFunction& GetThermalCoefficient(
+      void) const override final;
 
   virtual ~ConductionOperator(void) override final;
 
@@ -43,20 +44,24 @@ class ConductionOperator : public ConductionOperatorBase {
   mfem::ParBilinearForm* M;
   mfem::ParBilinearForm* K;
 
-  mfem::HypreParMatrix Mmat;
-  mfem::HypreParMatrix Kmat;
-  mfem::HypreParMatrix* T;  // T = M + dt K
+  mfem::ParBilinearForm* T;  // T = M + dt K
   double current_dt;
 
-  mfem::CGSolver M_solver;     // Krylov solver for inverting the mass matrix M
-  mfem::HypreSmoother M_prec;  // Preconditioner for the mass matrix M
+  mfem::CGSolver M_solver;  // Krylov solver for inverting the mass matrix M
+  mfem::OperatorJacobiSmoother* M_prec;  // Preconditioner for the mass matrix M
 
-  mfem::CGSolver T_solver;     // Implicit solver for T = M + dt K
-  mfem::HypreSmoother T_prec;  // Preconditioner for the implicit solver
+  mfem::CGSolver T_solver;  // Implicit solver for T = M + dt K
+  mfem::OperatorJacobiSmoother*
+      T_prec;  // Preconditioner for the implicit solver
+
+  mfem::OperatorPtr T_op, M_op, K_op;
 
   double alpha, kappa;
 
   mutable mfem::Vector z;  // auxiliary vector
+  mutable mfem::OperatorHandle A;
+  mutable mfem::Vector X, B;
+  // mutable mfem::Vector tmp_u;
 
  private:
   mfem::ParGridFunction thermal_coefficient_m;

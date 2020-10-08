@@ -364,6 +364,9 @@ void InputParser::ParseCL(int argc, char** argv) {
     }
   }
   mfem_parser.Parse();  // This will also populate the stored parse data for us.
+  if (!mfem_parser.Good()) {
+    std::cout << "problem with input arguments" << std::endl;
+  }
 
   // Perform a deep copy of strings if they changed from reading in the command
   // line.

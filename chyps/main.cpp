@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
   auto condition = BoundaryCondition(BoundaryConditionType::DIRICHLET);
   condition.SetValues(10.0);
   solver.SetBoundaryCondition(1, condition);
-  condition.SetValues(10.0);
+  condition = BoundaryCondition(BoundaryConditionType::HOMOGENEOUS_DIRICHLET);
   solver.SetBoundaryCondition(2, condition);
   condition = BoundaryCondition(BoundaryConditionType::HOMOGENEOUS_NEUMANN);
   solver.SetBoundaryCondition(3, condition);

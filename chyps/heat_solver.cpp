@@ -76,7 +76,9 @@ void HeatSolver::CommitBoundaryConditions(void) {
       case BoundaryConditionType::HOMOGENEOUS_DIRICHLET: {
         operator_m->AddToEssentialDOF(ess_tdof_list);
         mfem::ConstantCoefficient boundary_coeff(0.0);
-        temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+        for (int n = 0; n < ess_tdof_list.Size(); ++n) {
+          temperature_m(ess_tdof_list[n]) = 0.0;
+        }
         break;
       }
       case BoundaryConditionType::HOMOGENEOUS_NEUMANN: {
@@ -88,12 +90,13 @@ void HeatSolver::CommitBoundaryConditions(void) {
         assert(values.Size() > 0);
         operator_m->AddToEssentialDOF(ess_tdof_list);
         if (values.Size() == 1) {
-          mfem::ConstantCoefficient boundary_coeff(*values.Data());
-          temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+          for (int n = 0; n < ess_tdof_list.Size(); ++n) {
+            temperature_m(ess_tdof_list[n]) = *values.Data();
+          }
         } else {
           assert(values.Size() ==
                  static_cast<std::size_t>(ess_tdof_list.Size()));
-          for (std::size_t n = 0; n < values.Size(); ++n) {
+          for (int n = 0; n < ess_tdof_list.Size(); ++n) {
             temperature_m(ess_tdof_list[n]) = *(values.Data() + n);
           }
         }
@@ -103,6 +106,7 @@ void HeatSolver::CommitBoundaryConditions(void) {
         // Will need to be some form of BoundaryIntegrator I think
         std::cout << "Neumann condition not yet implemented" << std::endl;
         std::exit(-1);
+        break;
       }
 
       default:
@@ -149,7 +153,7 @@ int HeatSolver::UpdateBoundaryConditions(void) {
       case BoundaryConditionType::HOMOGENEOUS_DIRICHLET: {
         operator_m->AddToEssentialDOF(ess_tdof_list);
         mfem::ConstantCoefficient boundary_coeff(0.0);
-        temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+        temperature_m.SetSubVector(ess_tdof_list, 0.0);
         break;
       }
       case BoundaryConditionType::HOMOGENEOUS_NEUMANN: {
@@ -161,16 +165,20 @@ int HeatSolver::UpdateBoundaryConditions(void) {
         assert(values.Size() > 0);
         operator_m->AddToEssentialDOF(ess_tdof_list);
         if (values.Size() == 1) {
-          mfem::ConstantCoefficient boundary_coeff(*values.Data());
-          temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+          temperature_m.SetSubVector(ess_tdof_list, *values.Data());
         } else {
           assert(values.Size() ==
                  static_cast<std::size_t>(ess_tdof_list.Size()));
-          for (std::size_t n = 0; n < values.Size(); ++n) {
+          for (int n = 0; n < ess_tdof_list.Size(); ++n) {
             temperature_m(ess_tdof_list[n]) = *(values.Data() + n);
           }
         }
-
+        break;
+      }
+      case BoundaryConditionType::NEUMANN: {
+        // Will need to be some form of BoundaryIntegrator I think
+        std::cout << "Neumann condition not yet implemented" << std::endl;
+        std::exit(-1);
         break;
       }
 
@@ -246,10 +254,16 @@ void HeatSolver::ReadAndRefineMesh(void) {
     const int nx = parser_m["gen_nx"];
     const int ny = parser_m["gen_ny"];
     const int nz = parser_m["gen_nz"];
-    std::cout << nx << " " << ny << " " << nz << std::endl;
-    if (nz <= 0) {
-      assert(nx != -1);
-      assert(ny != -1);
+    if (ny <= 0) {
+      assert(nx > 0);
+      std::array<std::array<double, 1>, 2> bounding_box{
+          {parser_m["gen_blx"], parser_m["gen_bly"]}};
+      auto mesh_and_vertices = GenerateLineMesh(bounding_box, nx);
+      mesh = mesh_and_vertices.first;
+      vertices = mesh_and_vertices.second;
+    } else if (nz <= 0) {
+      assert(nx > 0);
+      assert(ny > 0);
       // 2D Mesh with Quads
       std::array<std::array<double, 2>, 2> bounding_box{
           {{parser_m["gen_blx"], parser_m["gen_bly"]},
@@ -258,9 +272,9 @@ void HeatSolver::ReadAndRefineMesh(void) {
       mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
     } else {
-      assert(nx != -1);
-      assert(ny != -1);
-      assert(nz != -1);
+      assert(nx > 0);
+      assert(ny > 0);
+      assert(nz > 0);
       // 3D Mesh with Hexs
       std::array<std::array<double, 3>, 2> bounding_box{
           {{parser_m["gen_blx"], parser_m["gen_bly"], parser_m["gen_blz"]},
@@ -276,10 +290,10 @@ void HeatSolver::ReadAndRefineMesh(void) {
   const auto serial_refinement = static_cast<int>(parser_m["serial_refine"]);
   const auto parallel_refinement =
       static_cast<int>(parser_m["parallel_refine"]);
-  std::cout << mesh->GetNE() << std::endl;
   for (int lev = 0; lev < serial_refinement; ++lev) {
     mesh->UniformRefinement();
   }
+  // FIXME:  1D mesh fails in conversion to parallel_mesh_m
   parallel_mesh_m = new mfem::ParMesh(mpi_comm_m, *mesh);
   delete mesh;
   delete[] vertices;
@@ -341,7 +355,7 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   element_space_m =
       new mfem::ParFiniteElementSpace(parallel_mesh_m, element_collection_m);
 
-  temperature_m.SetSpace(element_space_m);
+  // temperature_m set later from initial condition
 
   operator_m = new ConductionOperator(*element_space_m, parser_m["alpha"],
                                       parser_m["kappa"]);
@@ -361,9 +375,9 @@ void HeatSolver::RegisterVisItFields(void) {
 
 static double SetInitialTemperature(const mfem::Vector& x) {
   if (x.Norml2() < 0.5) {
-    return 2.0;
+    return 0.0;
   } else {
-    return 1.0;
+    return 0.0;
   }
 }
 
@@ -379,8 +393,9 @@ void HeatSolver::ExportVisIt(const int a_cycle, const double a_time) {
     return;
   }
   visit_collection_m->UpdateField("temperature", temperature_m);
-  visit_collection_m->UpdateField("ThermalCoefficient",
-                                  operator_m->GetThermalCoefficient());
+  mfem::Vector temp_true_vector;
+  operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
+  visit_collection_m->UpdateField("ThermalCoefficient", temp_true_vector);
   visit_collection_m->WriteOutFields(a_cycle, a_time);
 }
 

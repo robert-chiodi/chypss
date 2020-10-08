@@ -12,14 +12,56 @@
 
 #include <vector>
 
+namespace chyps {
+
+std::pair<mfem::Mesh*, double*> GenerateLineMesh(
+    const std::array<std::array<double, 1>, 2>& a_bounding_box,
+    const int a_nx) {
+  const int nvert = a_nx + 1;
+  const int nelem = a_nx;
+  double* vertices = new double[nvert * 3];
+
+  std::vector<int> elem_indices(2 * nelem);
+
+  std::vector<int> elem_attrib(nelem);
+  std::fill(elem_attrib.begin(), elem_attrib.end(), 1);
+
+  const int nboundary = 2;
+  std::vector<int> boundary_indices(nboundary);
+  std::vector<int> boundary_attrib(nboundary);
+  for (int i = 0; i < a_nx; ++i) {
+    elem_indices[2 * i] = i;
+    elem_indices[2 * i + 1] = i + 1;
+  }
+  boundary_indices[0] = 0;
+  boundary_attrib[0] = 1;
+  boundary_indices[1] = a_nx + 1;
+  boundary_attrib[1] = 2;
+
+  const double dx =
+      (a_bounding_box[1][0] - a_bounding_box[0][0]) / static_cast<double>(a_nx);
+  // Apparently a vertex is always 3D in MFEM
+  for (int i = 0; i < a_nx + 1; ++i) {
+    const int node_index = i;
+    const double x_loc = a_bounding_box[0][0] + static_cast<double>(i) * dx;
+    vertices[3 * node_index] = x_loc;
+    vertices[3 * node_index + 1] = 0.0;
+    vertices[3 * node_index + 2] = 0.0;
+  }
+  return std::make_pair(
+      new mfem::Mesh(vertices, nvert, elem_indices.data(),
+                     mfem::Geometry::Type::SEGMENT, elem_attrib.data(), nelem,
+                     boundary_indices.data(), mfem::Geometry::Type::POINT,
+                     boundary_attrib.data(), nboundary, 1, -1),
+      vertices);
+}
+
 std::pair<mfem::Mesh*, double*> GenerateQuadMesh(
     const std::array<std::array<double, 2>, 2>& a_bounding_box, const int a_nx,
     const int a_ny) {
   const int nvert = (a_nx + 1) * (a_ny + 1);
   const int nelem = a_nx * a_ny;
   double* vertices = new double[nvert * 3];
-
-  std::cout << nelem << std::endl;
 
   std::vector<int> elem_indices(4 * nelem);
 
@@ -226,3 +268,5 @@ std::pair<mfem::Mesh*, double*> GenerateHexMesh(
                      boundary_attrib.data(), nboundary, 3, -1),
       vertices);
 }
+
+}  // namespace chyps

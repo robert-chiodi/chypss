@@ -35,7 +35,7 @@ class ConductionOperatorBase : public mfem::TimeDependentOperator {
   /// `u`.
   virtual void SetParameters(const mfem::Vector& u) = 0;
 
-  virtual const mfem::Vector& GetThermalCoefficient(void) const = 0;
+  virtual const mfem::ParGridFunction& GetThermalCoefficient(void) const = 0;
 
   void AddToEssentialDOF(const mfem::Array<int>& a_list);
 
