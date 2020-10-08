@@ -21,6 +21,9 @@ class ConductionOperator : public ConductionOperatorBase {
   ConductionOperator(mfem::ParFiniteElementSpace& f, const double a_alpha,
                      const double a_kappa);
 
+  /// \brief Build operators that will not change over course of the simulation.
+  virtual void BuildStaticOperators(void) override final;
+
   virtual void Mult(const mfem::Vector& u,
                     mfem::Vector& du_dt) const override final;
   /** Solve the Backward-Euler equation: k = f(u + dt*k, t), for the unknown k.

@@ -11,6 +11,7 @@
 #include <mpi.h>
 #include <mfem/mfem.hpp>
 
+#include "chyps/boundary_condition.hpp"
 #include "chyps/heat_solver.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/precice_adapter.hpp"
@@ -45,6 +46,18 @@ int main(int argc, char** argv) {
   const double final_time = input_parser["end_time"];
   const int viz_steps = input_parser["viz_steps"];
   solver.Initialize();
+
+  auto condition = BoundaryCondition(BoundaryConditionType::DIRICHLET);
+  condition.SetValues(10.0);
+  solver.SetBoundaryCondition(1, condition);
+  condition.SetValues(10.0);
+  solver.SetBoundaryCondition(2, condition);
+  condition = BoundaryCondition(BoundaryConditionType::HOMOGENEOUS_NEUMANN);
+  solver.SetBoundaryCondition(3, condition);
+  solver.SetBoundaryCondition(4, condition);
+
+  solver.CommitBoundaryConditions();
+  solver.ExportVisIt(0, 0.0);
   for (int ti = 1; !last_step; ++ti) {
     if (time + dt > final_time) {
       dt = final_time - time;
@@ -54,6 +67,8 @@ int main(int argc, char** argv) {
     }
     dt = solver.AdjustTimeStep(dt);
     dt = solver.Advance(time, dt);
+    int number_of_boundaries_updated = solver.UpdateBoundaryConditions();
+    ++number_of_boundaries_updated;  // Just to prevent warning while developing
     time += dt;
 
     if (ti % viz_steps == 0 || last_step) {

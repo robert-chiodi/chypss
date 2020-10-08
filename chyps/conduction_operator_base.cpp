@@ -15,4 +15,12 @@ namespace chyps {
 ConductionOperatorBase::ConductionOperatorBase(mfem::ParFiniteElementSpace& f)
     : mfem::TimeDependentOperator(f.GetTrueVSize(), 0.0), fespace(f) {}
 
+void ConductionOperatorBase::AddToEssentialDOF(const mfem::Array<int>& a_list) {
+  ess_tdof_list.Append(a_list);
+}
+
+void ConductionOperatorBase::ClearEssentialDOF(void) {
+  ess_tdof_list.DeleteAll();
+}
+
 }  // namespace chyps

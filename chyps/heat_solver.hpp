@@ -18,6 +18,7 @@
 #include <mpi.h>
 #include <mfem/mfem.hpp>
 
+#include "chyps/boundary_condition.hpp"
 #include "chyps/conduction_operator.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/mfem_visit_collection.hpp"
@@ -49,6 +50,24 @@ class HeatSolver : public SolverInterface {
 
   /// \brief Advance the solver by a dt (or less) amount of time.
   virtual double Advance(const double a_time, const double dt) override final;
+
+  /// \brief Sets boundary condition for boundary elements tagged with a_tag.
+  ///
+  /// These boundary conditions are stored for calling again later.
+  void SetBoundaryCondition(const int a_tag,
+                            const BoundaryCondition& a_condition);
+
+  /// \brief Applies boundary conditions set by calls to SetBoundaryCondition.
+  ///
+  /// Note: Any unset boundary condition will be assumed to be a homogeneous
+  /// Dirichlet condition. This method MUST BE CALLED before calls to
+  /// AdjustTimeStep or Advance. This is true even if the default boundary
+  /// conditions are desired.
+  void CommitBoundaryConditions(void);
+
+  /// \brief Reapplies the boundary conditions marked as time varying.
+  /// Returns the number of boundary conditions updated.
+  int UpdateBoundaryConditions(void);
 
   /// \brief Write out data to disk for visualization in VisIt.
   virtual void ExportVisIt(const int a_cycle,
@@ -82,7 +101,8 @@ class HeatSolver : public SolverInterface {
   mfem::FiniteElementCollection* element_collection_m;
   mfem::ParFiniteElementSpace* element_space_m;
   ConductionOperatorBase* operator_m;
-  mfem::Vector temperature_m;
+  mfem::ParGridFunction temperature_m;
+  std::vector<BoundaryCondition> boundary_conditions_m;
 };
 
 }  // namespace chyps

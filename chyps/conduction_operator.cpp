@@ -22,15 +22,11 @@ ConductionOperator::ConductionOperator(mfem::ParFiniteElementSpace& f,
       current_dt(0.0),
       M_solver(f.GetComm()),
       T_solver(f.GetComm()),
+      alpha(a_alpha),
+      kappa(a_kappa),
       z(height),
       thermal_coefficient_m(&f) {
   const double rel_tol = 1e-8;
-
-  M = new mfem::ParBilinearForm(&fespace);
-  M->AddDomainIntegrator(new mfem::MassIntegrator());
-  M->Assemble(0);  // keep sparsity pattern of M and K the same
-  M->FormSystemMatrix(ess_tdof_list, Mmat);
-
   M_solver.iterative_mode = false;
   M_solver.SetRelTol(rel_tol);
   M_solver.SetAbsTol(0.0);
@@ -38,10 +34,6 @@ ConductionOperator::ConductionOperator(mfem::ParFiniteElementSpace& f,
   M_solver.SetPrintLevel(0);
   M_prec.SetType(mfem::HypreSmoother::Jacobi);
   M_solver.SetPreconditioner(M_prec);
-  M_solver.SetOperator(Mmat);
-
-  alpha = a_alpha;
-  kappa = a_kappa;
 
   T_solver.iterative_mode = false;
   T_solver.SetRelTol(rel_tol);
@@ -49,6 +41,15 @@ ConductionOperator::ConductionOperator(mfem::ParFiniteElementSpace& f,
   T_solver.SetMaxIter(100);
   T_solver.SetPrintLevel(0);
   T_solver.SetPreconditioner(T_prec);
+}
+
+void ConductionOperator::BuildStaticOperators(void) {
+  M = new mfem::ParBilinearForm(&fespace);
+  M->AddDomainIntegrator(new mfem::MassIntegrator());
+  M->Assemble(0);  // keep sparsity pattern of M and K the same
+  M->FormSystemMatrix(ess_tdof_list, Mmat);
+
+  M_solver.SetOperator(Mmat);
 }
 
 void ConductionOperator::Mult(const mfem::Vector& u,

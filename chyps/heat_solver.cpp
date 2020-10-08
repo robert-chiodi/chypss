@@ -10,6 +10,10 @@
 
 #include "chyps/heat_solver.hpp"
 
+#include <array>
+
+#include "chyps/mfem_mesh_generator.hpp"
+
 namespace chyps {
 
 HeatSolver::HeatSolver(const MPI_Comm& a_mpi_comm, InputParser& a_parser)
@@ -22,7 +26,8 @@ HeatSolver::HeatSolver(const MPI_Comm& a_mpi_comm, InputParser& a_parser)
       element_collection_m(nullptr),
       element_space_m(nullptr),
       operator_m(nullptr),
-      temperature_m() {
+      temperature_m(),
+      boundary_conditions_m() {
   this->GatherOptions();
 }
 
@@ -46,6 +51,71 @@ void HeatSolver::Initialize(void) {
   this->RegisterVisItFields();
 }
 
+void HeatSolver::SetBoundaryCondition(const int a_tag,
+                                      const BoundaryCondition& a_condition) {
+  assert(a_tag >= 1 && a_tag <= static_cast<int>(boundary_conditions_m.size()));
+  boundary_conditions_m[a_tag - 1] = a_condition;
+}
+
+// FIXME : Why does temperature change on boundary after first step when using
+// Dirichlet conditions? Since they are added to ess_tdof_list, they shouldn't
+// be solved for?
+void HeatSolver::CommitBoundaryConditions(void) {
+  const std::size_t number_of_boundary_conditions =
+      boundary_conditions_m.size();
+  for (std::size_t n = 0; n < number_of_boundary_conditions; ++n) {
+    const auto& condition = boundary_conditions_m[n];
+
+    mfem::Array<int> ess_bdr(parallel_mesh_m->bdr_attributes.Max());
+    ess_bdr = 0;
+    ess_bdr[n] = 1;  // boundary attribute n (index n-1) is fixed
+    mfem::Array<int> ess_tdof_list;
+    element_space_m->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
+
+    switch (condition.GetBCType()) {
+      case BoundaryConditionType::HOMOGENEOUS_DIRICHLET: {
+        operator_m->AddToEssentialDOF(ess_tdof_list);
+        mfem::ConstantCoefficient boundary_coeff(0.0);
+        temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+        break;
+      }
+      case BoundaryConditionType::HOMOGENEOUS_NEUMANN: {
+        // Nothing required.
+        break;
+      }
+      case BoundaryConditionType::DIRICHLET: {
+        const auto& values = condition.GetValues();
+        assert(values.Size() > 0);
+        operator_m->AddToEssentialDOF(ess_tdof_list);
+        if (values.Size() == 1) {
+          mfem::ConstantCoefficient boundary_coeff(*values.Data());
+          temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+        } else {
+          assert(values.Size() ==
+                 static_cast<std::size_t>(ess_tdof_list.Size()));
+          for (std::size_t n = 0; n < values.Size(); ++n) {
+            temperature_m(ess_tdof_list[n]) = *(values.Data() + n);
+          }
+        }
+        break;
+      }
+      case BoundaryConditionType::NEUMANN: {
+        // Will need to be some form of BoundaryIntegrator I think
+        std::cout << "Neumann condition not yet implemented" << std::endl;
+        std::exit(-1);
+      }
+
+      default:
+        std::cout
+            << "Unknown BoundaryConditionType set in HeatSolver. Set type is: "
+            << static_cast<int>(condition.GetBCType()) << std::endl;
+        std::exit(-1);
+    }
+  }
+  // Need to call this after setting BC's because it effects built operators
+  operator_m->BuildStaticOperators();
+}
+
 double HeatSolver::AdjustTimeStep(const double a_proposed_dt) const {
   return a_proposed_dt;
 }
@@ -56,6 +126,62 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
   operator_m->SetParameters(temperature_m);
   ode_solver_m->Step(temperature_m, time, taken_time_step);
   return taken_time_step;
+}
+
+int HeatSolver::UpdateBoundaryConditions(void) {
+  const std::size_t number_of_boundary_conditions =
+      boundary_conditions_m.size();
+  int boundary_conditions_updated = 0;
+  for (std::size_t n = 0; n < number_of_boundary_conditions; ++n) {
+    const auto& condition = boundary_conditions_m[n];
+    if (!condition.IsTimeVarying()) {
+      continue;
+    }
+    ++boundary_conditions_updated;
+
+    mfem::Array<int> ess_bdr(parallel_mesh_m->bdr_attributes.Max());
+    ess_bdr = 0;
+    ess_bdr[n] = 1;  // boundary attribute n (index n-1) is fixed
+    mfem::Array<int> ess_tdof_list;
+    element_space_m->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
+
+    switch (condition.GetBCType()) {
+      case BoundaryConditionType::HOMOGENEOUS_DIRICHLET: {
+        operator_m->AddToEssentialDOF(ess_tdof_list);
+        mfem::ConstantCoefficient boundary_coeff(0.0);
+        temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+        break;
+      }
+      case BoundaryConditionType::HOMOGENEOUS_NEUMANN: {
+        // Nothing required.
+        break;
+      }
+      case BoundaryConditionType::DIRICHLET: {
+        const auto& values = condition.GetValues();
+        assert(values.Size() > 0);
+        operator_m->AddToEssentialDOF(ess_tdof_list);
+        if (values.Size() == 1) {
+          mfem::ConstantCoefficient boundary_coeff(*values.Data());
+          temperature_m.ProjectBdrCoefficient(boundary_coeff, ess_bdr);
+        } else {
+          assert(values.Size() ==
+                 static_cast<std::size_t>(ess_tdof_list.Size()));
+          for (std::size_t n = 0; n < values.Size(); ++n) {
+            temperature_m(ess_tdof_list[n]) = *(values.Data() + n);
+          }
+        }
+
+        break;
+      }
+
+      default:
+        std::cout
+            << "Unknown BoundaryConditionType set in HeatSolver. Set type is: "
+            << static_cast<int>(condition.GetBCType()) << std::endl;
+        std::exit(-1);
+    }
+  }
+  return boundary_conditions_updated;
 }
 
 void HeatSolver::GatherOptions(void) {
@@ -77,6 +203,33 @@ void HeatSolver::GatherOptions(void) {
   parser_m.AddOption("alpha", "-a", "--alpha", "Alpha coefficient.", 1.0e-2);
   parser_m.AddOption("kappa", "-k", "--kappa", "Kappa coefficient offset.",
                      0.5);
+  parser_m.AddOption(
+      "gen_nx", "-nx", "--nx",
+      "If using generated mesh, number of elements in x direction.", -1);
+  parser_m.AddOption(
+      "gen_ny", "-ny", "--ny",
+      "If using generated mesh, number of elements in y direction.", -1);
+  parser_m.AddOption(
+      "gen_nz", "-nz", "--nz",
+      "If using generated mesh, number of elements in z direction.", -1);
+  parser_m.AddOption(
+      "gen_blx", "-blx", "--blx",
+      "If using generated mesh, lower x dimension of the cuboid domain", -1.0);
+  parser_m.AddOption(
+      "gen_bly", "-bly", "--bly",
+      "If using generated mesh, lower y dimension of the cuboid domain", -1.0);
+  parser_m.AddOption(
+      "gen_blz", "-blz", "--blz",
+      "If using generated mesh, lower z dimension of the cuboid domain", -1.0);
+  parser_m.AddOption(
+      "gen_bux", "-bux", "--bux",
+      "If using generated mesh, upper x dimension of the cuboid domain", 1.0);
+  parser_m.AddOption(
+      "gen_buy", "-buy", "--buy",
+      "If using generated mesh, upper y dimension of the cuboid domain", 1.0);
+  parser_m.AddOption(
+      "gen_buz", "-buz", "--buz",
+      "If using generated mesh, upper z dimension of the cuboid domain", 1.0);
   // TODO Add a flag and way to specify which variables we wish to export to
   // VisIt.
 }
@@ -86,16 +239,50 @@ bool HeatSolver::AllOptionsSupplied(void) const {
 }
 
 void HeatSolver::ReadAndRefineMesh(void) {
+  mfem::Mesh* mesh = nullptr;
+  double* vertices = nullptr;
   const std::string file_name = parser_m["mesh_file"];
-  mfem::Mesh mesh(file_name.c_str(), 1, 1);
-  dimension_m = mesh.Dimension();
+  if (file_name == "generate") {
+    const int nx = parser_m["gen_nx"];
+    const int ny = parser_m["gen_ny"];
+    const int nz = parser_m["gen_nz"];
+    std::cout << nx << " " << ny << " " << nz << std::endl;
+    if (nz <= 0) {
+      assert(nx != -1);
+      assert(ny != -1);
+      // 2D Mesh with Quads
+      std::array<std::array<double, 2>, 2> bounding_box{
+          {{parser_m["gen_blx"], parser_m["gen_bly"]},
+           {parser_m["gen_bux"], parser_m["gen_buy"]}}};
+      auto mesh_and_vertices = GenerateQuadMesh(bounding_box, nx, ny);
+      mesh = mesh_and_vertices.first;
+      vertices = mesh_and_vertices.second;
+    } else {
+      assert(nx != -1);
+      assert(ny != -1);
+      assert(nz != -1);
+      // 3D Mesh with Hexs
+      std::array<std::array<double, 3>, 2> bounding_box{
+          {{parser_m["gen_blx"], parser_m["gen_bly"], parser_m["gen_blz"]},
+           {parser_m["gen_bux"], parser_m["gen_buy"], parser_m["gen_buz"]}}};
+      auto mesh_and_vertices = GenerateHexMesh(bounding_box, nx, ny, nz);
+      mesh = mesh_and_vertices.first;
+      vertices = mesh_and_vertices.second;
+    }
+  } else {
+    mesh = new mfem::Mesh(file_name.c_str(), 1, 1);
+  }
+  dimension_m = mesh->Dimension();
   const auto serial_refinement = static_cast<int>(parser_m["serial_refine"]);
   const auto parallel_refinement =
       static_cast<int>(parser_m["parallel_refine"]);
+  std::cout << mesh->GetNE() << std::endl;
   for (int lev = 0; lev < serial_refinement; ++lev) {
-    mesh.UniformRefinement();
+    mesh->UniformRefinement();
   }
-  parallel_mesh_m = new mfem::ParMesh(mpi_comm_m, mesh);
+  parallel_mesh_m = new mfem::ParMesh(mpi_comm_m, *mesh);
+  delete mesh;
+  delete[] vertices;
   for (int lev = 0; lev < parallel_refinement; ++lev) {
     parallel_mesh_m->UniformRefinement();
   }
@@ -154,11 +341,12 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   element_space_m =
       new mfem::ParFiniteElementSpace(parallel_mesh_m, element_collection_m);
 
-  // FIXME : Check this is the right size
-  temperature_m.SetSize(element_space_m->GetTrueVSize());
+  temperature_m.SetSpace(element_space_m);
 
   operator_m = new ConductionOperator(*element_space_m, parser_m["alpha"],
                                       parser_m["kappa"]);
+
+  boundary_conditions_m.resize(parallel_mesh_m->bdr_attributes.Max());
 }
 
 void HeatSolver::RegisterVisItFields(void) {
