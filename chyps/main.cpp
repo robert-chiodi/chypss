@@ -23,8 +23,6 @@
 namespace chyps {
 
 int main(int argc, char** argv) {
-  // FIXME : Bring mesh building to outside of the solver class. Solver should
-  // just be told the mesh to solve the heat equation on
   int num_procs, myid;
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
