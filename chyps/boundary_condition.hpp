@@ -42,6 +42,7 @@ class BoundaryCondition {
   /// \brief Construct while setting BoundaryConditionType to a_type. Data must
   /// be separately allocated through SetValues(...).
   BoundaryCondition(const BoundaryConditionType a_type,
+                    const bool a_spatial_varying = false,
                     const bool a_time_varying = false);
 
   /// \brief Copy constructor. Please note, if underlying data
@@ -76,14 +77,19 @@ class BoundaryCondition {
   void SetValues(const double* a_value, const bool a_deep_copy = false);
 
   /// \brief Set a_size values for boundary condition. Can point to different
-  /// (external) storage if a_deep_copy = false;
+  /// (external) storage if a_deep_copy = false; The vertices and values
+  /// will be assumed to use the same value of a_deep_copy.
   void SetValues(const std::size_t a_size, const double* a_values,
-                 const bool a_deep_copy = false);
+                 const int* a_vertices, const bool a_deep_copy = false);
 
   /// \brief Return type of this boundary condition, which is one of the options
   /// in the BoundaryConditionType enum. Individual solver will use this to
   /// properly handle their boundary conditions.
   BoundaryConditionType GetBCType(void) const;
+
+  /// \brief Returns whether the BC value is constant or spatially varying,
+  /// as set during construction.
+  bool IsSpatiallyVarying(void) const;
 
   /// \brief Return if boundary condition might vary in time between iterations.
   ///
@@ -94,12 +100,19 @@ class BoundaryCondition {
   /// \brief Return values in form of a StorageWrapper.
   const StorageWrapper<double>& GetValues(void) const;
 
+  /// \brief Return the index corresponding to each entry in GetValues.
+  const StorageWrapper<int>& GetIndices(void) const;
+
   /// \brief Default destructor.
   ~BoundaryCondition(void) = default;
 
  private:
+  bool LogicalConditionsSet(void) const;
+
   BoundaryConditionType bc_type_m;
   StorageWrapper<double> values_m;
+  StorageWrapper<int> indices_m;
+  bool spatial_varying_m;
   bool time_varying_m;
 };
 

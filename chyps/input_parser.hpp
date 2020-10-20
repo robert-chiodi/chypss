@@ -19,6 +19,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <nlohmann_json/json.hpp>
+
 namespace chyps {
 
 /// \enum InputType input_parser.hpp chyps/input_parser.hpp
@@ -150,6 +152,9 @@ class CommonType {
   /// std::string.
   operator std::string(void) const;
 
+  /// \brief Set type to treat this as. See InputType enum for options.
+  void SetType(const InputType a_type);
+
   /// \brief Returns the type CommonType is currently being used as.
   InputType GetType(void) const;
 
@@ -186,10 +191,16 @@ class InputParser {
   void ParseCL(int argc, char** argv);
 
   /// \brief Lookup of option value through given name.
-  const CommonType& operator[](const std::string& a_name) const;
+  const nlohmann::json& operator[](const std::string& a_name) const;
+
+  /// \brief Directly set values for parsed_input_m that can then be
+  /// used through operator[].
+  template <class Type>
+  void DirectSet(const std::string& a_name, const Type& a_value);
 
   /// \brief Add an option to be looked for when parsing. If not found,
   /// a_default value will be used. OptionType must NOT be a *_REQUIRED kind.
+  /// Type must be a type from InputType enum.
   template <class ValueType>
   void AddOption(const std::string& a_name, const std::string& a_short_flag,
                  const std::string& a_long_flag,
@@ -198,12 +209,27 @@ class InputParser {
                  const OptionType a_input_type = OptionType::ANY);
 
   /// \brief Add an option to be looked for when parsing. OptionType must be
-  /// a *_REQUIRED kind.
+  /// a *_REQUIRED kind. Type must be a type from InputType enum.
   template <class ValueType>
   void AddOption(const std::string& a_name, const std::string& a_short_flag,
                  const std::string& a_long_flag,
                  const std::string& a_description,
                  const OptionType a_input_type = OptionType::ANY);
+
+  /// \brief Add an option to be looked for when parsing. If not found,
+  /// a_default value will be used. OptionType must NOT be a *_REQUIRED kind.
+  /// Since no flag is specified, this must be an InputType::INPUT_FILE option.
+  /// These types can be any of those valid in nlohmann::json.
+  template <class ValueType>
+  void AddOption(const std::string& a_name, const std::string& a_description,
+                 const ValueType& a_default_value);
+
+  /// \brief Add an option to be looked for when parsing. OptionType must be
+  /// a *_REQUIRED kind. Since no flag is specified, this must be an
+  /// OptionType::INPUT_FILE option. These types can be any of those valid
+  /// in nlohmann::json.
+  template <class ValueType>
+  void AddOption(const std::string& a_name, const std::string& a_description);
 
   /// \brief Checks that all options added have been specified or have an
   /// available default value.
@@ -216,13 +242,13 @@ class InputParser {
  private:
   bool CommandLineOption(const OptionType a_type) const;
   bool InputFileOption(const OptionType a_type) const;
+  bool RequiredOption(const OptionType a_type) const;
+  bool OptionalOption(const OptionType a_type) const;
 
-  std::vector<CommonType> input_storage_m;
-  std::unordered_map<std::string, std::size_t> parsed_input_m;
+  nlohmann::json parsed_input_m;
   std::vector<std::array<std::string, 4>> option_description_m;
   std::vector<OptionType> option_type_m;
   std::vector<InputType> type_m;
-  std::vector<std::array<std::string, 2>> negative_bool_statement_m;
 };
 
 }  // namespace chyps

@@ -23,8 +23,6 @@ class ConductionOperatorBase : public mfem::TimeDependentOperator {
  public:
   ConductionOperatorBase(mfem::ParFiniteElementSpace& f);
 
-  virtual void BuildStaticOperators(void) = 0;
-
   virtual void Mult(const mfem::Vector& u, mfem::Vector& du_dt) const = 0;
   /** Solve the Backward-Euler equation: k = f(u + dt*k, t), for the unknown k.
       This is the only requirement for high-order SDIRK implicit integration.*/
@@ -35,11 +33,9 @@ class ConductionOperatorBase : public mfem::TimeDependentOperator {
   /// `u`.
   virtual void SetParameters(const mfem::Vector& u) = 0;
 
+  virtual void UpdateBoundaryConditions(mfem::Vector& u) = 0;
+
   virtual const mfem::ParGridFunction& GetThermalCoefficient(void) const = 0;
-
-  void AddToEssentialDOF(const mfem::Array<int>& a_list);
-
-  void ClearEssentialDOF(void);
 
   virtual ~ConductionOperatorBase(void) = default;
 };

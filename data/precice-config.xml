@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+
+<precice-configuration>
+
+  <solver-interface dimensions="2">
+    
+    <data:scalar name="Temperature" />
+    
+    <mesh name="HeatSolverMesh">
+      <use-data name="Temperature" />
+    </mesh>
+
+    <mesh name="DummyMesh">
+      <use-data name="Temperature" />
+    </mesh>
+
+    <participant name="HeatSolver">
+      <use-mesh name="DummyMesh" from="DummySolver" />
+      <use-mesh name="HeatSolverMesh" provide="yes" />
+      <read-data  name="Temperature" mesh="HeatSolverMesh" />
+      <mapping:nearest-neighbor direction="read" from="DummyMesh" to="HeatSolverMesh" constraint="consistent"  />
+    </participant>
+
+    <participant name="DummySolver">
+      <use-mesh name="DummyMesh" provide="yes"/>
+      <write-data name="Temperature" mesh="DummyMesh" />
+    </participant>
+
+    <m2n:sockets from="DummySolver" to="HeatSolver" network="lo0"/>
+
+    <coupling-scheme:serial-explicit>
+      <participants first="DummySolver" second="HeatSolver" />
+      <max-time value="0.5"/>
+      <time-window-size value="0.1"/>
+      <exchange data="Temperature" mesh="DummyMesh" from="DummySolver" to="HeatSolver"/>
+    </coupling-scheme:serial-explicit>
+
+  </solver-interface>
+
+</precice-configuration>

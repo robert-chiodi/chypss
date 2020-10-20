@@ -9,6 +9,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include "chyps/mfem_visit_collection.hpp"
+#include "chyps/logger.hpp"
 
 namespace chyps {
 
@@ -16,7 +17,10 @@ MfemVisItCollection::MfemVisItCollection(const MPI_Comm& a_mpi_comm,
                                          const std::string& a_collection_name,
                                          mfem::ParMesh& a_mesh)
     : visit_collection_m(a_mpi_comm, a_collection_name, &a_mesh),
-      name_data_map_m() {}
+      name_data_map_m() {
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Made new VisIt collection: {}",
+                     a_collection_name);
+}
 
 void MfemVisItCollection::RegisterField(
     const std::string& a_name, mfem::ParFiniteElementSpace* a_element_space) {
@@ -27,6 +31,8 @@ void MfemVisItCollection::RegisterField(
   name_data_map_m[a_name] = grid_function;
   name_update_map_m[a_name] = false;
   visit_collection_m.RegisterField(a_name, grid_function);
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Registered field {} in VisIt collection {}",
+                     a_name, visit_collection_m.GetCollectionName());
 }
 
 void MfemVisItCollection::UpdateField(const std::string& a_name,
@@ -35,6 +41,8 @@ void MfemVisItCollection::UpdateField(const std::string& a_name,
          name_data_map_m.end());  // Make sure field with name exists
   name_data_map_m[a_name]->SetFromTrueDofs(a_data);
   name_update_map_m[a_name] = true;
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Updated field {} in VisIt collection {}",
+                     a_name, visit_collection_m.GetCollectionName());
 }
 
 void MfemVisItCollection::WriteOutFields(const int a_cycle,
@@ -46,6 +54,9 @@ void MfemVisItCollection::WriteOutFields(const int a_cycle,
   for (auto& elem : name_update_map_m) {
     elem.second = false;
   }
+  SPDLOG_LOGGER_INFO(MAIN_LOG,
+                     "Wrote VisIt collection {} at cycle {} and time {:8.6E}",
+                     visit_collection_m.GetCollectionName(), a_cycle, a_time);
 }
 
 MfemVisItCollection::~MfemVisItCollection(void) {

@@ -46,3 +46,9 @@ set_target_properties(test_chyps
 include(GoogleTest)
 
 add_subdirectory("./unit")
+
+setup_target_for_coverage_gcovr_html(
+NAME test_chyps_coverage
+EXECUTABLE tests/test_chyps
+DEPENDENCIES test_chyps
+)

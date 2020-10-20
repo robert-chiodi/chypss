@@ -17,22 +17,10 @@
 
 namespace chyps {
 
-// template <class ValueType>
-// InputType TypeToInputType(void) {
-//   static_assert(
-//       false,
-//       "Invalid type supplied to TypeToInputType. Verify type has existing "
-//       "implementation in input_parser.tpp\n");
-//   return InputType::INVALID;
-// }
-
-// template <class ValueType>
-// ValueType CommonType::GetPointer(void) {
-//   static_assert(false,
-//                 "Invalid type supplied to CommonType::GetPointer. Verify type
-//                 " "has existing " "implementation in input_parser.tpp\n");
-//   return nullptr;
-// }
+template <class Type>
+void InputParser::DirectSet(const std::string& a_name, const Type& a_value) {
+  parsed_input_m[a_name] = a_value;
+}
 
 template <class ValueType>
 void InputParser::AddOption(const std::string& a_name,
@@ -43,13 +31,11 @@ void InputParser::AddOption(const std::string& a_name,
                             const OptionType a_option_type) {
   option_description_m.push_back(std::array<std::string, 4>{
       {a_name, a_short_flag, a_long_flag, a_description}});
-  input_storage_m.push_back(CommonType(a_default_value));
   type_m.push_back(TypeToInputType<ValueType>());
   // FIXME: Make an exception
-  assert(parsed_input_m.find(a_name) == parsed_input_m.end());
-  parsed_input_m[a_name] = input_storage_m.size() - 1;
+  assert(!parsed_input_m.contains(a_name));
+  parsed_input_m[a_name] = a_default_value;
   option_type_m.push_back(a_option_type);
-  negative_bool_statement_m.push_back(std::array<std::string, 2>());
 }
 
 template <class ValueType>
@@ -60,13 +46,34 @@ void InputParser::AddOption(const std::string& a_name,
                             const OptionType a_option_type) {
   option_description_m.push_back(std::array<std::string, 4>{
       {a_name, a_short_flag, a_long_flag, a_description}});
-  input_storage_m.push_back(CommonType());
   type_m.push_back(TypeToInputType<ValueType>());
   // FIXME: Make an exception
-  assert(parsed_input_m.find(a_name) == parsed_input_m.end());
-  parsed_input_m[a_name] = input_storage_m.size() - 1;
+  assert(!parsed_input_m.contains(a_name));
+  parsed_input_m[a_name] = nlohmann::json::object();
   option_type_m.push_back(MakeOptionRequired(a_option_type));
-  negative_bool_statement_m.push_back(std::array<std::string, 2>());
+}
+
+template <class ValueType>
+void InputParser::AddOption(const std::string& a_name,
+                            const std::string& a_description,
+                            const ValueType& a_default_value) {
+  option_description_m.push_back(
+      std::array<std::string, 4>{{a_name, "", "", a_description}});
+  // FIXME: Make an exception
+  assert(!parsed_input_m.contains(a_name));
+  parsed_input_m[a_name] = a_default_value;
+  option_type_m.push_back(OptionType::INPUT_FILE);
+}
+
+template <class ValueType>
+void InputParser::AddOption(const std::string& a_name,
+                            const std::string& a_description) {
+  option_description_m.push_back(
+      std::array<std::string, 4>{{a_name, "", "", a_description}});
+  // FIXME: Make an exception
+  assert(!parsed_input_m.contains(a_name));
+  parsed_input_m[a_name] = nlohmann::json::object();
+  option_type_m.push_back(MakeOptionRequired(OptionType::INPUT_FILE));
 }
 
 }  // namespace chyps

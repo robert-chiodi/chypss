@@ -64,7 +64,6 @@ else()
   find_path(Mfem_INCLUDE_DIR
   NAMES mfem.hpp
   PATHS ${Mfem_DIR}/include
-  PATH_SUFFIXES mfem
   NO_DEFAULT_PATH
   )
   find_library(Mfem_LIBRARY

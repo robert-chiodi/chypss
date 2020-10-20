@@ -67,6 +67,7 @@ class PreciceAdapter {
   /// Assumed that the mesh used will be "mfem_mesh", which must match in the
   /// Precice XML config file.
   PreciceAdapter(const std::string& a_solver_name,
+                 const std::string& a_mesh_name,
                  const std::string& a_config_file_name, const int a_proc_rank,
                  const int a_proc_size);
 
@@ -84,27 +85,62 @@ class PreciceAdapter {
   /// \brief Return the number of vertices that exist in the coupling mesh.
   int NumberOfVertices(void) const;
 
+  /// \brief Return if precice is still actively coupling multiple solvers.
+  bool IsCouplingOngoing(void) const;
+
   /// \brief Add Data to be tracked by Precice. This does not do any update
   /// itself, but registers it inside Precice.
   void AddData(const std::string& a_name, const DataOperation a_operation);
+
+  /// \brief Size of scalar data passed through precice. Is
+  /// this->NumberOfVertices().
+  std::size_t ScalarDataSize(void) const;
+
+  /// \brief Size of vector data passed through precice. Is
+  /// this->NumberOfVertices()*dimension_m.
+  std::size_t VectorDataSize(void) const;
 
   /// \brief Write the data to be read by the other solver(s).
   ///
   /// The supplied a_name must match one previously added for writing via
   /// AddData with DataOperation::WRITE. The values written will be taken from
-  /// a_data. The size of a_data must be atleast this->NumberOfVertices() long.
+  /// a_data. The size of a_data must be atleast
+  /// this->ScalarDataSize long.
+  void WriteBlockScalarData(const std::string& a_name, const double* a_data);
+
+  /// \brief Read the data written by the other solver(s).
+  ///
+  /// The supplied a_name must match one previously added for reading via
+  /// AddData with DataOperation::READ. The values will be placed in
+  /// a_data. The size of a_data must be atleast
+  /// this->ScalarDataSize() long.
+  void ReadBlockScalarData(const std::string& a_name, double* a_data);
+
+  /// \brief Write the data to be read by the other solver(s).
+  ///
+  /// The supplied a_name must match one previously added for writing via
+  /// AddData with DataOperation::WRITE. The values written will be taken from
+  /// a_data. The size of a_data must be atleast
+  /// this->NumberOfVertices()*dimension_m long.
   void WriteBlockVectorData(const std::string& a_name, const double* a_data);
 
   /// \brief Read the data written by the other solver(s).
   ///
   /// The supplied a_name must match one previously added for reading via
   /// AddData with DataOperation::READ. The values will be placed in
-  /// a_data. The size of a_data must be atleast this->NumberOfVertices() long.
+  /// a_data. The size of a_data must be atleast
+  /// this->NumberOfVertices()*dimension_m long.
   void ReadBlockVectorData(const std::string& a_name, double* a_data);
 
-  /// \brief Custom destructor that finalizes the precice::SolverInterface,
-  /// freeing any used memory by Precice.
-  ~PreciceAdapter(void);
+  /// \brief Advance time solution in precice by a_dt.
+  double Advance(const double a_dt);
+
+  /// \brief Calls precice::SolverInterface::finalize(). Must be called before
+  /// MPI_Finalize().
+  void Finalize(void);
+
+  /// \brief Default destructor.
+  ~PreciceAdapter(void) = default;
 
  private:
   precice::SolverInterface interface_m;

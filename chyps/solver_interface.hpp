@@ -18,8 +18,10 @@
 #ifndef CHYPS_SOLVER_INTERFACE_HPP_
 #define CHYPS_SOLVER_INTERFACE_HPP_
 
-#include <mpi.h>
 #include "chyps/input_parser.hpp"
+#include "chyps/mesh.hpp"
+
+namespace chyps {
 
 /// \class SolverInterface solver_interface.hpp chyps/solver_interface.hpp
 /// \brief Abstract interface class for solvers.
@@ -34,7 +36,7 @@ class SolverInterface {
   /// variables that will be used by the solver. It will be called
   /// separately from advancement of the solution, and will only
   /// be called once.
-  virtual void Initialize(void) = 0;
+  virtual void Initialize(Mesh& a_mesh) = 0;
 
   /// \brief Return the a timestep <= a_proposed_dt that
   /// meets any requirements of the solver (e.g., for stability).
@@ -52,5 +54,6 @@ class SolverInterface {
 
  private:
 };
+}  // namespace chyps
 
 #endif  // CHYPS_SOLVER_INTERFACE_HPP_

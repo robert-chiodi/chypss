@@ -20,6 +20,10 @@ find_package(Boost 1.65.1 REQUIRED
   COMPONENTS filesystem log log_setup program_options system thread unit_test_framework
 )
 find_package(PETSC REQUIRED)
+find_package(SPDLOG REQUIRED)
+
+# Packages held in this repo in ./external
+set(NLOHMANN_JSON_SINGLE_HEADER "./external/nlohmann_json")
 
 
 set(CHYPS_SOURCE "./chyps")
@@ -27,6 +31,7 @@ set(CHYPS_SOURCE "./chyps")
 add_library(chyps STATIC)
 set_property(TARGET chyps PROPERTY CXX_STANDARD 11)
 target_include_directories(chyps PUBLIC "./")
+target_include_directories(chyps PUBLIC "${NLOHMANN_JSON_SINGLE_HEADER}")
 target_link_libraries(chyps PUBLIC MPI::MPI_CXX)
 target_link_libraries(chyps PUBLIC Hypre::Hypre)
 target_link_libraries(chyps PUBLIC Metis::Metis)
@@ -43,11 +48,24 @@ target_link_libraries(chyps PUBLIC
   Boost::unit_test_framework
 )
 target_link_libraries(chyps PUBLIC Petsc::Petsc)
-
+target_link_libraries(chyps PUBLIC Spdlog::Spdlog)
 
 add_executable(chyps_heat)
 target_link_libraries(chyps_heat PRIVATE chyps)
 set_property(TARGET chyps_heat PROPERTY CXX_STANDARD 11)
+
+add_executable(dummy_precice)
+target_link_libraries(dummy_precice PRIVATE chyps)
+set_property(TARGET dummy_precice PROPERTY CXX_STANDARD 11)
+
+add_executable(example)
+#target_link_libraries(example PRIVATE chyps)
+target_link_libraries(example PUBLIC MPI::MPI_CXX)
+target_link_libraries(example PUBLIC Mfem::Mfem)
+target_link_libraries(example PUBLIC Metis::Metis)
+target_link_libraries(example PUBLIC Hypre::Hypre)
+
+set_property(TARGET example PROPERTY CXX_STANDARD 11)
 
 add_subdirectory("${CHYPS_SOURCE}")
 
@@ -57,5 +75,10 @@ add_subdirectory("${CHYPS_SOURCE}")
 if("${BUILD_TESTING}" MATCHES "ON")
   include(CTest)
   enable_testing()
+  include(CodeCoverage)
+  append_coverage_compiler_flags()
   add_subdirectory(./tests)
+  gtest_add_tests(TARGET test_chyps)
 endif()
+
+

@@ -229,6 +229,8 @@ CommonType::operator std::string(void) const {
   return value_m.the_string;
 }
 
+void CommonType::SetType(const InputType a_type) { type_id_m = a_type; }
+
 InputType CommonType::GetType(void) const { return type_id_m; }
 
 template <>
@@ -285,6 +287,17 @@ bool InputParser::InputFileOption(const OptionType a_type) const {
          a_type == OptionType::INPUT_FILE_REQUIRED;
 }
 
+bool InputParser::RequiredOption(const OptionType a_type) const {
+  return a_type == OptionType::ANY_REQUIRED ||
+         a_type == OptionType::COMMAND_LINE_REQUIRED ||
+         a_type == OptionType::INPUT_FILE_REQUIRED;
+}
+
+bool InputParser::OptionalOption(const OptionType a_type) const {
+  return a_type == OptionType::ANY || a_type == OptionType::COMMAND_LINE ||
+         a_type == OptionType::INPUT_FILE;
+}
+
 // TODO Command lines specified as ANY but required should not fail
 // if not found here but potentially found later in an input file (or separate
 // manner of supply)
@@ -299,6 +312,10 @@ void InputParser::ParseCL(int argc, char** argv) {
   mfem::OptionsParser mfem_parser(argc, argv);
   const std::size_t number_of_options = option_description_m.size();
   std::vector<const char*> string_pointers(number_of_options, nullptr);
+  std::vector<std::array<std::string, 2>> negative_bool_statement(
+      number_of_options);
+  std::vector<CommonType> common_type(number_of_options);
+
   for (std::size_t n = 0; n < number_of_options; ++n) {
     if (!this->CommandLineOption(option_type_m[n])) {
       continue;
@@ -315,24 +332,30 @@ void InputParser::ParseCL(int argc, char** argv) {
         std::exit(-1);
       }
       case InputType::BOOL: {
-        negative_bool_statement_m[n][0] = string_set[1];
-        assert(negative_bool_statement_m[n][0][0] == '-');
-        negative_bool_statement_m[n][0].insert(1, "no-");
-        negative_bool_statement_m[n][1] = string_set[2];
-        assert(negative_bool_statement_m[n][1][0] == '-');
-        assert(negative_bool_statement_m[n][1][1] == '-');
-        negative_bool_statement_m[n][1].insert(2, "no-");
-        auto value = input_storage_m[n].GetPointer<bool*>();
+        negative_bool_statement[n][0] = string_set[1];
+        assert(negative_bool_statement[n][0][0] == '-');
+        negative_bool_statement[n][0].insert(1, "no-");
+        negative_bool_statement[n][1] = string_set[2];
+        assert(negative_bool_statement[n][1][0] == '-');
+        assert(negative_bool_statement[n][1][1] == '-');
+        negative_bool_statement[n][1].insert(2, "no-");
+        auto value = common_type[n].GetPointer<bool*>();
+        if (this->OptionalOption(option_type_m[n])) {
+          *value = static_cast<bool>(parsed_input_m[string_set[0]]);
+        }
         mfem_parser.AddOption(value, string_set[1].c_str(),
                               string_set[2].c_str(),
-                              negative_bool_statement_m[n][0].c_str(),
-                              negative_bool_statement_m[n][1].c_str(),
+                              negative_bool_statement[n][0].c_str(),
+                              negative_bool_statement[n][1].c_str(),
                               string_set[3].c_str(), required);
         break;
       }
 
       case InputType::INT: {
-        auto value = input_storage_m[n].GetPointer<int*>();
+        auto value = common_type[n].GetPointer<int*>();
+        if (this->OptionalOption(option_type_m[n])) {
+          *value = static_cast<int>(parsed_input_m[string_set[0]]);
+        }
         mfem_parser.AddOption(value, string_set[1].c_str(),
                               string_set[2].c_str(), string_set[3].c_str(),
                               required);
@@ -340,7 +363,10 @@ void InputParser::ParseCL(int argc, char** argv) {
       }
 
       case InputType::DOUBLE: {
-        auto value = input_storage_m[n].GetPointer<double*>();
+        auto value = common_type[n].GetPointer<double*>();
+        if (this->OptionalOption(option_type_m[n])) {
+          *value = static_cast<double>(parsed_input_m[string_set[0]]);
+        }
         mfem_parser.AddOption(value, string_set[1].c_str(),
                               string_set[2].c_str(), string_set[3].c_str(),
                               required);
@@ -348,7 +374,10 @@ void InputParser::ParseCL(int argc, char** argv) {
       }
 
       case InputType::STRING: {
-        auto value = input_storage_m[n].GetPointer<std::string*>();
+        auto value = common_type[n].GetPointer<std::string*>();
+        if (this->OptionalOption(option_type_m[n])) {
+          *value = static_cast<std::string>(parsed_input_m[string_set[0]]);
+        }
         string_pointers[n] = value->data();
         mfem_parser.AddOption(&(string_pointers[n]), string_set[1].c_str(),
                               string_set[2].c_str(), string_set[3].c_str(),
@@ -357,9 +386,9 @@ void InputParser::ParseCL(int argc, char** argv) {
       }
 
       default:
-        std::cout
-            << "Cannot transmit InputType to MFEM::OptionsParser. Type is:  "
-            << static_cast<int>(input_storage_m[n].GetType()) << std::endl;
+        std::cout << "Cannot transmit InputType to MFEM::OptionsParser. "
+                     "Type is:  "
+                  << static_cast<int>(type_m[n]) << std::endl;
         break;
     }
   }
@@ -368,32 +397,60 @@ void InputParser::ParseCL(int argc, char** argv) {
     std::cout << "problem with input arguments" << std::endl;
   }
 
-  // Perform a deep copy of strings if they changed from reading in the command
-  // line.
+  // Perform a deep copy of strings if they changed from reading in the
+  // command line.
   for (std::size_t n = 0; n < number_of_options; ++n) {
-    if (!this->CommandLineOption(option_type_m[n]) ||
-        type_m[n] != InputType::STRING) {
+    if (!this->CommandLineOption(option_type_m[n])) {
       continue;
     }
-    auto value = input_storage_m[n].GetPointer<std::string*>();
-    if (string_pointers[n] != nullptr && string_pointers[n] != value->data()) {
-      *value = std::string(string_pointers[n]);
+    switch (type_m[n]) {
+      case InputType::INVALID: {
+        std::cout << "Option added to parser with InputType::INVALID type. All "
+                     "options must use a valid type (see InputType enum for "
+                     "other options."
+                  << std::endl;
+        // FIXME : Make an exception.
+        std::exit(-1);
+      }
+      case InputType::BOOL: {
+        parsed_input_m[option_description_m[n][0]] =
+            static_cast<bool>(common_type[n]);
+        break;
+      }
+      case InputType::INT: {
+        parsed_input_m[option_description_m[n][0]] =
+            static_cast<int>(common_type[n]);
+        break;
+      }
+      case InputType::DOUBLE: {
+        parsed_input_m[option_description_m[n][0]] =
+            static_cast<double>(common_type[n]);
+        break;
+      }
+      case InputType::STRING: {
+        if ((string_pointers[n] != nullptr &&
+             string_pointers[n] != common_type[n].GetPointer<const char*>()) ||
+            this->RequiredOption(option_type_m[n])) {
+          parsed_input_m[option_description_m[n][0]] =
+              std::string(string_pointers[n]);
+        }
+        break;
+      }
     }
   }
 }
 
-const CommonType& InputParser::operator[](const std::string& a_name) const {
-  auto location = parsed_input_m.find(a_name);
+const nlohmann::json& InputParser::operator[](const std::string& a_name) const {
   // FIXME : Make an exception.
-  assert(location != parsed_input_m.end());
-  assert(input_storage_m[location->second].GetType() != InputType::INVALID);
-  return input_storage_m[location->second];
+  assert(parsed_input_m.contains(a_name));
+  return parsed_input_m[a_name];
 }
 
 bool InputParser::AllOptionsSet(void) const {
-  // TODO Add test for this.
-  for (const auto& elem : input_storage_m) {
-    if (elem.GetType() == InputType::INVALID) {
+  // FIXME: Add test for this.
+  // FIXME: Update for using json
+  for (const auto& elem : parsed_input_m) {
+    if (elem.empty()) {
       return false;
     }
   }
@@ -404,7 +461,6 @@ void InputParser::ClearOptions(void) {
   option_description_m.clear();
   option_type_m.clear();
   type_m.clear();
-  negative_bool_statement_m.clear();
 }
 
 }  // namespace chyps
