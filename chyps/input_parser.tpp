@@ -31,11 +31,11 @@ void InputParser::AddOption(const std::string& a_name,
                             const OptionType a_option_type) {
   option_description_m.push_back(std::array<std::string, 4>{
       {a_name, a_short_flag, a_long_flag, a_description}});
-  type_m.push_back(TypeToInputType<ValueType>());
   // FIXME: Make an exception
   assert(!parsed_input_m.contains(a_name));
   parsed_input_m[a_name] = a_default_value;
-  option_type_m.push_back(a_option_type);
+  option_type_m[a_name] = a_option_type;
+  type_m[a_name] = TypeToInputType<ValueType>();
 }
 
 template <class ValueType>
@@ -46,11 +46,11 @@ void InputParser::AddOption(const std::string& a_name,
                             const OptionType a_option_type) {
   option_description_m.push_back(std::array<std::string, 4>{
       {a_name, a_short_flag, a_long_flag, a_description}});
-  type_m.push_back(TypeToInputType<ValueType>());
   // FIXME: Make an exception
   assert(!parsed_input_m.contains(a_name));
   parsed_input_m[a_name] = nlohmann::json::object();
-  option_type_m.push_back(MakeOptionRequired(a_option_type));
+  option_type_m[a_name] = MakeOptionRequired(a_option_type);
+  type_m[a_name] = TypeToInputType<ValueType>();
 }
 
 template <class ValueType>
@@ -62,18 +62,7 @@ void InputParser::AddOption(const std::string& a_name,
   // FIXME: Make an exception
   assert(!parsed_input_m.contains(a_name));
   parsed_input_m[a_name] = a_default_value;
-  option_type_m.push_back(OptionType::INPUT_FILE);
-}
-
-template <class ValueType>
-void InputParser::AddOption(const std::string& a_name,
-                            const std::string& a_description) {
-  option_description_m.push_back(
-      std::array<std::string, 4>{{a_name, "", "", a_description}});
-  // FIXME: Make an exception
-  assert(!parsed_input_m.contains(a_name));
-  parsed_input_m[a_name] = nlohmann::json::object();
-  option_type_m.push_back(MakeOptionRequired(OptionType::INPUT_FILE));
+  option_type_m[a_name] = OptionType::INPUT_FILE;
 }
 
 }  // namespace chyps

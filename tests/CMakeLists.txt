@@ -38,7 +38,8 @@ endif()
 
 add_executable(test_chyps)
 target_include_directories(test_chyps PRIVATE "${PROJECT_SOURCE_DIR}")
-target_link_libraries(test_chyps chyps gtest gmock gtest_main)
+target_link_libraries(test_chyps chyps gtest gmock)
+
 set_target_properties(test_chyps
     PROPERTIES
     CXX_STANDARD 11
@@ -52,3 +53,7 @@ NAME test_chyps_coverage
 EXECUTABLE tests/test_chyps
 DEPENDENCIES test_chyps
 )
+
+add_custom_command(TARGET test_chyps POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                   "${CMAKE_CURRENT_SOURCE_DIR}/unit/data" "${CMAKE_CURRENT_BINARY_DIR}/unit/data")

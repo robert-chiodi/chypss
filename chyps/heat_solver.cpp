@@ -74,7 +74,7 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
 }
 
 void HeatSolver::ExportVisIt(const int a_cycle, const double a_time) {
-  if (!parser_m["use_visit"]) {
+  if (!parser_m["use_visit"].get<bool>()) {
     return;
   }
   visit_collection_m->UpdateField("temperature", temperature_m);
@@ -108,7 +108,7 @@ bool HeatSolver::AllOptionsSupplied(void) const {
 }
 
 void HeatSolver::SetODESolver(void) {
-  auto ode_solver_type = static_cast<int>(parser_m["time_advancement"]);
+  const auto ode_solver_type = parser_m["time_advancement"].get<int>();
   switch (ode_solver_type) {
     // Implicit L-stable methods
     case 1:
@@ -181,9 +181,9 @@ void HeatSolver::SetODESolver(void) {
 
 void HeatSolver::AllocateVariablesAndOperators(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating H1 collection with {} order elements",
-                     static_cast<int>(parser_m["order"]));
-  element_collection_m =
-      new mfem::H1_FECollection(parser_m["order"], mesh_m->GetDimension());
+                     parser_m["order"].get<int>());
+  element_collection_m = new mfem::H1_FECollection(parser_m["order"].get<int>(),
+                                                   mesh_m->GetDimension());
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Generating element space from H1 collection");
   element_space_m = new mfem::ParFiniteElementSpace(&(mesh_m->GetMfemMesh()),
@@ -202,15 +202,15 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Creating new variable thermal coefficient conduction "
                      "operator with alpha = {} and kappa = {}",
-                     static_cast<double>(parser_m["alpha"]),
-                     static_cast<double>(parser_m["kappa"]));
-  operator_m = new ConductionOperator(*mesh_m, *coarse_element_space_m,
-                                      *element_space_m, temperature_m,
-                                      parser_m["alpha"], parser_m["kappa"]);
+                     parser_m["alpha"].get<double>(),
+                     parser_m["kappa"].get<double>());
+  operator_m = new ConductionOperator(
+      *mesh_m, *coarse_element_space_m, *element_space_m, temperature_m,
+      parser_m["alpha"].get<double>(), parser_m["kappa"].get<double>());
 }
 
 void HeatSolver::RegisterVisItFields(void) {
-  if (!parser_m["use_visit"]) {
+  if (!parser_m["use_visit"].get<bool>()) {
     return;
   }
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Registering fields for export via VisIt");

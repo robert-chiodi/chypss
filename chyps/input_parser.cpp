@@ -10,7 +10,11 @@
 
 #include "chyps/input_parser.hpp"
 
+#include <fstream>
+
 #include <mfem/mfem.hpp>
+
+#include "chyps/logger.hpp"
 
 namespace chyps {
 
@@ -317,12 +321,12 @@ void InputParser::ParseCL(int argc, char** argv) {
   std::vector<CommonType> common_type(number_of_options);
 
   for (std::size_t n = 0; n < number_of_options; ++n) {
-    if (!this->CommandLineOption(option_type_m[n])) {
+    const auto& string_set = option_description_m[n];
+    const bool required = static_cast<int>(option_type_m[string_set[0]]) >= 10;
+    if (!this->CommandLineOption(option_type_m[string_set[0]])) {
       continue;
     }
-    const bool required = static_cast<int>(option_type_m[n]) >= 10;
-    const auto& string_set = option_description_m[n];
-    switch (type_m[n]) {
+    switch (type_m[string_set[0]]) {
       case InputType::INVALID: {
         std::cout << "Option added to parser with InputType::INVALID type. All "
                      "options must use a valid type (see InputType enum for "
@@ -340,7 +344,7 @@ void InputParser::ParseCL(int argc, char** argv) {
         assert(negative_bool_statement[n][1][1] == '-');
         negative_bool_statement[n][1].insert(2, "no-");
         auto value = common_type[n].GetPointer<bool*>();
-        if (this->OptionalOption(option_type_m[n])) {
+        if (this->OptionalOption(option_type_m[string_set[0]])) {
           *value = static_cast<bool>(parsed_input_m[string_set[0]]);
         }
         mfem_parser.AddOption(value, string_set[1].c_str(),
@@ -353,7 +357,7 @@ void InputParser::ParseCL(int argc, char** argv) {
 
       case InputType::INT: {
         auto value = common_type[n].GetPointer<int*>();
-        if (this->OptionalOption(option_type_m[n])) {
+        if (this->OptionalOption(option_type_m[string_set[0]])) {
           *value = static_cast<int>(parsed_input_m[string_set[0]]);
         }
         mfem_parser.AddOption(value, string_set[1].c_str(),
@@ -364,7 +368,7 @@ void InputParser::ParseCL(int argc, char** argv) {
 
       case InputType::DOUBLE: {
         auto value = common_type[n].GetPointer<double*>();
-        if (this->OptionalOption(option_type_m[n])) {
+        if (this->OptionalOption(option_type_m[string_set[0]])) {
           *value = static_cast<double>(parsed_input_m[string_set[0]]);
         }
         mfem_parser.AddOption(value, string_set[1].c_str(),
@@ -375,7 +379,7 @@ void InputParser::ParseCL(int argc, char** argv) {
 
       case InputType::STRING: {
         auto value = common_type[n].GetPointer<std::string*>();
-        if (this->OptionalOption(option_type_m[n])) {
+        if (this->OptionalOption(option_type_m[string_set[0]])) {
           *value = static_cast<std::string>(parsed_input_m[string_set[0]]);
         }
         string_pointers[n] = value->data();
@@ -388,7 +392,7 @@ void InputParser::ParseCL(int argc, char** argv) {
       default:
         std::cout << "Cannot transmit InputType to MFEM::OptionsParser. "
                      "Type is:  "
-                  << static_cast<int>(type_m[n]) << std::endl;
+                  << static_cast<int>(type_m[string_set[0]]) << std::endl;
         break;
     }
   }
@@ -400,10 +404,11 @@ void InputParser::ParseCL(int argc, char** argv) {
   // Perform a deep copy of strings if they changed from reading in the
   // command line.
   for (std::size_t n = 0; n < number_of_options; ++n) {
-    if (!this->CommandLineOption(option_type_m[n])) {
+    const auto& string_set = option_description_m[n];
+    if (!this->CommandLineOption(option_type_m[string_set[0]])) {
       continue;
     }
-    switch (type_m[n]) {
+    switch (type_m[string_set[0]]) {
       case InputType::INVALID: {
         std::cout << "Option added to parser with InputType::INVALID type. All "
                      "options must use a valid type (see InputType enum for "
@@ -430,7 +435,7 @@ void InputParser::ParseCL(int argc, char** argv) {
       case InputType::STRING: {
         if ((string_pointers[n] != nullptr &&
              string_pointers[n] != common_type[n].GetPointer<const char*>()) ||
-            this->RequiredOption(option_type_m[n])) {
+            this->RequiredOption(option_type_m[string_set[0]])) {
           parsed_input_m[option_description_m[n][0]] =
               std::string(string_pointers[n]);
         }
@@ -440,10 +445,57 @@ void InputParser::ParseCL(int argc, char** argv) {
   }
 }
 
+void InputParser::ParseFromFile(const std::string& a_file_name) {
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Parsing inputs from file {}", a_file_name);
+  std::ifstream myfile(a_file_name.c_str());
+  assert(myfile.good());
+  // Parse file while stripping comments given by // or /* ...  */
+  // Allows comments to be used and parse to still be of proper
+  // (standard conforming) JSON
+  nlohmann::json read_input =
+      nlohmann::json::parse(myfile, nullptr, true, true);
+  myfile.close();
+  for (const auto& element : read_input.items()) {
+    // FIXME: Make an exception.
+    assert(parsed_input_m.contains(element.key()));
+    parsed_input_m[element.key()] = element.value();
+  }
+  SPDLOG_LOGGER_INFO(
+      MAIN_LOG, "Finished parsing inputs from {}. Total of {} inputs found.",
+      a_file_name, parsed_input_m.size());
+}
+
+void InputParser::WriteToFile(const std::string& a_file_name) const {
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Writing parser to JSON with filename {}",
+                     a_file_name);
+  std::ofstream myfile(a_file_name);
+  myfile << std::setw(4) << parsed_input_m << std::endl;
+  myfile.close();
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished writing JSON to file {}", a_file_name);
+}
+
+std::vector<std::uint8_t> InputParser::ToBSON(void) const {
+  return nlohmann::json::to_bson(parsed_input_m);
+}
+
+void InputParser::SetFromBSON(const std::vector<std::uint8_t>& a_bson) {
+  parsed_input_m = nlohmann::json::from_bson(a_bson);
+}
+
 const nlohmann::json& InputParser::operator[](const std::string& a_name) const {
   // FIXME : Make an exception.
   assert(parsed_input_m.contains(a_name));
   return parsed_input_m[a_name];
+}
+
+void InputParser::AddOption(const std::string& a_name,
+                            const std::string& a_description) {
+  option_description_m.push_back(
+      std::array<std::string, 4>{{a_name, "", "", a_description}});
+  // FIXME: Make an exception
+  assert(!parsed_input_m.contains(a_name));
+  parsed_input_m[a_name] = nlohmann::json::object();
+  option_type_m[a_name] = MakeOptionRequired(OptionType::INPUT_FILE);
 }
 
 bool InputParser::AllOptionsSet(void) const {
@@ -461,6 +513,41 @@ void InputParser::ClearOptions(void) {
   option_description_m.clear();
   option_type_m.clear();
   type_m.clear();
+}
+
+void InputParser::PrintOptions(void) const {
+  for (const auto& elem : option_description_m) {
+    std::cout << "Option name: " << elem[0] << '\n';
+    std::cout << "\tDescription: " << elem[3] << '\n';
+    if (this->RequiredOption(option_type_m.at(elem[0]))) {
+      std::cout << "\tREQUIRED \n";
+    } else {
+      std::cout << "\tDefault value: " << parsed_input_m[elem[0]] << '\n';
+    }
+
+    if (this->CommandLineOption(option_type_m.at(elem[0]))) {
+      std::cout << "\tCommand line flags: " << elem[1] << " " << elem[2];
+      if (type_m.at(elem[0]) == InputType::BOOL) {
+        std::array<std::string, 2> negative_statements;
+        negative_statements[0] = elem[1];
+        assert(negative_statements[0][0] == '-');
+        negative_statements[0].insert(1, "no-");
+        negative_statements[1] = elem[2];
+        assert(negative_statements[1][0] == '-');
+        assert(negative_statements[1][1] == '-');
+        negative_statements[1].insert(2, "no-");
+
+        std::cout << " " << negative_statements[0] << " "
+                  << negative_statements[1];
+      }
+      std::cout << '\n';
+
+    } else {
+      std::cout << "\tInput file only \n";
+    }
+    std::cout << '\n';
+  }
+  std::cout << std::endl;
 }
 
 }  // namespace chyps

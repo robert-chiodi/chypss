@@ -241,19 +241,20 @@ void Mesh::GatherOptions(void) {
 void Mesh::ReadAndRefineMesh(void) {
   mfem::Mesh* serial_mesh = nullptr;
   double* vertices = nullptr;
-  const std::string file_name = parser_m["mesh_file"];
+  const auto file_name = parser_m["mesh_file"].get<std::string>();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Mesh reading mesh named {}", file_name);
 
   if (file_name == "generate") {
-    const int nx = parser_m["gen_nx"];
-    const int ny = parser_m["gen_ny"];
-    const int nz = parser_m["gen_nz"];
+    const auto nx = parser_m["gen_nx"].get<int>();
+    const auto ny = parser_m["gen_ny"].get<int>();
+    const auto nz = parser_m["gen_nz"].get<int>();
     if (ny <= 0) {
       assert(nx > 0);
       assert(nz <= 0);
       std::array<std::array<double, 1>, 2> bounding_box{
-          {parser_m["gen_blx"], parser_m["gen_bly"]}};
+          {parser_m["gen_blx"].get<double>(),
+           parser_m["gen_bly"].get<double>()}};
       auto mesh_and_vertices = this->GenerateLineMesh(bounding_box, nx);
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
@@ -262,8 +263,10 @@ void Mesh::ReadAndRefineMesh(void) {
       assert(ny > 0);
       // 2D Mesh with Quads
       std::array<std::array<double, 2>, 2> bounding_box{
-          {{parser_m["gen_blx"], parser_m["gen_bly"]},
-           {parser_m["gen_bux"], parser_m["gen_buy"]}}};
+          {{parser_m["gen_blx"].get<double>(),
+            parser_m["gen_bly"].get<double>()},
+           {parser_m["gen_bux"].get<double>(),
+            parser_m["gen_buy"].get<double>()}}};
       auto mesh_and_vertices = this->GenerateQuadMesh(bounding_box, nx, ny);
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
@@ -273,8 +276,12 @@ void Mesh::ReadAndRefineMesh(void) {
       assert(nz > 0);
       // 3D Mesh with Hexs
       std::array<std::array<double, 3>, 2> bounding_box{
-          {{parser_m["gen_blx"], parser_m["gen_bly"], parser_m["gen_blz"]},
-           {parser_m["gen_bux"], parser_m["gen_buy"], parser_m["gen_buz"]}}};
+          {{parser_m["gen_blx"].get<double>(),
+            parser_m["gen_bly"].get<double>(),
+            parser_m["gen_blz"].get<double>()},
+           {parser_m["gen_bux"].get<double>(),
+            parser_m["gen_buy"].get<double>(),
+            parser_m["gen_buz"].get<double>()}}};
       auto mesh_and_vertices = this->GenerateHexMesh(bounding_box, nx, ny, nz);
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
@@ -287,9 +294,8 @@ void Mesh::ReadAndRefineMesh(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Mesh consists of {} dimensions",
                      serial_mesh->Dimension());
 
-  const auto serial_refinement = static_cast<int>(parser_m["serial_refine"]);
-  const auto parallel_refinement =
-      static_cast<int>(parser_m["parallel_refine"]);
+  const auto serial_refinement = parser_m["serial_refine"].get<int>();
+  const auto parallel_refinement = parser_m["parallel_refine"].get<int>();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Performing {} levels of serial refinement",
                      serial_refinement);

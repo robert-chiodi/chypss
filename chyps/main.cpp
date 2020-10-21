@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
   input_parser.AddOption("use_precice", "-p", "--precice",
                          "If preCICE will be used to couple to another solver.",
                          false);
-  input_parser.AddOption("precice_config", "-pc", "--preCICE-config",
+  input_parser.AddOption("precice_config", "-pc", "--precice-config",
                          "XML File holding the configuration for preCICE",
                          std::string("../data/precice-config.xml"));
   input_parser.AddOption("end_time", "-tf", "--t-final",
@@ -51,34 +51,62 @@ int main(int argc, char** argv) {
 
   Mesh mesh(MPI_COMM_WORLD, input_parser);
   HeatSolver solver(input_parser);
-  input_parser.ParseCL(argc, argv);
+
+  --argc;
+  const std::string input_file_name = argv[1];
+  if (input_file_name == "help") {
+    if (myid == 0) {
+      input_parser.PrintOptions();
+    }
+    MPI_Finalize();
+    return 0;
+  }
+  if (input_file_name != "ignore") {
+    // Just have root processor parse file, then communicate
+    std::vector<std::uint8_t> v_bson;
+    int size = 0;
+    if (myid == 0) {
+      input_parser.ParseFromFile(input_file_name);
+      std::vector<std::uint8_t> v_bson = input_parser.ToBSON();
+      size = static_cast<int>(v_bson.size());
+    }
+    MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    v_bson.resize(size);  // Will do nothing for rank 0
+    MPI_Bcast(v_bson.data(), size, MPI_BYTE, 0, MPI_COMM_WORLD);
+    if (myid != 0) {
+      input_parser.SetFromBSON(v_bson);
+    }
+  }
+  input_parser.ParseCL(argc, argv + 1);
+  input_parser.WriteToFile("simulation_configuration.json");
   assert(input_parser.AllOptionsSet());
+  input_parser.ClearOptions();
 
   mesh.Initialize();
 
   PreciceAdapter* precice = nullptr;
-  const bool use_precice = input_parser["use_precice"];
+  const bool use_precice = input_parser["use_precice"].get<bool>();
 
   double* temperature_bc = nullptr;
   std::vector<double> vertex_positions;
   std::vector<int> vertex_indices;
   if (use_precice) {
-    precice =
-        new PreciceAdapter("HeatSolver", "HeatSolverMesh",
-                           input_parser["precice_config"], myid, num_procs);
+    precice = new PreciceAdapter(
+        "HeatSolver", "HeatSolverMesh",
+        input_parser["precice_config"].get<std::string>(), myid, num_procs);
     std::tie(vertex_positions, vertex_indices) = mesh.GetBoundaryVertices(4);
     precice->SetVertexPositions(vertex_positions);
     precice->AddData("Temperature", DataOperation::READ);
     temperature_bc = new double[precice->ScalarDataSize()];
     // Note, BC will not be used prior to being set in
-    // solver.UpdateBoundaryConditions.
+    // ConductionOperator during solver.Advance().
     std::fill(temperature_bc, temperature_bc + precice->ScalarDataSize(),
               -10.0);
   }
 
   BoundaryCondition(BoundaryConditionType::HOMOGENEOUS_NEUMANN);
   auto condition =
-      BoundaryCondition(BoundaryConditionType::DIRICHLET, true, false);
+      BoundaryCondition(BoundaryConditionType::DIRICHLET, true, true);
   // TESTING START
   std::tie(vertex_positions, vertex_indices) = mesh.GetBoundaryVertices(4);
   temperature_bc = new double[vertex_indices.size()];
@@ -89,14 +117,14 @@ int main(int argc, char** argv) {
                       vertex_indices.data(), false);
   mesh.SetBoundaryCondition(4, condition);
   // TESTING END
-  condition = BoundaryCondition(BoundaryConditionType::NEUMANN, false, true);
-  condition.SetValues(1.0);
+  condition = BoundaryCondition(BoundaryConditionType::HOMOGENEOUS_NEUMANN,
+                                false, false);
+  //  condition.SetValues(1.0);
   mesh.SetBoundaryCondition(1, condition);
-  condition.SetValues(5.0);
+  //  condition.SetValues(1.0);
   mesh.SetBoundaryCondition(2, condition);
-  condition.SetValues(10.0);
+  //  condition.SetValues(2.5);
   mesh.SetBoundaryCondition(3, condition);
-  // mesh.SetBoundaryCondition(4, condition);
 
   mesh.CommitBoundaryConditions();
   solver.Initialize(mesh);
@@ -104,13 +132,13 @@ int main(int argc, char** argv) {
 
   double time = 0.0;
   bool last_step = false;
-  double dt = input_parser["time_step"];
+  auto dt = input_parser["time_step"].get<double>();
   double max_dt = dt;
   if (use_precice) {
     max_dt = precice->Initialize();
   }
-  const double final_time = input_parser["end_time"];
-  const int viz_steps = input_parser["viz_steps"];
+  const auto final_time = input_parser["end_time"].get<double>();
+  const auto viz_steps = input_parser["viz_steps"].get<int>();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Performing simulation to time {} with time steps of {}",

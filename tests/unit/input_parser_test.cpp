@@ -12,8 +12,11 @@
 
 #include <array>
 #include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
+
+#include <fstream>
 
 namespace {
 
@@ -112,7 +115,7 @@ TEST(InputParser_CL, BoolDefault) {
   parser.AddOption("test", "-t", "--test", "A test value for testing", false,
                    OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  ASSERT_FALSE(parser["test"]);
+  ASSERT_FALSE(parser["test"].get<bool>());
   DeleteCommandLineInput(input_vec);
 }
 
@@ -127,7 +130,7 @@ TEST(InputParser_CL, IntDefault) {
   parser.AddOption("test", "-t", "--test", "A test value for testing", correct,
                    OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  int result = parser["test"];
+  int result = parser["test"].get<int>();
   ASSERT_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -143,7 +146,7 @@ TEST(InputParser_CL, DoubleDefault) {
   parser.AddOption("test", "-t", "--test", "A test value for testing", correct,
                    OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  double result = parser["test"];
+  double result = parser["test"].get<double>();
   ASSERT_DOUBLE_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -159,7 +162,7 @@ TEST(InputParser_CL, StringDefault) {
   parser.AddOption("test", "-t", "--test", "A test value for testing", correct,
                    OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  std::string result = parser["test"];
+  std::string result = parser["test"].get<std::string>();
   ASSERT_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -178,8 +181,8 @@ TEST(InputParser_CL, BoolDefaultOverwrite) {
   parser.AddOption("test2", "-st", "--second-test", "A test value for testing",
                    true, OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  ASSERT_TRUE(parser["test"]);
-  ASSERT_FALSE(parser["test2"]);
+  ASSERT_TRUE(parser["test"].get<bool>());
+  ASSERT_FALSE(parser["test2"].get<bool>());
   DeleteCommandLineInput(input_vec);
 }
 
@@ -197,7 +200,7 @@ TEST(InputParser_CL, IntDefaultOverwrite) {
   parser.AddOption("test", "-t", "--test", "A test value for testing",
                    incorrect, OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  int result = parser["test"];
+  int result = parser["test"].get<int>();
   ASSERT_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -216,7 +219,7 @@ TEST(InputParser_CL, DoubleDefaultOverwrite) {
   parser.AddOption("test", "-t", "--test", "A test value for testing",
                    incorrect, OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  double result = parser["test"];
+  double result = parser["test"].get<double>();
   ASSERT_DOUBLE_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -235,7 +238,7 @@ TEST(InputParser_CL, StringDefaultOverwrite) {
   parser.AddOption("test", "-t", "--test", "A test value for testing",
                    incorrect, OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  std::string result = parser["test"];
+  std::string result = parser["test"].get<std::string>();
   ASSERT_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -251,7 +254,7 @@ TEST(InputParser_CL, BoolRequired) {
   parser.AddOption<bool>("test", "-t", "--test", "A test value for testing",
                          OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  ASSERT_TRUE(parser["test"]);
+  ASSERT_TRUE(parser["test"].get<bool>());
   DeleteCommandLineInput(input_vec);
 }
 
@@ -268,7 +271,7 @@ TEST(InputParser_CL, IntRequired) {
   parser.AddOption<int>("test", "-t", "--test", "A test value for testing",
                         OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  int result = parser["test"];
+  int result = parser["test"].get<int>();
   ASSERT_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -286,7 +289,7 @@ TEST(InputParser_CL, DoubleRequired) {
   parser.AddOption<double>("test", "-t", "--test", "A test value for testing",
                            OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  double result = parser["test"];
+  double result = parser["test"].get<double>();
   ASSERT_DOUBLE_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -305,7 +308,7 @@ TEST(InputParser_CL, StringRequired) {
                                 "A test value for testing",
                                 OptionType::COMMAND_LINE);
   parser.ParseCL(argc, argv);
-  std::string result = parser["test"];
+  std::string result = parser["test"].get<std::string>();
   ASSERT_EQ(result, correct);
   DeleteCommandLineInput(input_vec);
 }
@@ -350,13 +353,173 @@ TEST(InputParser_CL, MultiOptions) {
 
   parser.ParseCL(argc, argv);
 
-  EXPECT_FALSE(parser["false_bool"]);
-  EXPECT_EQ(static_cast<int>(parser["int_test"]), 1042);
-  EXPECT_DOUBLE_EQ(parser["double_test"], -482.968);
-  EXPECT_TRUE(StringEqual(parser["string_test"], "A_Real_Test"));
-  EXPECT_FALSE(parser["on_bool_def"]);
-  EXPECT_TRUE(StringEqual(parser["string test default"], "Faker"));
+  EXPECT_FALSE(parser["false_bool"].get<bool>());
+  EXPECT_EQ(parser["int_test"].get<int>(), 1042);
+  EXPECT_DOUBLE_EQ(parser["double_test"].get<double>(), -482.968);
+  EXPECT_TRUE(
+      StringEqual(parser["string_test"].get<std::string>(), "A_Real_Test"));
+  EXPECT_FALSE(parser["on_bool_def"].get<bool>());
+  EXPECT_TRUE(
+      StringEqual(parser["string test default"].get<std::string>(), "Faker"));
   DeleteCommandLineInput(input_vec);
+}
+
+TEST(InputParser_FILE, ParseFile) {
+  InputParser parser;
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_double", "Testing reading of double.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
+
+  parser.ParseFromFile("tests/unit/data/test_input.json");
+  EXPECT_FALSE(parser["test_bool"].get<bool>());
+  EXPECT_EQ(parser["test_int"].get<int>(), 42);
+  EXPECT_DOUBLE_EQ(parser["test_double"].get<double>(), 68.492);
+  EXPECT_TRUE(StringEqual(parser["test_string1"], "TheBestString"));
+  EXPECT_TRUE(StringEqual(parser["test_string2"], "TheBestString With Spaces"));
+  const auto double_vector =
+      parser["test_double_vec"].get<std::vector<double>>();
+  const std::vector<double> double_correct{{-82.3, 0.0, 15.67, 22.8}};
+  for (std::size_t n = 0; n < double_correct.size(); ++n) {
+    EXPECT_DOUBLE_EQ(double_vector[n], double_correct[n]);
+  }
+
+  const auto int_vector = parser["test_int_vec"].get<std::vector<int>>();
+  const std::vector<int> int_correct{{1, 2, 3, -6, 4}};
+  for (std::size_t n = 0; n < int_correct.size(); ++n) {
+    EXPECT_EQ(int_vector[n], int_correct[n]);
+  }
+}
+
+TEST(InputParser, CL_Overwrite) {
+  InputParser parser;
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
+
+  parser.AddOption<double>("test_double", "-t", "--test",
+                           "A test value for testing",
+                           OptionType::COMMAND_LINE);
+
+  parser.ParseFromFile("tests/unit/data/test_input.json");
+
+  std::vector<std::string> inputs;
+  inputs.emplace_back("exe_name");
+  inputs.emplace_back("--test");
+  inputs.emplace_back("13.7892");
+  auto input_vec = FakeCommandLineInput(inputs);
+  char** argv = input_vec.data();
+  int argc = input_vec.size();
+  parser.ParseCL(argc, argv);
+  EXPECT_DOUBLE_EQ(parser["test_double"].get<double>(), 13.7892);
+}
+
+TEST(InputParser, OptionsToFile) {
+  InputParser parser;
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
+
+  parser.AddOption<double>("test_double", "-t", "--test",
+                           "A test value for testing",
+                           OptionType::COMMAND_LINE);
+
+  parser.ParseFromFile("tests/unit/data/test_input.json");
+
+  std::vector<std::string> inputs;
+  inputs.emplace_back("exe_name");
+  inputs.emplace_back("--test");
+  inputs.emplace_back("13.7892");
+  auto input_vec = FakeCommandLineInput(inputs);
+  char** argv = input_vec.data();
+  int argc = input_vec.size();
+  parser.ParseCL(argc, argv);
+
+  std::string write_file_name = "tests/unit/parser_writing_test.json";
+  parser.WriteToFile(write_file_name);
+
+  InputParser read_parser;
+  read_parser.AddOption("test_bool", "Testing reading of bool.");
+  read_parser.AddOption("test_int", "Testing reading of int.");
+  read_parser.AddOption("test_double", "Testing reading of double.");
+  read_parser.AddOption("test_string1", "Test string without spaces");
+  read_parser.AddOption("test_string2", "Test string with spaces");
+  read_parser.AddOption("test_double_vec", "Vector of doubles.");
+  read_parser.AddOption("test_int_vec", "Vector of ints.");
+  read_parser.ParseFromFile(write_file_name);
+
+  EXPECT_FALSE(parser["test_bool"].get<bool>());
+  EXPECT_EQ(parser["test_int"].get<int>(), 42);
+  EXPECT_DOUBLE_EQ(parser["test_double"].get<double>(), 13.7892);
+  EXPECT_TRUE(StringEqual(parser["test_string1"], "TheBestString"));
+  EXPECT_TRUE(StringEqual(parser["test_string2"], "TheBestString With Spaces"));
+  const auto double_vector =
+      parser["test_double_vec"].get<std::vector<double>>();
+  const std::vector<double> double_correct{{-82.3, 0.0, 15.67, 22.8}};
+  for (std::size_t n = 0; n < double_correct.size(); ++n) {
+    EXPECT_DOUBLE_EQ(double_vector[n], double_correct[n]);
+  }
+
+  const auto int_vector = parser["test_int_vec"].get<std::vector<int>>();
+  const std::vector<int> int_correct{{1, 2, 3, -6, 4}};
+  for (std::size_t n = 0; n < int_correct.size(); ++n) {
+    EXPECT_EQ(int_vector[n], int_correct[n]);
+  }
+  remove(write_file_name.c_str());
+}
+TEST(InputParser, RoundTripBSON) {
+  InputParser parser;
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_double", "Testing reading of double.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
+
+  parser.ParseFromFile("tests/unit/data/test_input.json");
+
+  auto v_bson = parser.ToBSON();
+
+  InputParser recreate_from_bson;
+  recreate_from_bson.SetFromBSON(v_bson);
+
+  EXPECT_EQ(parser["test_bool"].get<bool>(),
+            recreate_from_bson["test_bool"].get<bool>());
+  EXPECT_EQ(parser["test_int"].get<int>(),
+            recreate_from_bson["test_int"].get<int>());
+  EXPECT_DOUBLE_EQ(parser["test_double"].get<double>(),
+                   recreate_from_bson["test_double"].get<double>());
+  EXPECT_TRUE(
+      StringEqual(parser["test_string1"],
+                  recreate_from_bson["test_string1"].get<std::string>()));
+  EXPECT_TRUE(
+      StringEqual(parser["test_string2"],
+                  recreate_from_bson["test_string2"].get<std::string>()));
+  const auto double_vector =
+      parser["test_double_vec"].get<std::vector<double>>();
+  const auto double_correct =
+      recreate_from_bson["test_double_vec"].get<std::vector<double>>();
+  for (std::size_t n = 0; n < double_correct.size(); ++n) {
+    EXPECT_DOUBLE_EQ(double_vector[n], double_correct[n]);
+  }
+
+  const auto int_vector = parser["test_int_vec"].get<std::vector<int>>();
+  const auto int_correct =
+      recreate_from_bson["test_int_vec"].get<std::vector<int>>();
+
+  for (std::size_t n = 0; n < int_correct.size(); ++n) {
+    EXPECT_EQ(int_vector[n], int_correct[n]);
+  }
 }
 
 }  // namespace

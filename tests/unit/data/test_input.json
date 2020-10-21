@@ -1,0 +1,13 @@
+{
+  // This should not be read
+  "test_bool":false,
+  "test_int": 42,
+  "test_double": 68.492,
+  /*
+  This longer comment should also have no effect
+  */
+  "test_string1":"TheBestString",
+  "test_string2":"TheBestString With Spaces",
+  "test_double_vec":[-82.3,0.0,15.67,22.8],
+  "test_int_vec":[1,2,3,-6,4]
+}

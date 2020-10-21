@@ -190,7 +190,24 @@ class InputParser {
   /// given name.
   void ParseCL(int argc, char** argv);
 
+  /// \brief Parse input from a supplied input file in JSON format.
+  void ParseFromFile(const std::string& a_file_name);
+
+  /// \brief Write parsed input to file at a_file_name.
+  void WriteToFile(const std::string& a_file_name) const;
+
+  /// \brief Convert parsed input to BSON format stored in the returned vector.
+  std::vector<std::uint8_t> ToBSON(void) const;
+
+  /// \brief Convert the provided vector of bytes in BSON format to the parsed
+  /// JSON input.
+  void SetFromBSON(const std::vector<std::uint8_t>& a_bson);
+
   /// \brief Lookup of option value through given name.
+  ///
+  /// As suggested by nlohmann::json, should explicitly
+  /// case value to appropriate type via .get<Type>()
+  /// called on the returned reference.
   const nlohmann::json& operator[](const std::string& a_name) const;
 
   /// \brief Directly set values for parsed_input_m that can then be
@@ -228,7 +245,6 @@ class InputParser {
   /// a *_REQUIRED kind. Since no flag is specified, this must be an
   /// OptionType::INPUT_FILE option. These types can be any of those valid
   /// in nlohmann::json.
-  template <class ValueType>
   void AddOption(const std::string& a_name, const std::string& a_description);
 
   /// \brief Checks that all options added have been specified or have an
@@ -239,6 +255,9 @@ class InputParser {
   /// be available through operator[].
   void ClearOptions(void);
 
+  /// \brief Print out the options and their default value (if provided).
+  void PrintOptions(void) const;
+
  private:
   bool CommandLineOption(const OptionType a_type) const;
   bool InputFileOption(const OptionType a_type) const;
@@ -247,8 +266,8 @@ class InputParser {
 
   nlohmann::json parsed_input_m;
   std::vector<std::array<std::string, 4>> option_description_m;
-  std::vector<OptionType> option_type_m;
-  std::vector<InputType> type_m;
+  std::unordered_map<std::string, OptionType> option_type_m;
+  std::unordered_map<std::string, InputType> type_m;
 };
 
 }  // namespace chyps
