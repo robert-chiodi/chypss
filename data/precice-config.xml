@@ -31,7 +31,7 @@
     <coupling-scheme:serial-explicit>
       <participants first="DummySolver" second="HeatSolver" />
       <max-time value="0.5"/>
-      <time-window-size value="0.1"/>
+      <time-window-size value="0.01"/>
       <exchange data="Temperature" mesh="DummyMesh" from="DummySolver" to="HeatSolver"/>
     </coupling-scheme:serial-explicit>
 
