@@ -91,7 +91,7 @@ class ConductionOperator : public ConductionOperatorBase {
   void FinalizeNeumannCondition(void);
 
   mfem::ParGridFunction thermal_coefficient_m;
-  bool neumann_active_m;
+  bool inhomogeneous_neumann_active_m;
 };
 }  // namespace chyps
 

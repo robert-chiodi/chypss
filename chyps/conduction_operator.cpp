@@ -39,7 +39,7 @@ ConductionOperator::ConductionOperator(Mesh& a_mesh,
       neumann_coefficient_m(a_mesh.GetMfemMesh().bdr_attributes.Max(), nullptr),
       boundary_marker_m(a_mesh.GetMfemMesh().bdr_attributes.Max()),
       thermal_coefficient_m(&f),
-      neumann_active_m(false) {
+      inhomogeneous_neumann_active_m(false) {
   const double rel_tol = 1e-8;
   M_solver.iterative_mode = false;
   M_solver.SetRelTol(rel_tol);
@@ -67,7 +67,7 @@ ConductionOperator::ConductionOperator(Mesh& a_mesh,
     SPDLOG_LOGGER_INFO(
         MAIN_LOG,
         "Neumann boundary conditions exist. Turning on Neumann ParLinearForm");
-    neumann_active_m = true;
+    inhomogeneous_neumann_active_m = true;
     this->ResetNeumannCondition();
   }
 
@@ -143,7 +143,7 @@ ConductionOperator::ConductionOperator(Mesh& a_mesh,
   }
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished commiting boundary conditions");
 
-  if (neumann_active_m) {
+  if (inhomogeneous_neumann_active_m) {
     this->FinalizeNeumannCondition();
   }
 
@@ -174,7 +174,7 @@ void ConductionOperator::Mult(const mfem::Vector& u,
   K->Mult(tmp_u, tmp_z);
   tmp_z.Neg();  // z = -z
 
-  if (neumann_active_m) {
+  if (inhomogeneous_neumann_active_m) {
     tmp_z.Add(1.0, *neumann_m);
   }
 
@@ -220,7 +220,7 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
   tmp_z.Neg();  // z = -z
 
   // Add inhomogeneous Neumann to RHS
-  if (neumann_active_m) {
+  if (inhomogeneous_neumann_active_m) {
     tmp_z.Add(1.0, *neumann_m);
   }
 
@@ -257,7 +257,9 @@ void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
       SPDLOG_LOGGER_INFO(MAIN_LOG, "No time-varying conditions to be updated");
       return;
     }
-  } else {
+  }
+
+  if (inhomogeneous_neumann_active_m) {
     this->ResetNeumannCondition();
   }
 
@@ -348,7 +350,9 @@ void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Updated {} boundary conditions.",
                      boundary_conditions_updated);
 
-  this->FinalizeNeumannCondition();
+  if (inhomogeneous_neumann_active_m) {
+    this->FinalizeNeumannCondition();
+  }
 }
 
 const mfem::ParGridFunction& ConductionOperator::GetThermalCoefficient(
