@@ -139,7 +139,14 @@ int main(int argc, char** argv) {
   const double final_time = input_parser["end_time"];
   for (int ti = 1; !last_step; ++ti) {
     for (std::size_t n = 0; n < precice.ScalarDataSize(); ++n) {
-      temperature_bc[n] = static_cast<double>(ti);
+      const double vertex_x = vertex_positions[2 * n];
+      const double center_x_position =
+          time / final_time * (bounding_box[1][0] - bounding_box[0][0]) +
+          bounding_box[0][0];
+      temperature_bc[n] =
+          (1.0 - std::fabs(vertex_x - center_x_position) /
+                     (bounding_box[1][0] - bounding_box[0][0])) *
+          10.0;
     }
     precice.WriteBlockScalarData("Temperature", temperature_bc);
     double dt_adj = dt;
