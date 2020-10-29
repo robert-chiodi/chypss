@@ -329,13 +329,13 @@ TEST(InputParserCL, MultiOptions) {
 
 TEST(InputParserFILE, ParseFile) {
   InputParser parser;
-  parser.AddOption("test_bool", "Testing reading of bool.");
-  parser.AddOption("test_int", "Testing reading of int.");
-  parser.AddOption("test_double", "Testing reading of double.");
-  parser.AddOption("test_string1", "Test string without spaces");
-  parser.AddOption("test_string2", "Test string with spaces");
-  parser.AddOption("test_double_vec", "Vector of doubles.");
-  parser.AddOption("test_int_vec", "Vector of ints.");
+  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
+  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
+  parser.AddNoDefaultOption("test_double", "Testing reading of double.");
+  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
+  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
+  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
+  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
 
   parser.ParseFromFile("tests/unit/serial/data/test_input.json");
   EXPECT_FALSE(parser["test_bool"].get<bool>());
@@ -359,12 +359,12 @@ TEST(InputParserFILE, ParseFile) {
 
 TEST(InputParser, CLOverwrite) {
   InputParser parser;
-  parser.AddOption("test_bool", "Testing reading of bool.");
-  parser.AddOption("test_int", "Testing reading of int.");
-  parser.AddOption("test_string1", "Test string without spaces");
-  parser.AddOption("test_string2", "Test string with spaces");
-  parser.AddOption("test_double_vec", "Vector of doubles.");
-  parser.AddOption("test_int_vec", "Vector of ints.");
+  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
+  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
+  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
+  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
+  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
+  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
 
   parser.AddOption<double>("test_double", "-t", "--test",
                            "A test value for testing",
@@ -385,12 +385,12 @@ TEST(InputParser, CLOverwrite) {
 
 TEST(InputParser, OptionsToFile) {
   InputParser parser;
-  parser.AddOption("test_bool", "Testing reading of bool.");
-  parser.AddOption("test_int", "Testing reading of int.");
-  parser.AddOption("test_string1", "Test string without spaces");
-  parser.AddOption("test_string2", "Test string with spaces");
-  parser.AddOption("test_double_vec", "Vector of doubles.");
-  parser.AddOption("test_int_vec", "Vector of ints.");
+  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
+  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
+  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
+  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
+  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
+  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
 
   parser.AddOption<double>("test_double", "-t", "--test",
                            "A test value for testing",
@@ -411,13 +411,13 @@ TEST(InputParser, OptionsToFile) {
   parser.WriteToFile(write_file_name);
 
   InputParser read_parser;
-  read_parser.AddOption("test_bool", "Testing reading of bool.");
-  read_parser.AddOption("test_int", "Testing reading of int.");
-  read_parser.AddOption("test_double", "Testing reading of double.");
-  read_parser.AddOption("test_string1", "Test string without spaces");
-  read_parser.AddOption("test_string2", "Test string with spaces");
-  read_parser.AddOption("test_double_vec", "Vector of doubles.");
-  read_parser.AddOption("test_int_vec", "Vector of ints.");
+  read_parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
+  read_parser.AddNoDefaultOption("test_int", "Testing reading of int.");
+  read_parser.AddNoDefaultOption("test_double", "Testing reading of double.");
+  read_parser.AddNoDefaultOption("test_string1", "Test string without spaces");
+  read_parser.AddNoDefaultOption("test_string2", "Test string with spaces");
+  read_parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
+  read_parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
   read_parser.ParseFromFile(write_file_name);
 
   EXPECT_FALSE(parser["test_bool"].get<bool>());
@@ -441,13 +441,13 @@ TEST(InputParser, OptionsToFile) {
 }
 TEST(InputParser, RoundTripBSON) {
   InputParser parser;
-  parser.AddOption("test_bool", "Testing reading of bool.");
-  parser.AddOption("test_int", "Testing reading of int.");
-  parser.AddOption("test_double", "Testing reading of double.");
-  parser.AddOption("test_string1", "Test string without spaces");
-  parser.AddOption("test_string2", "Test string with spaces");
-  parser.AddOption("test_double_vec", "Vector of doubles.");
-  parser.AddOption("test_int_vec", "Vector of ints.");
+  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
+  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
+  parser.AddNoDefaultOption("test_double", "Testing reading of double.");
+  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
+  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
+  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
+  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
 
   parser.ParseFromFile("tests/unit/serial/data/test_input.json");
 
