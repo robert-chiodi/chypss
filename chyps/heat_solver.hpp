@@ -20,7 +20,9 @@
 #include "chyps/boundary_condition.hpp"
 #include "chyps/conduction_operator.hpp"
 #include "chyps/input_parser.hpp"
+#include "chyps/io.hpp"
 #include "chyps/mesh.hpp"
+#include "chyps/mfem_adios2_collection.hpp"
 #include "chyps/mfem_visit_collection.hpp"
 #include "chyps/solver_interface.hpp"
 
@@ -37,7 +39,7 @@ class HeatSolver : public SolverInterface {
 
   /// \brief Initialize HeatSolver and collect all options passed to
   /// parser.
-  HeatSolver(InputParser& a_parser);
+  HeatSolver(InputParser& a_parser, IO* a_file_io);
 
   /// \brief Initialize solver, including the construction of operators and MFEM
   /// objects.
@@ -52,7 +54,7 @@ class HeatSolver : public SolverInterface {
   virtual double Advance(const double a_time, const double dt) override final;
 
   /// \brief Write out data to disk for visualization in VisIt.
-  virtual void ExportVisIt(const int a_cycle,
+  virtual void WriteFields(const int a_cycle,
                            const double a_time) override final;
 
   /// \brief Return reference to built mesh.
@@ -75,7 +77,7 @@ class HeatSolver : public SolverInterface {
 
   void SetInitialConditions(void);
 
-  void RegisterVisItFields(void);
+  void RegisterFieldsForIO(void);
 
   // Set spatially varying condition onto solver true DOFs
   void SetTrueDofsFromVertexData(const std::size_t a_size,
@@ -84,7 +86,11 @@ class HeatSolver : public SolverInterface {
                                  mfem::Array<int>& a_boundary,
                                  mfem::ParGridFunction& a_temperature_gf);
 
+  bool FileWritingEnabled(void) const;
+  bool RestartFromFile(void) const;
+
   InputParser& parser_m;
+  IO* file_io_m;
   Mesh* mesh_m;
   mfem::ODESolver* ode_solver_m;
   mfem::FiniteElementCollection* element_collection_m;
@@ -94,6 +100,7 @@ class HeatSolver : public SolverInterface {
   ConductionOperatorBase* operator_m;
   mfem::Vector temperature_m;
   MfemVisItCollection* visit_collection_m;
+  MfemAdios2Collection* adios2_collection_m;
 };
 
 }  // namespace chyps

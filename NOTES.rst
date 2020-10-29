@@ -6,6 +6,12 @@ Verification failed: ((*offsets[i])[0] >= 0 && (*offsets[i])[1] >= 0) is false:
  ... in function: void mfem::ParMesh::GenerateOffsets(int, int *, mfem::Array<int> **) const
  ... in file: /home1/03602/rmc298/mfem/mesh/pmesh.cpp:1661
 
+
+For export, it seems like MFEM duplicates points shared by neighboring elements. This means that these points and ParGridFunction data will not be equivalent in size, since the data also needs to be duplicated for these points. I think this might be necessary for discontinuous solutions? Either way, it will make it so that it is not possible to do I/O that can be visualized (atleast it will require more thought).
+
+BUILDING INSTRUCTIONS BELOW
+===========================
+
 BUILDING BOOST
 ===== USING BOOST 1.68.0 ====
 
@@ -52,11 +58,11 @@ HYPRE
 ./configure --prefix=/Users/rmc298/lib_builds/hypre
 
 MFEM -- DEBUG
-cmake -DMFEM_USE_MPI=YES -D HYPRE_DIR=/Users/rmc298/lib_builds/hypre -DMETIS_DIR=/Users/rmc298/lib_builds/metis_built -DMFEM_DEBUG=YES -DMFEM_USE_METIS_5=YES -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=/Users/rmc298/lib_builds/mfem_built ..
+ cmake -DMFEM_USE_MPI=YES -D HYPRE_DIR=/Users/rmc298/lib_builds/hypre -DMETIS_DIR=/Users/rmc298/lib_builds/metis_built -DMFEM_DEBUG=YES -DMFEM_USE_METIS_5=YES -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=/Users/rmc298/lib_builds/mfem_built -D MFEM_USE_ADIOS2=YES -D ADIOS2_DIR=/Users/rmc298/lib_builds/adios2_built/  ..
 
 SPDLOG
 cmake -DCMAKE_INSTALL_PREFIX=/Users/rmc298/lib_builds/spdlog_built -DCMAKE_BUILD_TYPE=Release ..
 
 
 Building CHyPS
-cmake -D CMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -D Boost_DIR=/Users/rmc298/lib_builds/boost_built/ -D Boost_INCLUDE_DIR=/Users/rmc298/lib_builds/boost_built/include -D Precice_DIR=/Users/rmc298/lib_builds/precice_built/ -D Petsc_DIR=/Users/rmc298/lib_builds/petsc_built/ -D Spdlog_DIR=/Users/rmc298/lib_builds/spdlog_built/ -D Hypre_DIR=/Users/rmc298/lib_builds/hypre -D Metis_DIR=/Users/rmc298/lib_builds/metis_built -D Mfem_DIR=/Users/rmc298/lib_builds/mfem_built -DCMAKE_CXX_FLAGS="-Wall -Werror" -D GCOV_PATH=/usr/local/bin/gcov-10 ..
+cmake -D CMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -D Boost_DIR=/Users/rmc298/lib_builds/boost_built/ -D Boost_INCLUDE_DIR=/Users/rmc298/lib_builds/boost_built/include -D Precice_DIR=/Users/rmc298/lib_builds/precice_built/ -D Petsc_DIR=/Users/rmc298/lib_builds/petsc_built/ -D Spdlog_DIR=/Users/rmc298/lib_builds/spdlog_built/ -D Hypre_DIR=/Users/rmc298/lib_builds/hypre -D Metis_DIR=/Users/rmc298/lib_builds/metis_built -D Mfem_DIR=/Users/rmc298/lib_builds/mfem_built -D ADIOS2_DIR=/Users/rmc298/lib_builds/adios2_built/lib/cmake/adios2/ -DCMAKE_CXX_FLAGS="-Wall -Werror" -D GCOV_PATH=/usr/local/bin/gcov-10 ..

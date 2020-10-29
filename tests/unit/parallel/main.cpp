@@ -14,24 +14,17 @@
 #define CHYPS_LOGGER_OFF
 #include "chyps/logger.hpp"
 
+#include "chyps/mpi_parallel.hpp"
+
+#include "tests/unit/parallel/mpi_session.hpp"
+
 using namespace chyps;
 
-// Custom main function needed to turn off Spdlog.
-// int main(int argc, char** argv) {
-//   ::testing::InitGoogleTest(&argc, argv);
-//   MPI_Init(&argc, &argv);
-//   StartLogger(0, 1, SpdlogLevel::OFF);
-//   auto result = RUN_ALL_TESTS();
-//   MPI_Finalize();
-//   return result;
-// }
+MPIParallel* mpi_session;
 
 int main(int argc, char** argv) {
   // Filter out Google Test arguments
   ::testing::InitGoogleTest(&argc, argv);
-
-  // Initialize MPI
-  MPI_Init(&argc, &argv);
 
   // Turn off logger
   StartLogger(0, 1, SpdlogLevel::OFF);

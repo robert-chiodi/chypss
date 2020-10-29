@@ -1,2 +1,2 @@
-target_sources(test_chyps PRIVATE main.cpp)
-target_sources(test_chyps PRIVATE input_parser_test.cpp)
+add_subdirectory("./serial")
+add_subdirectory("./parallel")

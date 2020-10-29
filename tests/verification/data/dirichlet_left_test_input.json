@@ -1,0 +1,30 @@
+{
+    "alpha": 0.01,
+    "end_time": 0.5,
+    "gen_blx": -1.0,
+    "gen_bly": -1.0,
+    "gen_blz": -1.0,
+    "gen_bux": 1.0,
+    "gen_buy": 1.0,
+    "gen_buz": 1.0,
+    "gen_nx": 20,
+    "gen_ny": 20,
+    "gen_nz": -1,
+    "kappa": 0.5,
+    "mesh_file": "generate",
+    "order": 2,
+    "parallel_refine": 0,
+    "serial_refine": 0,
+    "time_advancement": 3,
+    "time_step": 0.01,
+    "use_adios2": false,
+    "use_visit": false,
+    "viz_steps": 25,
+    "bc_default": "HOMOGENEOUS_NEUMANN",
+    "bc_list":{
+                "1":{
+                    "type": "DIRICHLET",
+                    "value": 10.0
+		    }
+              }
+}

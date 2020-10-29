@@ -13,33 +13,24 @@
 #include <algorithm>
 #include <set>
 
+#include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 
 namespace chyps {
 
-namespace details {
-// H is homogeneous, TV is time-varying
-enum BCType {
-  H_DIRICHLET = 0,
-  DIRICHLET,
-  TV_DIRICHLET,
-  H_NEUMANN,
-  NEUMANN,
-  TV_NEUMANN,
-  COUNT
-};
-}  // namespace details
-
-Mesh::Mesh(const MPI_Comm& a_mpi_comm, InputParser& a_parser)
+Mesh::Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser,
+           IO* a_file_io)
     : parser_m(a_parser),
-      mpi_comm_m(a_mpi_comm),
+      mpi_session_m(a_mpi_session),
+      file_io_m(a_file_io),
       parallel_mesh_m(nullptr),
-      boundary_conditions_m() {
+      boundary_condition_manager_m(nullptr),
+      element_offset_m(0) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing mesh object");
   this->GatherOptions();
 }
 
-void Mesh::Initialize(void) {
+void Mesh::Initialize(BoundaryConditionManager& a_boundary_condition_manager) {
   if (!this->AllOptionsSupplied()) {
     std::cout << "Not all options needed in parser are supplied" << std::endl;
     std::cout << "Make sure that the InputParser has been parsed before "
@@ -48,11 +39,12 @@ void Mesh::Initialize(void) {
               << std::endl;
     std::exit(-1);
   }
+  boundary_condition_manager_m = &a_boundary_condition_manager;
   this->ReadAndRefineMesh();
   this->AllocateVariables();
 }
 
-const MPI_Comm& Mesh::GetMPIComm(void) const { return mpi_comm_m; }
+const MPI_Comm& Mesh::GetMPIComm(void) const { return mpi_session_m.GetComm(); }
 
 mfem::ParMesh& Mesh::GetMfemMesh(void) {
   assert(parallel_mesh_m != nullptr);
@@ -64,86 +56,42 @@ int Mesh::GetDimension(void) const {
   return parallel_mesh_m->Dimension();
 }
 
-int Mesh::GetNumberOfBoundaryConditions(void) const {
-  return static_cast<int>(boundary_conditions_m.size());
+template <>
+std::size_t Mesh::GetGlobalCount<MeshElement::ELEMENT>(void) const {
+  assert(parallel_mesh_m != nullptr);
+  return static_cast<std::size_t>(parallel_mesh_m->GetGlobalNE());
 }
 
-const BoundaryCondition& Mesh::GetBoundaryCondition(const int a_tag) const {
-  assert(a_tag >= 1);
-  assert(a_tag - 1 < this->GetNumberOfBoundaryConditions());
-  return boundary_conditions_m[a_tag - 1];
+template <>
+std::size_t Mesh::GetOffsetStart<MeshElement::ELEMENT>(void) const {
+  assert(parallel_mesh_m != nullptr);
+  return element_offset_m;
 }
 
-int Mesh::GetNumberOfHomogeneousDirichletConditions(void) const {
-  return boundary_condition_counts_m[details::BCType::H_DIRICHLET];
+template <>
+std::size_t Mesh::GetLocalCount<MeshElement::ELEMENT>(void) const {
+  assert(parallel_mesh_m != nullptr);
+  return static_cast<std::size_t>(parallel_mesh_m->GetNE());
 }
 
-int Mesh::GetNumberOfDirichletConditions(void) const {
-  return boundary_condition_counts_m[details::BCType::DIRICHLET];
+template <>
+std::size_t Mesh::GetLocalCount<MeshElement::VERTEX>(void) const {
+  assert(parallel_mesh_m != nullptr);
+  return static_cast<std::size_t>(parallel_mesh_m->GetNV());
 }
 
-int Mesh::GetNumberOfTimeVaryingDirichletConditions(void) const {
-  assert(boundary_condition_counts_m[details::BCType::TV_DIRICHLET] <=
-         boundary_condition_counts_m[details::BCType::DIRICHLET]);
-  return boundary_condition_counts_m[details::BCType::TV_DIRICHLET];
+int Mesh::GetNumberOfBoundaryTagValues(void) const {
+  assert(parallel_mesh_m != nullptr);
+  return parallel_mesh_m->bdr_attributes.Max();
 }
 
-int Mesh::GetNumberOfHomogeneousNeumannConditions(void) const {
-  return boundary_condition_counts_m[details::BCType::H_NEUMANN];
-}
-
-int Mesh::GetNumberOfNeumannConditions(void) const {
-  return boundary_condition_counts_m[details::BCType::NEUMANN];
-}
-
-int Mesh::GetNumberOfTimeVaryingNeumannConditions(void) const {
-  assert(boundary_condition_counts_m[details::BCType::TV_NEUMANN] <=
-         boundary_condition_counts_m[details::BCType::NEUMANN]);
-  return boundary_condition_counts_m[details::BCType::TV_NEUMANN];
-}
-
-void Mesh::SetBoundaryCondition(const int a_tag,
-                                const BoundaryCondition& a_condition) {
-  assert(a_tag >= 1 && a_tag <= static_cast<int>(boundary_conditions_m.size()));
-  boundary_conditions_m[a_tag - 1] = a_condition;
-  SPDLOG_LOGGER_INFO(MAIN_LOG,
-                     "Added BoundaryCondition of type {} for boundary tag {}",
-                     static_cast<int>(a_condition.GetBCType()), a_tag);
-}
-
-void Mesh::CommitBoundaryConditions(void) {
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Commiting {} boundary conditions",
-                     boundary_conditions_m.size());
-  boundary_condition_counts_m.resize(details::BCType::COUNT);
-  std::fill(boundary_condition_counts_m.begin(),
-            boundary_condition_counts_m.end(), 0);
-  for (const auto& condition : boundary_conditions_m) {
-    if (condition.GetBCType() == BoundaryConditionType::HOMOGENEOUS_DIRICHLET) {
-      ++boundary_condition_counts_m[details::BCType::H_DIRICHLET];
-    } else if (condition.GetBCType() == BoundaryConditionType::DIRICHLET) {
-      ++boundary_condition_counts_m[details::BCType::DIRICHLET];
-      if (condition.IsTimeVarying()) {
-        ++boundary_condition_counts_m[details::BCType::TV_DIRICHLET];
-      }
-    } else if (condition.GetBCType() ==
-               BoundaryConditionType::HOMOGENEOUS_NEUMANN) {
-      ++boundary_condition_counts_m[details::BCType::H_NEUMANN];
-    } else if (condition.GetBCType() == BoundaryConditionType::NEUMANN) {
-      ++boundary_condition_counts_m[details::BCType::NEUMANN];
-      if (condition.IsTimeVarying()) {
-        ++boundary_condition_counts_m[details::BCType::TV_NEUMANN];
-      }
-
-    } else {
-      std::cout << "Unknown boundary condition type of : "
-                << static_cast<int>(condition.GetBCType()) << std::endl;
-      std::exit(-1);
-    }
-  }
+const BoundaryConditionManager& Mesh::GetBoundaryConditionManager(void) const {
+  assert(boundary_condition_manager_m != nullptr);
+  return *boundary_condition_manager_m;
 }
 
 std::pair<std::vector<double>, std::vector<int>> Mesh::GetBoundaryVertices(
-    const int a_tag) {
+    const int a_tag) const {
   SPDLOG_LOGGER_INFO(
       MAIN_LOG,
       "Building boundary vertex position list for boundaries tagged with {}",
@@ -305,7 +253,7 @@ void Mesh::ReadAndRefineMesh(void) {
 
   // FIXME:  1D mesh fails in conversion to parallel_mesh_m
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Converting serial mesh to parallel mesh.");
-  parallel_mesh_m = new mfem::ParMesh(mpi_comm_m, *serial_mesh);
+  parallel_mesh_m = new mfem::ParMesh(this->GetMPIComm(), *serial_mesh);
   delete serial_mesh;
   delete[] vertices;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Parallel mesh successfully built");
@@ -322,7 +270,12 @@ void Mesh::ReadAndRefineMesh(void) {
 void Mesh::AllocateVariables(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Allocating space for {} boundary conditions",
                      parallel_mesh_m->bdr_attributes.Max());
-  boundary_conditions_m.resize(parallel_mesh_m->bdr_attributes.Max());
+
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Computing offsets for mesh elements.");
+  std::size_t local_elems = this->GetLocalCount<MeshElement::ELEMENT>();
+  MPI_Scan(&local_elems, &element_offset_m, 1, MPI_LONG, MPI_SUM,
+           this->GetMPIComm());
+  element_offset_m -= local_elems;
 }
 
 std::pair<mfem::Mesh*, double*> Mesh::GenerateLineMesh(
@@ -595,6 +548,139 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateHexMesh(
                      boundary_indices.data(), mfem::Geometry::Type::SQUARE,
                      boundary_attrib.data(), nboundary, 3, -1),
       vertices);
+}
+
+bool Mesh::FileWritingEnabled(void) const {
+  return file_io_m != nullptr && file_io_m->IsWriteModeActive();
+}
+
+// Write now we will handle IO with independent (rank local) writes.
+// In future, would like to figure out how to handle global writes into
+// one-indexed array/space. Only hold-up is how to handle vertices (get a global
+// vertex number, which I don't believe MFEM stores).
+void Mesh::AddIOVariables(void) {
+  if (!this->FileWritingEnabled()) {
+    return;
+  }
+  file_io_m->WriteAttribute("format", std::string("MFEM ADIOS2 BP v0.2"));
+  file_io_m->WriteAttribute("format/version", std::string("0.2"));
+  file_io_m->WriteAttribute("format/mfem_mesh", std::string("MFEM mesh v1.0"));
+  std::vector<std::string> export_types{"Paraview: ADIOS2VTXReader",
+                                        "VTK: vtkADIOS2VTXReader.h"};
+  file_io_m->WriteAttribute("format/viz_tools", export_types);
+
+  file_io_m->RootAddVariable<uint32_t>("dimension");
+  file_io_m->AddVariable<uint32_t>("NumOfElements");
+  file_io_m->AddVariable<uint32_t>("NumOfVertices");
+  file_io_m->RootAddVariable<uint32_t>("types");
+  // Need to compute and include sizes for these.
+  // Assumes same element type across all of mesh.
+  std::size_t element_nvertices =
+      static_cast<std::size_t>(parallel_mesh_m->GetElement(0)->GetNVertices());
+  file_io_m->AddVariable<uint64_t>(
+      "connectivity",
+      {this->GetLocalCount<MeshElement::ELEMENT>(), 1 + element_nvertices},
+      true);
+  file_io_m->AddVariable<int32_t>(
+      "attribute", {this->GetLocalCount<MeshElement::ELEMENT>()}, true);
+  file_io_m->MarkAsElementVariable("attribute");
+
+  // Will handle vertices in WriteMesh function.
+}
+
+void Mesh::WriteMesh(void) {
+  if (!this->FileWritingEnabled()) {
+    return;
+  }
+  assert(file_io_m->IsWriteModeActive());
+  assert(file_io_m->OngoingWriteStep());
+  auto min_max_order = file_io_m->MinMaxVariableOrder();
+  // Handle only constant order mesh/simulation for now
+  assert(min_max_order[0] == min_max_order[1]);
+  mfem::H1_FECollection fec(min_max_order[0], this->GetDimension());
+  mfem::ParFiniteElementSpace fes(parallel_mesh_m, &fec, this->GetDimension(),
+                                  mfem::Ordering::byVDIM);
+  mfem::ParGridFunction nodes(&fes);
+  parallel_mesh_m->GetNodes(nodes);
+
+  //*****************
+  // This part inherently assumes mesh will only be written once.
+  this->AddIOVariables();
+  // Handle vertices
+  const auto ndofs = static_cast<std::size_t>(fes.GetNDofs());
+  const auto dim = static_cast<std::size_t>(this->GetDimension());
+  // True here will be invalid for AMR and H/P refinement.
+  file_io_m->AddVariable<double>("vertices", {ndofs, dim}, true);
+  //*****************
+
+  uint32_t dimension = static_cast<uint32_t>(this->GetDimension());
+  uint32_t number_of_elements =
+      static_cast<uint32_t>(this->GetLocalCount<MeshElement::ELEMENT>());
+  uint32_t number_of_vertices = static_cast<uint32_t>(fes.GetNDofs());
+  // static_cast<uint32_t>(this->GetLocalCount<MeshElement::VERTEX>());
+  uint32_t vtk_type = static_cast<uint32_t>(this->GLVISToVTKType(
+      static_cast<int>(parallel_mesh_m->GetElement(0)->GetGeometryType())));
+  file_io_m->RootPutDeferred("dimension", &dimension);
+  file_io_m->PutDeferred("NumOfElements", &number_of_elements);
+  file_io_m->PutDeferred("NumOfVertices", &number_of_vertices);
+  file_io_m->RootPutDeferred("types", &vtk_type);
+  auto connectivity_span = file_io_m->PutSpan<uint64_t>("connectivity");
+  auto attribute_span = file_io_m->PutSpan<int32_t>("attribute");
+
+  std::size_t span_position = 0;
+  for (uint32_t n = 0; n < number_of_elements; ++n) {
+    attribute_span[n] = static_cast<uint32_t>(parallel_mesh_m->GetAttribute(n));
+    auto element = parallel_mesh_m->GetElement(n);
+    const auto nvertices = element->GetNVertices();
+    const int* vertex_buffer = element->GetVertices();
+    connectivity_span[span_position] = nvertices;
+    std::copy(vertex_buffer, vertex_buffer + nvertices,
+              &connectivity_span[span_position + 1]);
+    span_position += (1 + nvertices);
+  }
+  assert(span_position ==
+         static_cast<std::size_t>(
+             (parallel_mesh_m->GetElement(0)->GetNVertices() + 1) *
+             number_of_elements));
+
+  file_io_m->PutDeferred("vertices", nodes.GetData());
+
+  file_io_m->PerformPuts();
+}
+
+// Note: Taken from adios2stream.cpp in MFEM, added
+// by William F Godoy godoywf@ornl.gov on Jan 22, 2020
+uint32_t Mesh::GLVISToVTKType(const int glvisType) const noexcept {
+  uint32_t vtkType = 0;
+  switch (glvisType) {
+    case mfem::Geometry::Type::POINT:
+      vtkType = 1;
+      break;
+    case mfem::Geometry::Type::SEGMENT:
+      vtkType = 3;
+      break;
+    case mfem::Geometry::Type::TRIANGLE:
+      vtkType = 5;
+      break;
+    case mfem::Geometry::Type::SQUARE:
+      // vtkType = 8;
+      vtkType = 9;
+      break;
+    case mfem::Geometry::Type::TETRAHEDRON:
+      vtkType = 10;
+      break;
+    case mfem::Geometry::Type::CUBE:
+      // vtkType = 11;
+      vtkType = 12;
+      break;
+    case mfem::Geometry::Type::PRISM:
+      vtkType = 13;
+      break;
+    default:
+      vtkType = 0;
+      break;
+  }
+  return vtkType;
 }
 
 }  // namespace chyps

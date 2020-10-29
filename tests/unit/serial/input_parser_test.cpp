@@ -11,54 +11,17 @@
 #include "chyps/input_parser.hpp"
 
 #include <array>
+#include <fstream>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
-#include <fstream>
+#include "tests/helper/command_line_input.hpp"
 
 namespace {
 
 using namespace chyps;
-
-static std::vector<char*> FakeCommandLineInput(
-    const std::vector<std::string>& a_input);
-
-static void DeleteCommandLineInput(std::vector<char*>& a_input);
-
-static std::vector<char*> FakeCommandLineInput(
-    const std::vector<std::string>& a_input) {
-  std::vector<char*> vec;
-  for (const auto& s : a_input) {
-    char* c_str = new char[s.size() + 1];
-    std::copy(s.begin(), s.end(), c_str);
-    c_str[s.size()] = '\0';
-    vec.push_back(c_str);
-  }
-  return vec;
-}
-
-static void DeleteCommandLineInput(std::vector<char*>& a_input) {
-  for (auto& elem : a_input) {
-    delete[] elem;
-    elem = nullptr;
-  }
-}
-
-static bool StringEqual(const std::string& a_s1, const std::string& a_s2);
-static bool StringEqual(const std::string& a_s1, const std::string& a_s2) {
-  if (a_s1.size() != a_s2.size()) {
-    return false;
-  } else {
-    for (std::size_t n = 0; n < a_s1.size(); ++n) {
-      if (a_s1[n] != a_s2[n]) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
 
 TEST(CommonType, DefaultInvalid) {
   CommonType ctype;

@@ -11,6 +11,7 @@
 #ifndef CHYPS_MESH_HPP_
 #define CHYPS_MESH_HPP_
 
+#include <cstddef>
 #include <vector>
 
 #include <mfem/mfem.hpp>
@@ -18,19 +19,26 @@
 #include <mpi.h>
 
 #include "chyps/boundary_condition.hpp"
+#include "chyps/boundary_condition_manager.hpp"
 #include "chyps/input_parser.hpp"
+#include "chyps/mpi_parallel.hpp"
 
 namespace chyps {
+
+// Forward declare IO to prevent cyclical reference
+class IO;
+
+enum class MeshElement { ELEMENT = 0, VERTEX };
 
 class Mesh {
  public:
   Mesh(void) = delete;
 
   /// \brief Initialize Mesh for parallel use and collect options in a_parser.
-  Mesh(const MPI_Comm& a_mpi_comm, InputParser& a_parser);
+  Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser, IO* a_file_io);
 
   /// \brief Construct mesh for use by flow solvers.
-  void Initialize(void);
+  void Initialize(BoundaryConditionManager& a_boundary_condition_manager);
 
   /// \brief Return MPI Communicator used for this mesh.
   const MPI_Comm& GetMPIComm(void) const;
@@ -41,61 +49,38 @@ class Mesh {
   /// \brief Return spatial dimension of the mesh.
   int GetDimension(void) const;
 
-  /// \brief Return number of boundary conditions.
-  int GetNumberOfBoundaryConditions(void) const;
+  /// \brief Whether this mesh uses AMR or not. Currently AMR is not
+  /// implemented, so this is always false.
+  static constexpr bool UsesAMR(void) { return false; }
 
-  /// \brief Return boundary condition for boundary element tag a_tag.
-  const BoundaryCondition& GetBoundaryCondition(const int a_tag) const;
+  template <enum MeshElement>
+  std::size_t GetGlobalCount(void) const;
+  template <enum MeshElement>
+  std::size_t GetOffsetStart(void) const;
+  template <enum MeshElement>
+  std::size_t GetLocalCount(void) const;
 
-  /// \brief Return number of homogeneous Dirichlet conditions set.
+  /// \brief Return the number of boundary tag values that exist on the mesh.
   ///
-  /// Note: Must be called after Mesh::CommitBoundaryConditions.
-  int GetNumberOfHomogeneousDirichletConditions(void) const;
+  /// It is assumed that all tags from [1,ntags] are valid and exist on the
+  /// mesh.
+  int GetNumberOfBoundaryTagValues(void) const;
 
-  /// \brief Return number of inhomogeneous Dirichlet conditions set.
-  ///
-  /// Note: Must be called after Mesh::CommitBoundaryConditions.
-  int GetNumberOfDirichletConditions(void) const;
-
-  /// \brief Return number of time-varying Dirichlet conditions.
-  ///
-  /// Note: This must be <= the number of inhomogeneous Dirichlet conditions.
-  int GetNumberOfTimeVaryingDirichletConditions(void) const;
-
-  /// \brief Return number of homogeneous Neumann conditions set.
-  ///
-  /// Note: Must be called after Mesh::CommitBoundaryConditions.
-  int GetNumberOfHomogeneousNeumannConditions(void) const;
-
-  /// \brief Return number of inhomogeneous Neumann conditions set.
-  ///
-  /// Note: Must be called after Mesh::CommitBoundaryConditions.
-  int GetNumberOfNeumannConditions(void) const;
-
-  /// \brief Return number of time-varying Neumann conditions.
-  ///
-  /// Note: This must be <= the number of inhomogeneous Neumann conditions.
-  int GetNumberOfTimeVaryingNeumannConditions(void) const;
+  /// \brief Return the boundary condition manager to give solvers access to
+  /// boundary conditions.
+  const BoundaryConditionManager& GetBoundaryConditionManager(void) const;
 
   /// \brief Function computes and returns a std::vector of vertex positions for
   /// border vertices in a_mesh tagged with a_tag. Number of vertices is
   /// vector.size()/Mesh::GetDimension();
   std::pair<std::vector<double>, std::vector<int>> GetBoundaryVertices(
-      const int a_tag);
+      const int a_tag) const;
 
-  /// \brief Sets boundary condition for boundary elements tagged with a_tag.
+  /// \brief Writes the mesh to the file opened in file_io_m.
   ///
-  /// These boundary conditions are stored for calling again later and passed to
-  /// a solver to be used.
-  void SetBoundaryCondition(const int a_tag,
-                            const BoundaryCondition& a_condition);
-
-  /// \brief Commits the boundary conditions used for this mesh.
-  ///
-  /// If changes are made to the boundary conditions (beyond the values
-  /// at the values) they must be recommitted by calling
-  /// CommitBoundaryConditions.
-  void CommitBoundaryConditions(void);
+  /// Note: Mesh must be initialized before calling this and
+  /// file_io_m must be in Write mode.
+  void WriteMesh(void);
 
   /// \brief Destructor to free all heap-allocated objects.
   ~Mesh(void);
@@ -103,6 +88,7 @@ class Mesh {
  private:
   bool AllOptionsSupplied(void);
   void GatherOptions(void);
+  void AddIOVariables(void);
   void ReadAndRefineMesh(void);
   void AllocateVariables(void);
 
@@ -133,11 +119,16 @@ class Mesh {
       const std::array<std::array<double, 3>, 2>& a_bounding_box,
       const int a_nx, const int a_ny, const int a_nz);
 
+  bool FileWritingEnabled(void) const;
+
+  uint32_t GLVISToVTKType(const int glvisType) const noexcept;
+
   InputParser& parser_m;
-  const MPI_Comm& mpi_comm_m;
+  const MPIParallel& mpi_session_m;
+  IO* file_io_m;
   mfem::ParMesh* parallel_mesh_m;
-  std::vector<BoundaryCondition> boundary_conditions_m;
-  std::vector<int> boundary_condition_counts_m;
+  BoundaryConditionManager* boundary_condition_manager_m;
+  std::size_t element_offset_m;
 };
 
 }  // namespace chyps

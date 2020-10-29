@@ -16,8 +16,9 @@
 
 namespace chyps {
 
-HeatSolver::HeatSolver(InputParser& a_parser)
+HeatSolver::HeatSolver(InputParser& a_parser, IO* a_file_io)
     : parser_m(a_parser),
+      file_io_m(a_file_io),
       mesh_m(nullptr),
       ode_solver_m(nullptr),
       element_collection_m(nullptr),
@@ -26,7 +27,8 @@ HeatSolver::HeatSolver(InputParser& a_parser)
       coarse_element_space_m(nullptr),
       operator_m(nullptr),
       temperature_m(),
-      visit_collection_m(nullptr) {
+      visit_collection_m(nullptr),
+      adios2_collection_m(nullptr) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing HeatSolver object.");
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Gathering options of HeatSolver class.");
   this->GatherOptions();
@@ -49,7 +51,7 @@ void HeatSolver::Initialize(Mesh& a_mesh) {
   mesh_m = &a_mesh;
   this->AllocateVariablesAndOperators();
   this->SetODESolver();
-  this->RegisterVisItFields();
+  this->RegisterFieldsForIO();
 }
 
 double HeatSolver::AdjustTimeStep(const double a_proposed_dt) const {
@@ -73,15 +75,33 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
   return taken_time_step;
 }
 
-void HeatSolver::ExportVisIt(const int a_cycle, const double a_time) {
-  if (!parser_m["use_visit"].get<bool>()) {
-    return;
+void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
+  if (parser_m["use_visit"].get<bool>()) {
+    visit_collection_m->UpdateField("Temperature", temperature_m);
+    mfem::Vector temp_true_vector;
+    operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
+    visit_collection_m->UpdateField("ThermalCoefficient", temp_true_vector);
+    visit_collection_m->WriteOutFields(a_cycle, a_time);
   }
-  visit_collection_m->UpdateField("temperature", temperature_m);
-  mfem::Vector temp_true_vector;
-  operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
-  visit_collection_m->UpdateField("ThermalCoefficient", temp_true_vector);
-  visit_collection_m->WriteOutFields(a_cycle, a_time);
+
+  if (parser_m["use_adios2"].get<bool>()) {
+    adios2_collection_m->UpdateField("Temperature", temperature_m);
+    mfem::Vector temp_true_vector;
+    operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
+    adios2_collection_m->UpdateField("ThermalCoefficient", temp_true_vector);
+    adios2_collection_m->WriteOutFields(a_cycle, a_time);
+  }
+
+  if (this->FileWritingEnabled()) {
+    assert(file_io_m->IsWriteModeActive());
+    assert(file_io_m->OngoingWriteStep());
+    mfem::ParGridFunction temperature_gf(element_space_m);
+    temperature_gf.SetFromTrueDofs(temperature_m);
+    file_io_m->PutDeferred("HeatSolver/Temperature", temperature_gf);
+    file_io_m->PutDeferred("HeatSolver/ThermalCoefficient",
+                           operator_m->GetThermalCoefficient());
+    file_io_m->PerformPuts();
+  }
 }
 
 void HeatSolver::GatherOptions(void) {
@@ -209,16 +229,37 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
       parser_m["alpha"].get<double>(), parser_m["kappa"].get<double>());
 }
 
-void HeatSolver::RegisterVisItFields(void) {
-  if (!parser_m["use_visit"].get<bool>()) {
-    return;
+void HeatSolver::RegisterFieldsForIO(void) {
+  if (parser_m["use_visit"].get<bool>()) {
+    SPDLOG_LOGGER_INFO(MAIN_LOG, "Registering fields for export via VisIt");
+    visit_collection_m = new MfemVisItCollection(
+        mesh_m->GetMPIComm(), "HeatSolver", mesh_m->GetMfemMesh());
+    visit_collection_m->RegisterField("Temperature", element_space_m);
+    visit_collection_m->RegisterField("ThermalCoefficient", element_space_m);
+    SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
   }
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Registering fields for export via VisIt");
-  visit_collection_m = new MfemVisItCollection(
-      mesh_m->GetMPIComm(), "HeatSolver", mesh_m->GetMfemMesh());
-  visit_collection_m->RegisterField("temperature", element_space_m);
-  visit_collection_m->RegisterField("ThermalCoefficient", element_space_m);
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
+
+  if (parser_m["use_adios2"].get<bool>()) {
+    SPDLOG_LOGGER_INFO(MAIN_LOG,
+                       "Registering fields for export via ADIOS2 Collection");
+    adios2_collection_m = new MfemAdios2Collection(
+        mesh_m->GetMPIComm(), "HeatSolver.bp", mesh_m->GetMfemMesh());
+    adios2_collection_m->RegisterField("Temperature", element_space_m);
+    adios2_collection_m->RegisterField("ThermalCoefficient", element_space_m);
+    SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
+  }
+
+  // Below is ADIOS2 io calls. Will replace VisIt once working.
+  if (this->FileWritingEnabled()) {
+    file_io_m->AddVariableForGridFunction("HeatSolver/Temperature",
+                                          *element_space_m, true);
+    file_io_m->MarkAsPointVariable("HeatSolver/Temperature",
+                                   parser_m["order"].get<double>());
+    file_io_m->AddVariableForGridFunction("HeatSolver/ThermalCoefficient",
+                                          *element_space_m, true);
+    file_io_m->MarkAsPointVariable("HeatSolver/ThermalCoefficient",
+                                   parser_m["order"].get<double>());
+  }
 }
 
 static double SetInitialTemperature(const mfem::Vector& x) {
@@ -230,16 +271,23 @@ static double SetInitialTemperature(const mfem::Vector& x) {
 }
 
 void HeatSolver::SetInitialConditions(void) {
-  SPDLOG_LOGGER_INFO(
-      MAIN_LOG, "Creating and imposing initial temperature field conditions");
-  mfem::FunctionCoefficient initial_temperature(SetInitialTemperature);
   mfem::ParGridFunction temperature_grid_function(element_space_m);
-  temperature_grid_function.ProjectCoefficient(initial_temperature);
+  if (this->RestartFromFile()) {
+    temperature_grid_function = 0.0;
+    file_io_m->GetImmediateBlock(
+        "HeatSolver/Temperature", {0},
+        {static_cast<std::size_t>(temperature_grid_function.Size())},
+        temperature_grid_function.GetData());
+  } else {
+    SPDLOG_LOGGER_INFO(
+        MAIN_LOG, "Creating and imposing initial temperature field conditions");
+    mfem::FunctionCoefficient initial_temperature(SetInitialTemperature);
+    temperature_grid_function.ProjectCoefficient(initial_temperature);
 
-  SPDLOG_LOGGER_INFO(MAIN_LOG,
-                     "Projecting initial conditions onto temperature field");
+    SPDLOG_LOGGER_INFO(MAIN_LOG,
+                       "Projecting initial conditions onto temperature field");
+  }
   temperature_grid_function.GetTrueDofs(temperature_m);
-
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Temperature field allocated and set");
 }
 
@@ -248,6 +296,8 @@ HeatSolver::~HeatSolver(void) {
                      "Destructing HeatSolver and freeing associated memory");
   delete visit_collection_m;
   visit_collection_m = nullptr;
+  delete adios2_collection_m;
+  adios2_collection_m = nullptr;
   delete ode_solver_m;
   ode_solver_m = nullptr;
   delete element_collection_m;
@@ -261,6 +311,14 @@ HeatSolver::~HeatSolver(void) {
   delete operator_m;
   operator_m = nullptr;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "HeatSolver successfully destructed");
+}
+
+bool HeatSolver::FileWritingEnabled(void) const {
+  return file_io_m != nullptr && file_io_m->IsWriteModeActive();
+}
+
+bool HeatSolver::RestartFromFile(void) const {
+  return file_io_m != nullptr && file_io_m->IsReadModeActive();
 }
 
 }  // namespace chyps

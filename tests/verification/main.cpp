@@ -14,27 +14,15 @@
 #define CHYPS_LOGGER_OFF
 #include "chyps/logger.hpp"
 
-using namespace chyps;
+#include "chyps/mpi_parallel.hpp"
 
-// Custom main function needed to turn off Spdlog.
-// int main(int argc, char** argv) {
-//   ::testing::InitGoogleTest(&argc, argv);
-//   MPI_Init(&argc, &argv);
-//   StartLogger(0, 1, SpdlogLevel::OFF);
-//   auto result = RUN_ALL_TESTS();
-//   MPI_Finalize();
-//   return result;
-// }
+#include "tests/unit/parallel/mpi_session.hpp"
+
+using namespace chyps;
 
 int main(int argc, char** argv) {
   // Filter out Google Test arguments
   ::testing::InitGoogleTest(&argc, argv);
-
-  // Initialize MPI
-  MPI_Init(&argc, &argv);
-
-  // Turn off logger
-  StartLogger(0, 1, SpdlogLevel::OFF);
 
   // Add object that will finalize MPI on exit; Google Test owns this pointer
   ::testing::AddGlobalTestEnvironment(new GTestMPIListener::MPIEnvironment);
@@ -49,6 +37,10 @@ int main(int argc, char** argv) {
 
   // Adds MPI listener; Google Test owns this pointer
   listeners.Append(new GTestMPIListener::MPIWrapperPrinter(l, MPI_COMM_WORLD));
+
+  // Turn off logger
+  StartLogger(*mpi_session, SpdlogLevel::OFF);
+
   // Run tests, then clean up and exit. RUN_ALL_TESTS() returns 0 if all tests
   // pass and 1 if some test fails.
   int result = RUN_ALL_TESTS();

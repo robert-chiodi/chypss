@@ -8,6 +8,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+/// \file logger.hpp
+/// \brief File to include to use spdlog logger. Can be turned off via
+/// compile time option, which adjusts the SPDLOG_ACTIVE_LEVEL
+///
+/// Note: Always used this when including the logger since
+/// it will ensure that the macro SPDLOG_ACTIVE_LEVEL is
+/// define prior to inclusion of spdlog (and therefore
+/// make sure we respect the compile-time chosen level of logging.
+
 #ifndef CHYPS_LOGGER_HPP_
 #define CHYPS_LOGGER_HPP_
 
@@ -22,16 +31,10 @@
 #include <spdlog/spdlog.h>
 #include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 
-/// \file logger.hpp
-/// \brief File to include to use spdlog logger. Can be turned off via
-/// compile time option, which adjusts the SPDLOG_ACTIVE_LEVEL
-///
-/// Note: Always used this when including the logger since
-/// it will ensure that the macro SPDLOG_ACTIVE_LEVEL is
-/// define prior to inclusion of spdlog (and therefore
-/// make sure we respect the compile-time chosen level of logging.
-
 namespace chyps {
+
+// Forward declare MPIParallel to avoid circular reference
+class MPIParallel;
 
 /// \enum SpdlogLevel logger.hpp chyps/logger.hpp
 /// \briefEnumerator for choosing level of spdlog output at runtime.
@@ -46,7 +49,13 @@ extern std::shared_ptr<spdlog::logger> MAIN_LOG;
 /// \function StartLogger logger.hpp chyps/logger.hpp
 /// \brief Start global logging object, with one file per
 /// mpi_rank.
-void StartLogger(const int a_rank_id, const int a_world_size,
+void StartLogger(const MPIParallel& a_mpi_session,
+                 const SpdlogLevel a_level = SpdlogLevel::INFO);
+
+/// \function StartLogger logger.hpp chyps/logger.hpp
+/// \brief Start global logging object, with one file per
+/// mpi_rank.
+void StartLogger(const int a_rank, const int a_world_size,
                  const SpdlogLevel a_level = SpdlogLevel::INFO);
 
 }  // namespace chyps

@@ -14,27 +14,25 @@
 #include <mpi.h>
 #include <mfem/mfem.hpp>
 
+#include "chyps/boundary_condition_manager.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/mesh.hpp"
+#include "chyps/mpi_parallel.hpp"
 #include "chyps/precice_adapter.hpp"
 
 namespace chyps {
 
-int main(int argc, char** argv) {
-  int num_procs, myid;
-  MPI_Init(&argc, &argv);
-  MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-  MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-
-  StartLogger(myid, num_procs, SpdlogLevel::OFF);
+int main(int argc, char** argv, MPIParallel& a_mpi_session) {
+  StartLogger(a_mpi_session, SpdlogLevel::OFF);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Beginning simulation.");
 
   InputParser input_parser;
+  BoundaryConditionManager bc_manager(input_parser);
   // Related to mesh generation and use with chyps_heat executable.
   // Should be given same command line options as chyps_heat to
   // behave correctly.
-  Mesh mesh(MPI_COMM_WORLD, input_parser);
+  Mesh mesh(a_mpi_session, input_parser, nullptr);
 
   input_parser.AddOption<int>(
       "bc_tag", "-bt", "--boundary-condition-tag",
@@ -117,10 +115,13 @@ int main(int argc, char** argv) {
       break;
     }
   }
-  mesh.Initialize();
+  mesh.Initialize(bc_manager);
+
+  // FIXME: Rewrite to use bc_manager ?
 
   PreciceAdapter precice("DummySolver", "DummyMesh",
-                         input_parser["precice_config"], myid, num_procs);
+                         input_parser["precice_config"], a_mpi_session.MyRank(),
+                         a_mpi_session.NumberOfRanks());
   std::vector<double> vertex_positions;
   std::vector<int> vertex_indices;
   std::tie(vertex_positions, vertex_indices) = mesh.GetBoundaryVertices(my_tag);
@@ -165,9 +166,11 @@ int main(int argc, char** argv) {
 
   precice.Finalize();
 
-  MPI_Finalize();
   return 0;
 }
 }  // namespace chyps
 
-int main(int argc, char** argv) { return chyps::main(argc, argv); }
+int main(int argc, char** argv) {
+  chyps::MPIParallel mpi_session(&argc, &argv);
+  return chyps::main(argc, argv, mpi_session);
+}

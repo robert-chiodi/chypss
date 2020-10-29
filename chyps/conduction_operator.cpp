@@ -63,7 +63,8 @@ ConductionOperator::ConductionOperator(Mesh& a_mesh,
   // Set initial boundary conditions.
   mfem::Array<int> tdof_list;
 
-  if (mesh_m.GetNumberOfNeumannConditions() > 0) {
+  const auto& bc_manager = mesh_m.GetBoundaryConditionManager();
+  if (bc_manager.GetNumberOfNeumannConditions() > 0) {
     SPDLOG_LOGGER_INFO(
         MAIN_LOG,
         "Neumann boundary conditions exist. Turning on Neumann ParLinearForm");
@@ -72,14 +73,14 @@ ConductionOperator::ConductionOperator(Mesh& a_mesh,
   }
 
   const int number_of_boundary_conditions =
-      mesh_m.GetNumberOfBoundaryConditions();
+      bc_manager.GetNumberOfBoundaryConditions();
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Committing {} boundary conditions in ConductionOperator",
                      number_of_boundary_conditions);
   mfem::Vector boundary_temp;
   mfem::ParGridFunction temperature_gf(&fespace);
   for (int n = 0; n < number_of_boundary_conditions; ++n) {
-    const auto& condition = mesh_m.GetBoundaryCondition(n + 1);
+    const auto& condition = bc_manager.GetBoundaryCondition(n + 1);
 
     mfem::Array<int>& boundary = boundary_marker_m[n];
     fespace.GetEssentialTrueDofs(boundary, tdof_list);
@@ -252,8 +253,9 @@ void ConductionOperator::SetParameters(const mfem::Vector& u) {
 
 void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Entered UpdateBoundaryConditions.");
-  if (mesh_m.GetNumberOfTimeVaryingNeumannConditions() == 0) {
-    if (mesh_m.GetNumberOfTimeVaryingDirichletConditions() == 0) {
+  const auto& bc_manager = mesh_m.GetBoundaryConditionManager();
+  if (bc_manager.GetNumberOfTimeVaryingNeumannConditions() == 0) {
+    if (bc_manager.GetNumberOfTimeVaryingDirichletConditions() == 0) {
       SPDLOG_LOGGER_INFO(MAIN_LOG, "No time-varying conditions to be updated");
       return;
     }
@@ -266,13 +268,13 @@ void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
   mfem::Array<int> tdof_list;
 
   const int number_of_boundary_conditions =
-      mesh_m.GetNumberOfBoundaryConditions();
+      bc_manager.GetNumberOfBoundaryConditions();
 
   int boundary_conditions_updated = 0;
   mfem::Vector boundary_temp;
   mfem::ParGridFunction temperature_gf(&fespace);
   for (int n = 0; n < number_of_boundary_conditions; ++n) {
-    const auto& condition = mesh_m.GetBoundaryCondition(n + 1);
+    const auto& condition = bc_manager.GetBoundaryCondition(n + 1);
 
     mfem::Array<int>& boundary = boundary_marker_m[n];
     fespace.GetEssentialTrueDofs(boundary, tdof_list);

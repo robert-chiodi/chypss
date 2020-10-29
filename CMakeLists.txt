@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7...3.18)
+cmake_minimum_required(VERSION 3.9...3.18)
 
 if(${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
@@ -21,9 +21,11 @@ find_package(Boost 1.65.1 REQUIRED
 )
 find_package(PETSC REQUIRED)
 find_package(SPDLOG REQUIRED)
+find_package(ADIOS2 REQUIRED)
 
 # Packages held in this repo in ./external
-set(NLOHMANN_JSON_SINGLE_HEADER "./external/nlohmann_json")
+set(NLOHMANN_JSON_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/nlohmann_json")
+set(GTEST_MPI_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/gtest-mpi-listener")
 
 
 set(CHYPS_SOURCE "./chyps")
@@ -49,6 +51,7 @@ target_link_libraries(chyps PUBLIC
 )
 target_link_libraries(chyps PUBLIC Petsc::Petsc)
 target_link_libraries(chyps PUBLIC Spdlog::Spdlog)
+target_link_libraries(chyps PUBLIC adios2::cxx11_mpi)
 
 add_executable(chyps_heat)
 target_link_libraries(chyps_heat PRIVATE chyps)
@@ -59,11 +62,7 @@ target_link_libraries(dummy_precice PRIVATE chyps)
 set_property(TARGET dummy_precice PROPERTY CXX_STANDARD 11)
 
 add_executable(example)
-#target_link_libraries(example PRIVATE chyps)
-target_link_libraries(example PUBLIC MPI::MPI_CXX)
-target_link_libraries(example PUBLIC Mfem::Mfem)
-target_link_libraries(example PUBLIC Metis::Metis)
-target_link_libraries(example PUBLIC Hypre::Hypre)
+target_link_libraries(example PRIVATE chyps)
 
 set_property(TARGET example PROPERTY CXX_STANDARD 11)
 
@@ -75,10 +74,7 @@ add_subdirectory("${CHYPS_SOURCE}")
 if("${BUILD_TESTING}" MATCHES "ON")
   include(CTest)
   enable_testing()
-  include(CodeCoverage)
-  append_coverage_compiler_flags()
   add_subdirectory(./tests)
-  gtest_add_tests(TARGET test_chyps)
 endif()
 
 

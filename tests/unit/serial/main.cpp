@@ -8,10 +8,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include "chyps/mpi_parallel.hpp"
-#include "chyps/simulation.hpp"
+#include <gtest/gtest.h>
 
+#define CHYPS_LOGGER_OFF
+#include "chyps/logger.hpp"
+
+using namespace chyps;
+
+// Custom main function needed to turn off Spdlog.
 int main(int argc, char** argv) {
-  chyps::MPIParallel mpi_session(&argc, &argv);
-  return chyps::main(argc, argv, mpi_session);
+  ::testing::InitGoogleTest(&argc, argv);
+  StartLogger(0, 1, SpdlogLevel::OFF);
+  return RUN_ALL_TESTS();
 }

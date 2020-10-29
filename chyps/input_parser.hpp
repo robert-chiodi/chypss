@@ -191,10 +191,13 @@ class InputParser {
   void ParseCL(int argc, char** argv);
 
   /// \brief Parse input from a supplied input file in JSON format.
-  void ParseFromFile(const std::string& a_file_name);
+  bool ParseFromFile(const std::string& a_file_name);
 
   /// \brief Write parsed input to file at a_file_name.
   void WriteToFile(const std::string& a_file_name) const;
+
+  /// \brief Write parsed into to string in JSON format.
+  std::string WriteToString(void) const;
 
   /// \brief Convert parsed input to BSON format stored in the returned vector.
   std::vector<std::uint8_t> ToBSON(void) const;
@@ -244,12 +247,17 @@ class InputParser {
   /// \brief Add an option to be looked for when parsing. OptionType must be
   /// a *_REQUIRED kind. Since no flag is specified, this must be an
   /// OptionType::INPUT_FILE option. These types can be any of those valid
-  /// in nlohmann::json.
-  void AddOption(const std::string& a_name, const std::string& a_description);
+  /// in nlohmann::json. If marked as optional, it does not need to be supplied.
+  // FIXME : Add template to check that requested type is going to be valid.
+  void AddNoDefaultOption(const std::string& a_name,
+                          const std::string& a_description,
+                          const bool is_required = true);
 
   /// \brief Checks that all options added have been specified or have an
   /// available default value.
   bool AllOptionsSet(void) const;
+
+  bool OptionSet(const std::string& a_name) const;
 
   /// \brief Remove all option storage to save space. Parsed values will still
   /// be available through operator[].

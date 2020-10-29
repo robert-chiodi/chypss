@@ -445,10 +445,12 @@ void InputParser::ParseCL(int argc, char** argv) {
   }
 }
 
-void InputParser::ParseFromFile(const std::string& a_file_name) {
+bool InputParser::ParseFromFile(const std::string& a_file_name) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Parsing inputs from file {}", a_file_name);
   std::ifstream myfile(a_file_name.c_str());
-  assert(myfile.good());
+  if (!myfile.good()) {
+    return false;
+  }
   // Parse file while stripping comments given by // or /* ...  */
   // Allows comments to be used and parse to still be of proper
   // (standard conforming) JSON
@@ -457,12 +459,14 @@ void InputParser::ParseFromFile(const std::string& a_file_name) {
   myfile.close();
   for (const auto& element : read_input.items()) {
     // FIXME: Make an exception.
-    assert(parsed_input_m.contains(element.key()));
+    assert(parsed_input_m.contains(element.key()) ||
+           this->OptionalOption(option_type_m[element.key()]));
     parsed_input_m[element.key()] = element.value();
   }
   SPDLOG_LOGGER_INFO(
       MAIN_LOG, "Finished parsing inputs from {}. Total of {} inputs found.",
       a_file_name, parsed_input_m.size());
+  return true;
 }
 
 void InputParser::WriteToFile(const std::string& a_file_name) const {
@@ -472,6 +476,11 @@ void InputParser::WriteToFile(const std::string& a_file_name) const {
   myfile << std::setw(4) << parsed_input_m << std::endl;
   myfile.close();
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished writing JSON to file {}", a_file_name);
+}
+
+std::string InputParser::WriteToString(void) const {
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Writing JSON to string");
+  return parsed_input_m.dump(4);
 }
 
 std::vector<std::uint8_t> InputParser::ToBSON(void) const {
@@ -488,25 +497,36 @@ const nlohmann::json& InputParser::operator[](const std::string& a_name) const {
   return parsed_input_m[a_name];
 }
 
-void InputParser::AddOption(const std::string& a_name,
-                            const std::string& a_description) {
+void InputParser::AddNoDefaultOption(const std::string& a_name,
+                                     const std::string& a_description,
+                                     const bool is_required) {
+  SPDLOG_LOGGER_INFO(
+      MAIN_LOG, "Adding required command line option with name: {}", a_name);
   option_description_m.push_back(
       std::array<std::string, 4>{{a_name, "", "", a_description}});
   // FIXME: Make an exception
   assert(!parsed_input_m.contains(a_name));
-  parsed_input_m[a_name] = nlohmann::json::object();
-  option_type_m[a_name] = MakeOptionRequired(OptionType::INPUT_FILE);
+  if (is_required) {
+    parsed_input_m[a_name] = nlohmann::json::object();
+  }
+  const auto option_type = is_required
+                               ? MakeOptionRequired(OptionType::INPUT_FILE)
+                               : OptionType::INPUT_FILE;
+  option_type_m[a_name] = option_type;
 }
 
 bool InputParser::AllOptionsSet(void) const {
   // FIXME: Add test for this.
-  // FIXME: Update for using json
   for (const auto& elem : parsed_input_m) {
     if (elem.empty()) {
       return false;
     }
   }
   return true;
+}
+
+bool InputParser::OptionSet(const std::string& a_name) const {
+  return parsed_input_m.contains(a_name);
 }
 
 void InputParser::ClearOptions(void) {

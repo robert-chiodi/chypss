@@ -8,10 +8,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include "chyps/mpi_parallel.hpp"
-#include "chyps/simulation.hpp"
+#ifndef TESTS_UNIT_PARALLEL_MPI_SESSION_HPP_
+#define TESTS_UNIT_PARALLEL_MPI_SESSION_HPP_
 
-int main(int argc, char** argv) {
-  chyps::MPIParallel mpi_session(&argc, &argv);
-  return chyps::main(argc, argv, mpi_session);
+#include "chyps/mpi_parallel.hpp"
+
+namespace chyps {
+extern MPIParallel* mpi_session;
 }
+
+#endif  // TESTS_UNIT_PARALLEL_MPI_SESSION_HPP_

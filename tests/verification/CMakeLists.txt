@@ -1,0 +1,6 @@
+target_sources(test_chyps_verification PRIVATE main.cpp)
+target_sources(test_chyps_verification PRIVATE mpi_session.hpp)
+target_sources(test_chyps_verification PRIVATE mpi_session.cpp)
+target_sources(test_chyps_verification PRIVATE checkpoint_test.cpp)
+target_sources(test_chyps_verification PRIVATE dirichlet_test.cpp)
+

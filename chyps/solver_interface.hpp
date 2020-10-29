@@ -47,7 +47,7 @@ class SolverInterface {
   virtual double Advance(const double a_time, const double a_dt) = 0;
 
   /// \brief Write out data to disk for visualization in VisIt.
-  virtual void ExportVisIt(const int a_cycle, const double a_time) = 0;
+  virtual void WriteFields(const int a_cycle, const double a_time) = 0;
 
   /// \brief Empty virtual destructor to be overriden by inherited class.
   virtual ~SolverInterface(void) = default;
