@@ -263,11 +263,8 @@ void HeatSolver::RegisterFieldsForIO(void) {
 }
 
 static double SetInitialTemperature(const mfem::Vector& x) {
-  if (x.Norml2() < 0.5) {
-    return 0.0;
-  } else {
-    return 0.0;
-  }
+  return (1.0 - std::pow(x(0) - 1.0, 2)) * (1.0 - std::pow(x(1) - 1.0, 2)) *
+         1.0;
 }
 
 void HeatSolver::SetInitialConditions(void) {

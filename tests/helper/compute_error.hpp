@@ -77,7 +77,7 @@ inline double GlobalL2Diff_Normalized(const std::vector<double>& a_data_1,
                                       const std::vector<double>& a_data_2,
                                       const MPIParallel& a_mpi_session) {
   assert(a_data_1.size() == a_data_2.size());
-  auto summed_diff = GlobalL2Diff(a_data_1, a_data_1, a_mpi_session);
+  auto summed_diff = GlobalL2Diff(a_data_1, a_data_2, a_mpi_session);
   std::size_t local_count = a_data_1.size();
   std::size_t global_count;
   MPI_Allreduce(&local_count, &global_count, 1, my_MPI_SIZE_T, MPI_SUM,
@@ -89,7 +89,7 @@ inline double GlobalL1Diff_Normalized(const std::vector<double>& a_data_1,
                                       const std::vector<double>& a_data_2,
                                       const MPIParallel& a_mpi_session) {
   assert(a_data_1.size() == a_data_2.size());
-  auto summed_diff = GlobalL1Diff(a_data_1, a_data_1, a_mpi_session);
+  auto summed_diff = GlobalL1Diff(a_data_1, a_data_2, a_mpi_session);
   std::size_t local_count = a_data_1.size();
   std::size_t global_count;
   MPI_Allreduce(&local_count, &global_count, 1, my_MPI_SIZE_T, MPI_SUM,

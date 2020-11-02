@@ -29,7 +29,7 @@ TEST(Checkpoint, ReproduceLongRunLowOrder) {
   input_string.push_back(
       "tests/verification/data/checkpoint_loworder_test_input.json");
   input_string.push_back("-tf");
-  input_string.push_back("0.5");
+  input_string.push_back("0.3");
   input_string.push_back("-od");
   input_string.push_back("tests/verification/data/checkpointLO_OutputFull");
   auto input_char = FakeCommandLineInput(input_string);
@@ -39,7 +39,7 @@ TEST(Checkpoint, ReproduceLongRunLowOrder) {
 
   MPI_Barrier(mpi_session->GetComm());
   DeleteCommandLineInput(input_char);
-  input_string[3] = "0.25";
+  input_string[3] = "0.15";
   input_string[5] = "tests/verification/data/checkpointLO_OutputHalf";
   input_char = FakeCommandLineInput(input_string);
   argc = static_cast<int>(input_char.size());
@@ -48,7 +48,7 @@ TEST(Checkpoint, ReproduceLongRunLowOrder) {
 
   MPI_Barrier(mpi_session->GetComm());
   DeleteCommandLineInput(input_char);
-  input_string[3] = "0.5";
+  input_string[3] = "0.3";
   input_string[5] = "tests/verification/data/checkpointLO_OutputRestartFull";
   input_string.push_back("-id");
   input_string.push_back("tests/verification/data/checkpointLO_OutputHalf");
@@ -87,7 +87,7 @@ TEST(Checkpoint, ReproduceLongRunHigherOrder) {
   input_string.push_back(
       "tests/verification/data/checkpoint_highorder_test_input.json");
   input_string.push_back("-tf");
-  input_string.push_back("0.5");
+  input_string.push_back("0.3");
   input_string.push_back("-od");
   input_string.push_back("tests/verification/data/checkpointLO_OutputFull");
   auto input_char = FakeCommandLineInput(input_string);
@@ -97,7 +97,7 @@ TEST(Checkpoint, ReproduceLongRunHigherOrder) {
 
   MPI_Barrier(mpi_session->GetComm());
   DeleteCommandLineInput(input_char);
-  input_string[3] = "0.25";
+  input_string[3] = "0.15";
   input_string[5] = "tests/verification/data/checkpointLO_OutputHalf";
   input_char = FakeCommandLineInput(input_string);
   argc = static_cast<int>(input_char.size());
@@ -106,7 +106,7 @@ TEST(Checkpoint, ReproduceLongRunHigherOrder) {
 
   MPI_Barrier(mpi_session->GetComm());
   DeleteCommandLineInput(input_char);
-  input_string[3] = "0.5";
+  input_string[3] = "0.3";
   input_string[5] = "tests/verification/data/checkpointLO_OutputRestartFull";
   input_string.push_back("-id");
   input_string.push_back("tests/verification/data/checkpointLO_OutputHalf");

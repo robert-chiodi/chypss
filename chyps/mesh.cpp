@@ -302,7 +302,7 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateLineMesh(
   }
   boundary_indices[0] = 0;
   boundary_attrib[0] = 1;
-  boundary_indices[1] = a_nx + 1;
+  boundary_indices[1] = a_nx;
   boundary_attrib[1] = 2;
 
   const double dx =

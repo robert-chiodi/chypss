@@ -13,6 +13,7 @@
 #include <string>
 #include <utility>
 
+#include "chyps/logger.hpp"
 #include "chyps/mesh.hpp"
 
 namespace chyps {
@@ -75,6 +76,12 @@ void BoundaryConditionManager::SetBoundaryConditionType(
   assert(this->HasBeenInitialized());
   assert(a_tag > 0);
   assert(a_tag <= this->GetNumberOfBoundaryConditions());
+
+  SPDLOG_LOGGER_INFO(MAIN_LOG,
+                     "Setting boundary condition for tag {}: type({}), "
+                     "spatially_varying({}), temporally_varying({})",
+                     a_tag, static_cast<int>(a_bc_type), a_spatially_varying,
+                     a_time_varying);
 
   // Remove current occupier of a_tag from boundary_condition_counts_m;
   const auto previous_condition_count_type =
@@ -290,7 +297,7 @@ BoundaryConditionType BoundaryConditionManager::BoundaryConditionNameToEnum(
   if (a_bc_name == "HOMOGENEOUS_DIRICHLET") {
     return BoundaryConditionType::HOMOGENEOUS_DIRICHLET;
   } else if (a_bc_name == "HOMOGENEOUS_NEUMANN") {
-    return BoundaryConditionType::HOMOGENEOUS_DIRICHLET;
+    return BoundaryConditionType::HOMOGENEOUS_NEUMANN;
   } else if (a_bc_name == "DIRICHLET") {
     return BoundaryConditionType::DIRICHLET;
   } else if (a_bc_name == "HOMOGENEOUS_DIRICHLET") {
