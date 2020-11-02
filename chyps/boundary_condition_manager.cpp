@@ -219,14 +219,15 @@ bool BoundaryConditionManager::AllOptionsSupplied(void) const {
 }
 
 void BoundaryConditionManager::GatherOptions(void) {
-  parser_m.AddOption("bc_default", "-dbc", "--default-boundary-condition",
-                     "Default boundary condition type to use for the boundary "
-                     "conditions not "
-                     "explicitly supplied in the bc_list option. Options are "
-                     "HOMOGENEOUS_DIRICHLET or HOMOGENEOUS_NEUMANN",
-                     std::string("HOMOGENEOUS_DIRICHLET"));
-  parser_m.AddNoDefaultOption(
-      "bc_list",
+  parser_m.AddOptionDefault(
+      "BCManager/bc_default",
+      "Default boundary condition type to use for the boundary "
+      "conditions not "
+      "explicitly supplied in the bc_list option. Options are "
+      "HOMOGENEOUS_DIRICHLET or HOMOGENEOUS_NEUMANN",
+      std::string("HOMOGENEOUS_DIRICHLET"));
+  parser_m.AddOptionNoDefault(
+      "BCManager/bc_list",
       "A nested JSON object describing the boundary conditions. The keys "
       "inside bc_list should be the tag of the boundary condition being set. "
       "Inside this tag their should be {key,value} pairs. Valid {key,value} "
@@ -237,7 +238,7 @@ void BoundaryConditionManager::GatherOptions(void) {
 
 void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
   const auto default_bc = this->BoundaryConditionNameToEnum(
-      parser_m["bc_default"].get<std::string>());
+      parser_m["BCManager/bc_default"].get<std::string>());
   assert(default_bc == BoundaryConditionType::HOMOGENEOUS_DIRICHLET ||
          default_bc == BoundaryConditionType::HOMOGENEOUS_NEUMANN);
 
@@ -253,12 +254,12 @@ void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
         boundary_conditions_m.size();
   }
 
-  if (!parser_m.OptionSet("bc_list")) {
+  if (!parser_m.OptionSet("BCManager/bc_list")) {
     // No list provided, use only default
     return;
   }
 
-  const auto& bc_list = parser_m["bc_list"];
+  const auto& bc_list = parser_m["BCManager/bc_list"];
 
   for (const auto& el : bc_list.items()) {
     const auto& key = el.key();

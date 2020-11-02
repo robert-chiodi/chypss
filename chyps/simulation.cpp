@@ -34,32 +34,33 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Beginning simulation.");
 
   InputParser input_parser;
-  input_parser.AddOption("use_precice", "-p", "--precice",
-                         "If preCICE will be used to couple to another solver.",
-                         false);
-  input_parser.AddOption("precice_config", "-pc", "--precice-config",
-                         "XML File holding the configuration for preCICE",
-                         std::string("../data/precice-config.xml"));
-  input_parser.AddOption("end_time", "-tf", "--t-final",
-                         "Final time; start time is 0.", 0.5);
-  input_parser.AddOption("time_step", "-dt", "--time-step", "Time step.",
-                         1.0e-2);
-  input_parser.AddOption(
-      "use_visit", "-visit", "--visit-datafiles",
+  input_parser.AddOptionDefault(
+      "Simulation/use_precice",
+      "If preCICE will be used to couple to another solver.", false);
+  input_parser.AddOptionDefault(
+      "Simulation/precice_config",
+      "XML File holding the configuration for preCICE",
+      std::string("../data/precice-config.xml"));
+  input_parser.AddOptionDefault("Simulation/end_time",
+                                "Final time; start time is 0.", 0.5);
+  input_parser.AddOptionDefault("Simulation/time_step", "Time step.", 1.0e-2);
+  input_parser.AddOptionDefault(
+      "Simulation/use_visit",
       "Save data files for VisIt (visit.llnl.gov) visualization.", false);
-  input_parser.AddOption("use_adios2", "-adios2", "--adios2-datafiles",
-                         "Save data files for ADIOS2  visualization.", false);
+  input_parser.AddOptionDefault("Simulation/use_adios2",
+                                "Save data files for ADIOS2  visualization.",
+                                false);
 
-  input_parser.AddOption("viz_steps", "-vs", "--visualization-steps",
-                         "Visualize every n-th timestep.", 5);
-  input_parser.AddOption(
-      "in_data", "-id", "--in-data",
+  input_parser.AddOptionDefault("Simulation/viz_steps",
+                                "Visualize every n-th timestep.", 5);
+  input_parser.AddOptionDefault(
+      "Simulation/in_data",
       "Name of file (or BP4 directory) holding "
       "data for restart. Do not include extension. Pass ignore if you "
       "do not wish to restart from a file.",
       std::string("ignore"));
-  input_parser.AddOption(
-      "out_data", "-od", "--out-data",
+  input_parser.AddOptionDefault(
+      "Simulation/out_data",
       "Name of file (or BP4 directory) to write that holds "
       "data to restart from. Do not include extension. Pass ignore if you "
       "do not wish to write files.",
@@ -71,7 +72,6 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   BoundaryConditionManager bc_manager(input_parser);
   HeatSolver solver(input_parser, &file_io);
 
-  --argc;
   const std::string input_file_name = argv[1];
   if (input_file_name == "help") {
     if (mpi_session.IAmRoot()) {
@@ -84,7 +84,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
     std::vector<std::uint8_t> v_bson;
     int size = 0;
     if (mpi_session.IAmRoot()) {
-      bool good_read = input_parser.ParseFromFile(input_file_name);
+      const bool good_read = input_parser.ParseFromFile(input_file_name);
       if (!good_read) {
         std::cout << "Trouble reading input file " << input_file_name
                   << std::endl;
@@ -106,13 +106,16 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
       input_parser.SetFromBSON(v_bson);
     }
   }
-  input_parser.ParseCL(argc, argv + 1);
+  argc += -2;  // Skip executable and input file name
+  input_parser.ParseCL(argc, argv + 2);
   input_parser.WriteToFile("simulation_configuration.json");
   assert(input_parser.AllOptionsSet());
   input_parser.ClearOptions();
 
-  const auto in_data_name = input_parser["in_data"].get<std::string>();
-  const auto out_data_name = input_parser["out_data"].get<std::string>();
+  const auto in_data_name =
+      input_parser["Simulation/in_data"].get<std::string>();
+  const auto out_data_name =
+      input_parser["Simulation/out_data"].get<std::string>();
   if (in_data_name != "ignore") {
     assert(in_data_name != out_data_name);
     file_io.SetRead(in_data_name);
@@ -127,7 +130,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   bc_manager.Initialize(mesh);
 
   PreciceAdapter* precice = nullptr;
-  const bool use_precice = input_parser["use_precice"].get<bool>();
+  const bool use_precice = input_parser["Simulation/use_precice"].get<bool>();
 
   double* temperature_bc = nullptr;
   std::vector<double> vertex_positions;
@@ -139,7 +142,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
     return -1;
     // precice =
     //     new PreciceAdapter("HeatSolver", "HeatSolverMesh",
-    //                        input_parser["precice_config"].get<std::string>(),
+    //                        input_parser["Simulation/precice_config"].get<std::string>(),
     //                        mpi_session.MyRank(),
     //                        mpi_session.NumberOfRanks());
     // std::tie(vertex_positions, vertex_indices) = mesh.GetBoundaryVertices(4);
@@ -178,7 +181,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
 
   int ti = 0;
   double time = 0.0;
-  auto dt = input_parser["time_step"].get<double>();
+  auto dt = input_parser["Simulation/time_step"].get<double>();
   if (file_io.IsReadModeActive()) {
     file_io.GetImmediateValue("CYCLE", &ti);
     file_io.GetImmediateValue("TIME", &time);
@@ -190,8 +193,8 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   if (use_precice) {
     max_dt = precice->Initialize();
   }
-  const auto final_time = input_parser["end_time"].get<double>();
-  const auto viz_steps = input_parser["viz_steps"].get<int>();
+  const auto final_time = input_parser["Simulation/end_time"].get<double>();
+  const auto viz_steps = input_parser["Simulation/viz_steps"].get<int>();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting simulation at time {}", time);
   SPDLOG_LOGGER_INFO(MAIN_LOG,

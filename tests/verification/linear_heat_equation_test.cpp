@@ -82,12 +82,13 @@ class DirichletVerificationSolution {
   const std::size_t series_length_m;
 };
 
-TEST(DirichletVerification, HomogeneousDirichlet) {
+TEST(LinearHeatEquation, HomogeneousAndConstantCoefficient) {
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
   input_string.push_back(
-      "tests/verification/data/dirichlet_solution_test_input.json");
-  input_string.push_back("-rp");
+      "tests/verification/data/"
+      "homogeneous_constant_coefficient_linear_heat.json");
+  input_string.push_back("-Mesh/parallel_refine");
   input_string.push_back("0");
 
   static constexpr std::size_t res_levels = 3;
@@ -100,7 +101,7 @@ TEST(DirichletVerification, HomogeneousDirichlet) {
     chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
 
     IO run_file(*mpi_session, "Run");
-    run_file.SetRead("tests/verification/data/DirichletSolution");
+    run_file.SetRead("tests/verification/data/HomogeneousCCSolution");
     std::vector<double> temperature_field;
     run_file.GetImmediateBlock("HeatSolver/Temperature", temperature_field);
     std::vector<double> point_field;

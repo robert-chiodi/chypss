@@ -23,157 +23,27 @@
 
 namespace chyps {
 
-/// \enum InputType input_parser.hpp chyps/input_parser.hpp
-/// \brief Enum storing the type of input to set flag for CommonType union.
-enum class InputType { INVALID = -1, BOOL = 0, INT, DOUBLE, STRING };
-
-/// \function TypeToInputType input_parser.hpp chyps/input_parser.hpp
-/// \brief Given a value type, responds the correct InputType enum value.
-///
-/// Only ValueTypes valid are bool, int, double, and std::string, which
-/// correspond to the types in InputType.
-template <class ValueType>
-InputType TypeToInputType(void);
-
-/// \enum OptionType input_parser.hpp chyps/input_parser.hpp
-/// \brief Enum storing the type of option added to the parser.
-///
-/// Users should only use the options ANY, COMMAND_LINE, and INPUT_FILE.
-/// Whether or not they are required are determined via supply of a
-/// default value in InputParser::AddOption. Including a default value
-/// makes the Option NOT required. Lack of default value makes the
-/// option required, and the OptionType will be updated to reflect that
-/// in the InputParser class object.
-///
-///  Required options are to have values >= 10, and should be aligned
-/// with their non-required equivalent so that ``required_type =
-/// non_required_type+10``.
-enum class OptionType {
-  ANY = 0,
-  COMMAND_LINE,
-  INPUT_FILE,
-  ANY_REQUIRED = 10,
-  COMMAND_LINE_REQUIRED,
-  INPUT_FILE_REQUIRED
-};
-
-/// \function MakeOptionRequired
-/// \brief Takes the OptionType stored in a_option and returns the _REQUIRED
-/// equivalent.
-OptionType MakeOptionRequired(const OptionType a_option);
-
-/// \class CommonType input_parser.hpp chyps/input_parser.hpp
-/// \brief A base type capable of storing a boolean, integer, double, or
-/// std::string. Intended for use in InputParser only.
-class CommonType {
-  union CT {
-    bool the_bool;
-    int the_int;
-    double the_double;
-    std::string the_string;
-
-    /// \brief Default constructor. Marked as InputType::INVALID type when used
-    /// in CommonType.
-    CT(void) : the_bool(false) {}
-
-    /// \brief Construct to bool value. CommonType marks as InputType::BOOL.
-    CT(const bool a_value) : the_bool(a_value) {}
-
-    /// \brief Construct to int value. CommonType marks as InputType::INT.
-    CT(const int a_value) : the_int(a_value) {}
-
-    /// \brief Construct to double value. CommonType marks as InputType::DOUBLE.
-    CT(const double a_value) : the_double(a_value) {}
-
-    /// \brief Construct to std::string value. CommonType marks as
-    /// InputType::STRING.
-    CT(const std::string a_value) : the_string(a_value) {}
-
-    ~CT(void) {}
-  };
-
+/// \class DirectoryJSON input_parser.hpp chyps/input_parser.hpp
+/// \brief Light wrapper for nlohmann::json that treats
+/// the character '/' in keys as indicating nesting
+/// in the JSON file.
+class DirectoryJSON {
  public:
-  /// \brief Default constructor. Sets type to InputType::INVALID.
-  CommonType(void);
+  DirectoryJSON(void) = default;
 
-  /// \brief Constructs with value a_bool, sets type to InputType::BOOL.
-  explicit CommonType(const bool a_bool);
+  nlohmann::json& operator[](const std::string& a_name);
+  const nlohmann::json& operator[](const std::string& a_name) const;
+  bool Contains(const std::string& a_name) const;
 
-  /// \brief Constructs with value a_int, sets type to InputType::INT.
-  explicit CommonType(const int a_int);
+  ~DirectoryJSON(void) = default;
 
-  /// \brief Constructs with value a_double, sets type to InputType::DOUBLE.
-  explicit CommonType(const double a_double);
-
-  /// \brief Constructs a std::string from  value a_string, sets type to
-  /// InputType::STRING.
-  explicit CommonType(const char* a_string);
-
-  /// \brief Constructs with value a_string, sets type to InputType::STRING.
-  explicit CommonType(const std::string& a_string);
-
-  /// \brief Copy constructor for CommonType.
-  CommonType(const CommonType& a_other);
-
-  /// \brief Move constructor for CommonType.
-  CommonType(CommonType&& a_other);
-
-  /// \brief Copy assignment for CommonType.
-  CommonType& operator=(const CommonType& a_other);
-
-  /// \brief Move assignment for CommonType.
-  CommonType& operator=(CommonType&& a_other);
-
-  /// \brief Copy assignment. Sets to InputType::BOOL with value of a_value.
-  CommonType& operator=(const bool a_value);
-
-  /// \brief Copy assignment. Sets to InputType::INT with value of a_value.
-  CommonType& operator=(const int a_value);
-
-  /// \brief Copy assignment. Sets to InputType::DOUBLE with value of a_value.
-  CommonType& operator=(const double a_value);
-
-  /// \brief Copy assignment. Sets to InputType::STRING with value of a_value.
-  CommonType& operator=(const char* a_value);
-
-  /// \brief Copy assignment. Sets to InputType::STRING with value of a_value.
-  CommonType& operator=(const std::string& a_value);
-
-  /// \brief Conversion operator allowing conversion of CommonType to bool.
-  operator bool(void) const;
-
-  /// \brief Conversion operator allowing conversion of CommonType to int.
-  operator int(void) const;
-
-  /// \brief Conversion operator allowing conversion of CommonType to double.
-  operator double(void) const;
-
-  /// \brief Conversion operator allowing conversion of CommonType to
-  /// std::string.
-  operator std::string(void) const;
-
-  /// \brief Set type to treat this as. See InputType enum for options.
-  void SetType(const InputType a_type);
-
-  /// \brief Returns the type CommonType is currently being used as.
-  InputType GetType(void) const;
-
-  /// \brief Returns a pointer to CommonType interpreted as ``Type``.
-  ///
-  /// This method has template specializations for each member in
-  /// the InputType enum, with the exception of InputType::INVALID.
-  /// Calling this method will change CommonType to be Type. This means
-  /// if GetPointer is called when type_id_m is not for Type, the current
-  /// object will be invalid according to the returned pointer.
-  template <class Type>
-  Type GetPointer(void);
-
-  /// \brief Custom destructor to properly handle and delete std::string in CT.
-  ~CommonType(void);
+  nlohmann::json json_m;
 
  private:
-  InputType type_id_m;
-  CT value_m;
+  std::pair<nlohmann::json*, std::string> LowestObject(
+      const std::string a_name);
+  std::pair<const nlohmann::json*, std::string> LowestObject(
+      const std::string a_name) const;
 };
 
 /// \class InputParser input_parser.hpp chyps/input_parser.hpp
@@ -196,7 +66,7 @@ class InputParser {
   /// \brief Write parsed input to file at a_file_name.
   void WriteToFile(const std::string& a_file_name) const;
 
-  /// \brief Write parsed into to string in JSON format.
+  /// \brief Write parsed input to string in JSON format.
   std::string WriteToString(void) const;
 
   /// \brief Convert parsed input to BSON format stored in the returned vector.
@@ -218,64 +88,62 @@ class InputParser {
   template <class Type>
   void DirectSet(const std::string& a_name, const Type& a_value);
 
-  /// \brief Add an option to be looked for when parsing. If not found,
-  /// a_default value will be used. OptionType must NOT be a *_REQUIRED kind.
-  /// Type must be a type from InputType enum.
+  /// \brief Add option with a_name and the given description. The default value
+  /// will be used if the option is not provided in the input file or on the
+  /// command line. It is assumed that supplying the option is optional.
+  ///
+  /// In order to indicate nesting inside the input file (JSON), use '/'
+  /// in a_name.
+  ///
+  /// NOTE: Use of '/' is not valid in a_name and will be assumed to represent
+  /// nesting.
   template <class ValueType>
-  void AddOption(const std::string& a_name, const std::string& a_short_flag,
-                 const std::string& a_long_flag,
-                 const std::string& a_description,
-                 const ValueType& a_default_value,
-                 const OptionType a_input_type = OptionType::ANY);
+  void AddOptionDefault(const std::string& a_name,
+                        const std::string& a_description,
+                        const ValueType& a_default_value);
 
-  /// \brief Add an option to be looked for when parsing. OptionType must be
-  /// a *_REQUIRED kind. Type must be a type from InputType enum.
-  template <class ValueType>
-  void AddOption(const std::string& a_name, const std::string& a_short_flag,
-                 const std::string& a_long_flag,
-                 const std::string& a_description,
-                 const OptionType a_input_type = OptionType::ANY);
-
-  /// \brief Add an option to be looked for when parsing. If not found,
-  /// a_default value will be used. OptionType must NOT be a *_REQUIRED kind.
-  /// Since no flag is specified, this must be an InputType::INPUT_FILE option.
-  /// These types can be any of those valid in nlohmann::json.
-  template <class ValueType>
-  void AddOption(const std::string& a_name, const std::string& a_description,
-                 const ValueType& a_default_value);
-
-  /// \brief Add an option to be looked for when parsing. OptionType must be
-  /// a *_REQUIRED kind. Since no flag is specified, this must be an
-  /// OptionType::INPUT_FILE option. These types can be any of those valid
-  /// in nlohmann::json. If marked as optional, it does not need to be supplied.
-  // FIXME : Add template to check that requested type is going to be valid.
-  void AddNoDefaultOption(const std::string& a_name,
+  /// \brief Add option with a_name and the given description. The bool
+  /// a_required indicates whether a value must be provided for the option (via
+  /// input file or command line) or can be ommitted. The string a_dependency
+  /// should be supplied if the option can normally be ommitted, UNLESS the
+  /// option a_dependency is given in the input file. This is used to enforce
+  /// declaration of certain options in case some other options are declared.
+  ///
+  /// In order to indicate nesting inside the input file (JSON), use '/'
+  /// in a_name.
+  ///
+  /// NOTE: Use of '/' is not valid in a_name and will be assumed to represent
+  /// nesting.
+  void AddOptionNoDefault(const std::string& a_name,
                           const std::string& a_description,
-                          const bool is_required = true);
+                          const bool a_required,
+                          const std::string& a_dependency = "");
 
   /// \brief Checks that all options added have been specified or have an
   /// available default value.
   bool AllOptionsSet(void) const;
 
+  /// \brief Returns whether the option is set during parsing, including whether
+  /// the option was added with a default value.
   bool OptionSet(const std::string& a_name) const;
 
-  /// \brief Remove all option storage to save space. Parsed values will still
-  /// be available through operator[].
+  /// \brief Remove all option metadata used when initially setting up available
+  /// options. Any parsed options will  still be available through the
+  /// operator[].
   void ClearOptions(void);
 
   /// \brief Print out the options and their default value (if provided).
   void PrintOptions(void) const;
 
  private:
-  bool CommandLineOption(const OptionType a_type) const;
-  bool InputFileOption(const OptionType a_type) const;
-  bool RequiredOption(const OptionType a_type) const;
-  bool OptionalOption(const OptionType a_type) const;
+  void RecursiveInsert(const nlohmann::json& a_input,
+                       nlohmann::json& a_parsed_nest);
 
-  nlohmann::json parsed_input_m;
-  std::vector<std::array<std::string, 4>> option_description_m;
-  std::unordered_map<std::string, OptionType> option_type_m;
-  std::unordered_map<std::string, InputType> type_m;
+  DirectoryJSON parsed_input_m;
+  DirectoryJSON option_description_m;
+  // -2=not required, -1=required, >=0 dependent
+  std::unordered_map<std::string, int> option_required_status_m;
+  std::vector<std::string> dependencies_m;
 };
 
 }  // namespace chyps

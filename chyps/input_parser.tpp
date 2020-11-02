@@ -23,46 +23,14 @@ void InputParser::DirectSet(const std::string& a_name, const Type& a_value) {
 }
 
 template <class ValueType>
-void InputParser::AddOption(const std::string& a_name,
-                            const std::string& a_short_flag,
-                            const std::string& a_long_flag,
-                            const std::string& a_description,
-                            const ValueType& a_default_value,
-                            const OptionType a_option_type) {
-  option_description_m.push_back(std::array<std::string, 4>{
-      {a_name, a_short_flag, a_long_flag, a_description}});
-  // FIXME: Make an exception
-  assert(!parsed_input_m.contains(a_name));
+void InputParser::AddOptionDefault(const std::string& a_name,
+                                   const std::string& a_description,
+                                   const ValueType& a_default_value) {
+  option_description_m[a_name] = a_description;
   parsed_input_m[a_name] = a_default_value;
-  option_type_m[a_name] = a_option_type;
-  type_m[a_name] = TypeToInputType<ValueType>();
-}
-
-template <class ValueType>
-void InputParser::AddOption(const std::string& a_name,
-                            const std::string& a_short_flag,
-                            const std::string& a_long_flag,
-                            const std::string& a_description,
-                            const OptionType a_option_type) {
-  option_description_m.push_back(std::array<std::string, 4>{
-      {a_name, a_short_flag, a_long_flag, a_description}});
-  // FIXME: Make an exception
-  assert(!parsed_input_m.contains(a_name));
-  parsed_input_m[a_name] = nlohmann::json::object();
-  option_type_m[a_name] = MakeOptionRequired(a_option_type);
-  type_m[a_name] = TypeToInputType<ValueType>();
-}
-
-template <class ValueType>
-void InputParser::AddOption(const std::string& a_name,
-                            const std::string& a_description,
-                            const ValueType& a_default_value) {
-  option_description_m.push_back(
-      std::array<std::string, 4>{{a_name, "", "", a_description}});
-  // FIXME: Make an exception
-  assert(!parsed_input_m.contains(a_name));
-  parsed_input_m[a_name] = a_default_value;
-  option_type_m[a_name] = OptionType::INPUT_FILE;
+  assert(option_required_status_m.find(a_name) ==
+         option_required_status_m.end());
+  option_required_status_m[a_name] = -2;
 }
 
 }  // namespace chyps

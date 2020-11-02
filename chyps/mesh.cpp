@@ -148,40 +148,40 @@ Mesh::~Mesh(void) {
 bool Mesh::AllOptionsSupplied(void) { return parser_m.AllOptionsSet(); }
 void Mesh::GatherOptions(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Adding options to look for in parser");
-  parser_m.AddOption("mesh_file", "-m", "--mesh", "Mesh file to use.",
-                     std::string("../data/star.mesh"));
-  parser_m.AddOption("serial_refine", "-rs", "--refine-serial",
-                     "Number of times to refine the mesh uniformly in serial.",
-                     2);
-  parser_m.AddOption(
-      "parallel_refine", "-rp", "--refine-parallel",
+  parser_m.AddOptionDefault("Mesh/mesh_file", "Mesh file to use.",
+                            std::string("../data/star.mesh"));
+  parser_m.AddOptionDefault(
+      "Mesh/serial_refine",
+      "Number of times to refine the mesh uniformly in serial.", 2);
+  parser_m.AddOptionDefault(
+      "Mesh/parallel_refine",
       "Number of times to refine the mesh uniformly in parallel.", 1);
-  parser_m.AddOption(
-      "gen_nx", "-nx", "--nx",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_nx",
       "If using generated mesh, number of elements in x direction.", -1);
-  parser_m.AddOption(
-      "gen_ny", "-ny", "--ny",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_ny",
       "If using generated mesh, number of elements in y direction.", -1);
-  parser_m.AddOption(
-      "gen_nz", "-nz", "--nz",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_nz",
       "If using generated mesh, number of elements in z direction.", -1);
-  parser_m.AddOption(
-      "gen_blx", "-blx", "--blx",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_blx",
       "If using generated mesh, lower x dimension of the cuboid domain", -1.0);
-  parser_m.AddOption(
-      "gen_bly", "-bly", "--bly",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_bly",
       "If using generated mesh, lower y dimension of the cuboid domain", -1.0);
-  parser_m.AddOption(
-      "gen_blz", "-blz", "--blz",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_blz",
       "If using generated mesh, lower z dimension of the cuboid domain", -1.0);
-  parser_m.AddOption(
-      "gen_bux", "-bux", "--bux",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_bux",
       "If using generated mesh, upper x dimension of the cuboid domain", 1.0);
-  parser_m.AddOption(
-      "gen_buy", "-buy", "--buy",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_buy",
       "If using generated mesh, upper y dimension of the cuboid domain", 1.0);
-  parser_m.AddOption(
-      "gen_buz", "-buz", "--buz",
+  parser_m.AddOptionDefault(
+      "Mesh/gen_buz",
       "If using generated mesh, upper z dimension of the cuboid domain", 1.0);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "All options added to parser for Mesh class");
 }
@@ -189,20 +189,20 @@ void Mesh::GatherOptions(void) {
 void Mesh::ReadAndRefineMesh(void) {
   mfem::Mesh* serial_mesh = nullptr;
   double* vertices = nullptr;
-  const auto file_name = parser_m["mesh_file"].get<std::string>();
+  const auto file_name = parser_m["Mesh/mesh_file"].get<std::string>();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Mesh reading mesh named {}", file_name);
 
   if (file_name == "generate") {
-    const auto nx = parser_m["gen_nx"].get<int>();
-    const auto ny = parser_m["gen_ny"].get<int>();
-    const auto nz = parser_m["gen_nz"].get<int>();
+    const auto nx = parser_m["Mesh/gen_nx"].get<int>();
+    const auto ny = parser_m["Mesh/gen_ny"].get<int>();
+    const auto nz = parser_m["Mesh/gen_nz"].get<int>();
     if (ny <= 0) {
       assert(nx > 0);
       assert(nz <= 0);
       std::array<std::array<double, 1>, 2> bounding_box{
-          {parser_m["gen_blx"].get<double>(),
-           parser_m["gen_bly"].get<double>()}};
+          {parser_m["Mesh/gen_blx"].get<double>(),
+           parser_m["Mesh/gen_bly"].get<double>()}};
       auto mesh_and_vertices = this->GenerateLineMesh(bounding_box, nx);
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
@@ -211,10 +211,10 @@ void Mesh::ReadAndRefineMesh(void) {
       assert(ny > 0);
       // 2D Mesh with Quads
       std::array<std::array<double, 2>, 2> bounding_box{
-          {{parser_m["gen_blx"].get<double>(),
-            parser_m["gen_bly"].get<double>()},
-           {parser_m["gen_bux"].get<double>(),
-            parser_m["gen_buy"].get<double>()}}};
+          {{parser_m["Mesh/gen_blx"].get<double>(),
+            parser_m["Mesh/gen_bly"].get<double>()},
+           {parser_m["Mesh/gen_bux"].get<double>(),
+            parser_m["Mesh/gen_buy"].get<double>()}}};
       auto mesh_and_vertices = this->GenerateQuadMesh(bounding_box, nx, ny);
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
@@ -224,12 +224,12 @@ void Mesh::ReadAndRefineMesh(void) {
       assert(nz > 0);
       // 3D Mesh with Hexs
       std::array<std::array<double, 3>, 2> bounding_box{
-          {{parser_m["gen_blx"].get<double>(),
-            parser_m["gen_bly"].get<double>(),
-            parser_m["gen_blz"].get<double>()},
-           {parser_m["gen_bux"].get<double>(),
-            parser_m["gen_buy"].get<double>(),
-            parser_m["gen_buz"].get<double>()}}};
+          {{parser_m["Mesh/gen_blx"].get<double>(),
+            parser_m["Mesh/gen_bly"].get<double>(),
+            parser_m["Mesh/gen_blz"].get<double>()},
+           {parser_m["Mesh/gen_bux"].get<double>(),
+            parser_m["Mesh/gen_buy"].get<double>(),
+            parser_m["Mesh/gen_buz"].get<double>()}}};
       auto mesh_and_vertices = this->GenerateHexMesh(bounding_box, nx, ny, nz);
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
@@ -242,8 +242,8 @@ void Mesh::ReadAndRefineMesh(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Mesh consists of {} dimensions",
                      serial_mesh->Dimension());
 
-  const auto serial_refinement = parser_m["serial_refine"].get<int>();
-  const auto parallel_refinement = parser_m["parallel_refine"].get<int>();
+  const auto serial_refinement = parser_m["Mesh/serial_refine"].get<int>();
+  const auto parallel_refinement = parser_m["Mesh/parallel_refine"].get<int>();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Performing {} levels of serial refinement",
                      serial_refinement);

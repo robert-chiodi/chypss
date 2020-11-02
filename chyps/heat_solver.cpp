@@ -76,7 +76,7 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
 }
 
 void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
-  if (parser_m["use_visit"].get<bool>()) {
+  if (parser_m["Simulation/use_visit"].get<bool>()) {
     visit_collection_m->UpdateField("Temperature", temperature_m);
     mfem::Vector temp_true_vector;
     operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
@@ -84,7 +84,7 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
     visit_collection_m->WriteOutFields(a_cycle, a_time);
   }
 
-  if (parser_m["use_adios2"].get<bool>()) {
+  if (parser_m["Simulation/use_adios2"].get<bool>()) {
     adios2_collection_m->UpdateField("Temperature", temperature_m);
     mfem::Vector temp_true_vector;
     operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
@@ -107,16 +107,16 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
 void HeatSolver::GatherOptions(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Gathering options to look for in parser.");
 
-  parser_m.AddOption("order", "-o", "--order",
-                     "Order (degree) of the finite elements.", 2);
-  parser_m.AddOption(
-      "time_advancement", "-s", "--ode-solver",
+  parser_m.AddOptionDefault("HeatSolver/order",
+                            "Order (degree) of the finite elements.", 2);
+  parser_m.AddOptionDefault(
+      "HeatSolver/time_advancement",
       "ODE solver: 1 - Backward Euler, 2 - SDIRK2, 3 - SDIRK3,\n\t"
       "\t   11 - Forward Euler, 12 - RK2, 13 - RK3 SSP, 14 - RK4.",
       3);
-  parser_m.AddOption("alpha", "-a", "--alpha", "Alpha coefficient.", 1.0e-2);
-  parser_m.AddOption("kappa", "-k", "--kappa", "Kappa coefficient offset.",
-                     0.5);
+  parser_m.AddOptionDefault("HeatSolver/alpha", "Alpha coefficient.", 1.0e-2);
+  parser_m.AddOptionDefault("HeatSolver/kappa", "Kappa coefficient offset.",
+                            0.5);
   // TODO Add a flag and way to specify which variables we wish to export to
   // VisIt.
 
@@ -128,7 +128,8 @@ bool HeatSolver::AllOptionsSupplied(void) const {
 }
 
 void HeatSolver::SetODESolver(void) {
-  const auto ode_solver_type = parser_m["time_advancement"].get<int>();
+  const auto ode_solver_type =
+      parser_m["HeatSolver/time_advancement"].get<int>();
   switch (ode_solver_type) {
     // Implicit L-stable methods
     case 1:
@@ -201,9 +202,9 @@ void HeatSolver::SetODESolver(void) {
 
 void HeatSolver::AllocateVariablesAndOperators(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating H1 collection with {} order elements",
-                     parser_m["order"].get<int>());
-  element_collection_m = new mfem::H1_FECollection(parser_m["order"].get<int>(),
-                                                   mesh_m->GetDimension());
+                     parser_m["HeatSolver/order"].get<int>());
+  element_collection_m = new mfem::H1_FECollection(
+      parser_m["HeatSolver/order"].get<int>(), mesh_m->GetDimension());
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Generating element space from H1 collection");
   element_space_m = new mfem::ParFiniteElementSpace(&(mesh_m->GetMfemMesh()),
@@ -222,15 +223,16 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Creating new variable thermal coefficient conduction "
                      "operator with alpha = {} and kappa = {}",
-                     parser_m["alpha"].get<double>(),
-                     parser_m["kappa"].get<double>());
+                     parser_m["HeatSolver/alpha"].get<double>(),
+                     parser_m["HeatSolver/kappa"].get<double>());
   operator_m = new ConductionOperator(
       *mesh_m, *coarse_element_space_m, *element_space_m, temperature_m,
-      parser_m["alpha"].get<double>(), parser_m["kappa"].get<double>());
+      parser_m["HeatSolver/alpha"].get<double>(),
+      parser_m["HeatSolver/kappa"].get<double>());
 }
 
 void HeatSolver::RegisterFieldsForIO(void) {
-  if (parser_m["use_visit"].get<bool>()) {
+  if (parser_m["Simulation/use_visit"].get<bool>()) {
     SPDLOG_LOGGER_INFO(MAIN_LOG, "Registering fields for export via VisIt");
     visit_collection_m = new MfemVisItCollection(
         mesh_m->GetMPIComm(), "HeatSolver", mesh_m->GetMfemMesh());
@@ -239,7 +241,7 @@ void HeatSolver::RegisterFieldsForIO(void) {
     SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
   }
 
-  if (parser_m["use_adios2"].get<bool>()) {
+  if (parser_m["Simulation/use_adios2"].get<bool>()) {
     SPDLOG_LOGGER_INFO(MAIN_LOG,
                        "Registering fields for export via ADIOS2 Collection");
     adios2_collection_m = new MfemAdios2Collection(
@@ -254,11 +256,11 @@ void HeatSolver::RegisterFieldsForIO(void) {
     file_io_m->AddVariableForGridFunction("HeatSolver/Temperature",
                                           *element_space_m, true);
     file_io_m->MarkAsPointVariable("HeatSolver/Temperature",
-                                   parser_m["order"].get<double>());
+                                   parser_m["HeatSolver/order"].get<double>());
     file_io_m->AddVariableForGridFunction("HeatSolver/ThermalCoefficient",
                                           *element_space_m, true);
     file_io_m->MarkAsPointVariable("HeatSolver/ThermalCoefficient",
-                                   parser_m["order"].get<double>());
+                                   parser_m["HeatSolver/order"].get<double>());
   }
 }
 

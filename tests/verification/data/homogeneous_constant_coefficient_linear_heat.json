@@ -1,0 +1,39 @@
+{
+    "Simulation":{
+		    "in_data":"ignore",
+		    "out_data":"tests/verification/data/HomogeneousCCSolution",
+		    "end_time": 0.01,
+		    "time_step": 0.001,
+		    "use_adios2": false,
+		    "use_visit": false,
+		    "viz_steps": 10		     
+		 },
+    "HeatSolver":{
+		    "alpha": 0.0,
+		    "kappa": 0.5,
+		    "order": 2,
+		    "time_advancement": 3
+		 },
+    "BCManager":{
+		    "bc_default": "HOMOGENEOUS_DIRICHLET",
+		    "bc_list":{
+                	"4":{
+ 	                   "type": "HOMOGENEOUS_NEUMANN"
+			    }
+        	      }
+		},
+    "Mesh":{
+	    "gen_blx": 0.0,
+	    "gen_bly": 0.0,
+	    "gen_blz": -1.0,
+	    "gen_bux": 2.0,
+	    "gen_buy": 2.0,
+	    "gen_buz": 1.0,
+	    "gen_nx": 10,
+	    "gen_ny": 10,
+	    "gen_nz": -1,
+	    "mesh_file": "generate",
+	    "parallel_refine": 0,
+	    "serial_refine": 0
+	   }
+}
