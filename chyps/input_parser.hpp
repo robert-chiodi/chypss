@@ -150,6 +150,13 @@ class InputParser {
                        nlohmann::json& a_parsed_nest);
   bool RecursiveOptionSetCheck(const nlohmann::json& a_input,
                                const std::string& a_path_name) const;
+  void RecursiveOptionPrint(const nlohmann::json& a_input,
+                            const std::string& a_path_name,
+                            const int a_nest_level) const;
+  static std::string AddTabs(const int a_number_of_tabs, const int a_tab_size);
+  static std::string ReTab(const std::string& a_string,
+                           const int a_number_of_tabs, const int a_tab_size);
+  static std::string BreakupString(const std::string& a_string);
 
   DirectoryJSON parsed_input_m;
   DirectoryJSON option_description_m;

@@ -174,6 +174,123 @@ bool InputParser::AllOptionsSet(const std::string& a_name) const {
                                        a_name + '/');
 }
 
+bool InputParser::OptionSet(const std::string& a_name) const {
+  return parsed_input_m.Contains(a_name);
+}
+
+void InputParser::ClearOptions(void) {
+  option_description_m.json_m.clear();
+  option_required_status_m.clear();
+  dependencies_m.clear();
+}
+
+void InputParser::PrintOptions(void) const {
+  std::cout << "\n\n// NOTE: This is not a valid JSON File.\n\n";
+  this->RecursiveOptionPrint(option_description_m.json_m, "", 0);
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished writing help to std::cout");
+}
+
+void InputParser::RecursiveOptionPrint(const nlohmann::json& a_input,
+                                       const std::string& a_path_name,
+                                       const int a_nest_level) const {
+  for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
+       ++it) {
+    if (it->is_object()) {
+      // Is a nested object object
+      std::cout << InputParser::AddTabs(a_nest_level, 4) << '"' << it.key()
+                << "\":"
+                << "{\n\n";
+      this->RecursiveOptionPrint(*it, a_path_name + it.key() + '/',
+                                 a_nest_level + 1);
+      std::cout << InputParser::AddTabs(a_nest_level, 4) << "}\n\n";
+    } else {
+      const std::string full_name = a_path_name + it.key();
+      const int required_status = option_required_status_m.at(full_name);
+      std::cout << InputParser::AddTabs(a_nest_level + 1, 4) << '"' << it.key()
+                << "\":"
+                << "\n";
+      std::cout << InputParser::AddTabs(a_nest_level + 3, 4) << "DESCRIPTION: "
+                << InputParser::ReTab(InputParser::BreakupString(
+                                          a_input[it.key()].get<std::string>()),
+                                      a_nest_level + 3, 4)
+                << '\n';
+      std::cout << InputParser::AddTabs(a_nest_level + 3, 4) << "OPTION TYPE: ";
+      if (required_status == -2) {
+        std::cout << "OPTIONAL";
+      } else if (required_status == -1) {
+        std::cout << "REQUIRED";
+      } else if (required_status >= 0) {
+        std::cout << "DEPENDENT ON " << dependencies_m[required_status];
+      }
+      std::cout << '\n';
+
+      std::cout << InputParser::AddTabs(a_nest_level + 3, 4)
+                << "DEFAULT VALUE: ";
+      if (parsed_input_m[full_name].empty()) {
+        std::cout << "NONE";
+      } else {
+        std::cout << parsed_input_m[full_name].dump();
+      }
+      std::cout << "\n\n";
+    }
+  }
+}
+
+std::string InputParser::AddTabs(const int a_number_of_tabs,
+                                 const int a_tab_size) {
+  return std::string(a_tab_size * a_number_of_tabs, ' ');
+}
+
+std::string InputParser::ReTab(const std::string& a_string,
+                               const int a_number_of_tabs,
+                               const int a_tab_size) {
+  std::string return_string = a_string;
+  std::size_t newline_location = return_string.find('\n');
+  while (newline_location != return_string.npos) {
+    return_string.replace(
+        newline_location, 1,
+        '\n' + InputParser::AddTabs(a_number_of_tabs, a_tab_size));
+    newline_location = return_string.find(
+        '\n', newline_location + a_number_of_tabs * a_tab_size + 1);
+  }
+  return return_string;
+}
+
+std::string InputParser::BreakupString(const std::string& a_string) {
+  static constexpr std::size_t line_length = 80;
+  if (a_string.size() < line_length) {
+    return a_string;
+  } else {
+    std::string return_string = a_string;
+    std::size_t string_end = line_length;
+    std::size_t space_location = 0;
+    while (return_string.size() > string_end) {
+      space_location = return_string.find(" ", space_location + line_length);
+      if (space_location == return_string.npos) {
+        return return_string;
+      }
+      return_string[space_location] = '\n';
+      string_end += line_length;
+    }
+    return return_string;
+  }
+}
+
+void InputParser::RecursiveInsert(const nlohmann::json& a_input,
+                                  nlohmann::json& a_parsed_nest) {
+  // FIXME : Need way to make sure there is a corresponding option for this
+  // input.
+  for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
+       ++it) {
+    if (it->is_object()) {
+      // Is a nested object object
+      this->RecursiveInsert(*it, a_parsed_nest[it.key()]);
+    } else {
+      a_parsed_nest[it.key()] = it.value();
+    }
+  }
+}
+
 bool InputParser::RecursiveOptionSetCheck(
     const nlohmann::json& a_input, const std::string& a_path_name) const {
   for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
@@ -196,50 +313,18 @@ bool InputParser::RecursiveOptionSetCheck(
       } else if (required_status >= 0) {
         if (parsed_input_m.Contains(dependencies_m[required_status]) &&
             !parsed_input_m.Contains(full_name)) {
-          {
-            // This option depends on anoher. That option was supplied, so this
-            // one must be as well, but was not found.
-            std::cout
-                << "The option " << full_name
-                << " is missing. It is required due to use of the dependency "
-                << dependencies_m[required_status] << std::endl;
-            return false;
-          }
+          // This option depends on anoher. That option was supplied, so this
+          // one must be as well, but was not found.
+          std::cout
+              << "The option " << full_name
+              << " is missing. It is required due to use of the dependency "
+              << dependencies_m[required_status] << std::endl;
+          return false;
         }
       }
     }
   }
   return true;
-}
-
-bool InputParser::OptionSet(const std::string& a_name) const {
-  return parsed_input_m.Contains(a_name);
-}
-
-void InputParser::ClearOptions(void) {
-  option_description_m.json_m.clear();
-  option_required_status_m.clear();
-  dependencies_m.clear();
-}
-
-void InputParser::PrintOptions(void) const {
-  std::cout << option_description_m.json_m.dump(4);
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished writing help to std::cout");
-}
-
-void InputParser::RecursiveInsert(const nlohmann::json& a_input,
-                                  nlohmann::json& a_parsed_nest) {
-  // FIXME : Need way to make sure there is a corresponding option for this
-  // input.
-  for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
-       ++it) {
-    if (it->is_object()) {
-      // Is a nested object object
-      this->RecursiveInsert(*it, a_parsed_nest[it.key()]);
-    } else {
-      a_parsed_nest[it.key()] = it.value();
-    }
-  }
 }
 
 }  // namespace chyps
