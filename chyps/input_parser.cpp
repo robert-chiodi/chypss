@@ -202,19 +202,20 @@ void InputParser::RecursiveOptionPrint(const nlohmann::json& a_input,
                 << "{\n\n";
       this->RecursiveOptionPrint(*it, a_path_name + it.key() + '/',
                                  a_nest_level + 1);
-      std::cout << InputParser::AddTabs(a_nest_level, 4) << "}\n\n";
+      std::cout << InputParser::AddTabs(a_nest_level, 4) << "} // End " << '"'
+                << it.key() << "\"\n\n ";
     } else {
       const std::string full_name = a_path_name + it.key();
       const int required_status = option_required_status_m.at(full_name);
-      std::cout << InputParser::AddTabs(a_nest_level + 1, 4) << '"' << it.key()
+      std::cout << InputParser::AddTabs(a_nest_level, 4) << '"' << it.key()
                 << "\":"
                 << "\n";
-      std::cout << InputParser::AddTabs(a_nest_level + 3, 4) << "DESCRIPTION: "
+      std::cout << InputParser::AddTabs(a_nest_level + 2, 4) << "DESCRIPTION: "
                 << InputParser::ReTab(InputParser::BreakupString(
                                           a_input[it.key()].get<std::string>()),
-                                      a_nest_level + 3, 4)
+                                      a_nest_level + 2, 4)
                 << '\n';
-      std::cout << InputParser::AddTabs(a_nest_level + 3, 4) << "OPTION TYPE: ";
+      std::cout << InputParser::AddTabs(a_nest_level + 2, 4) << "OPTION TYPE: ";
       if (required_status == -2) {
         std::cout << "OPTIONAL";
       } else if (required_status == -1) {
@@ -224,7 +225,7 @@ void InputParser::RecursiveOptionPrint(const nlohmann::json& a_input,
       }
       std::cout << '\n';
 
-      std::cout << InputParser::AddTabs(a_nest_level + 3, 4)
+      std::cout << InputParser::AddTabs(a_nest_level + 2, 4)
                 << "DEFAULT VALUE: ";
       if (parsed_input_m[full_name].empty()) {
         std::cout << "NONE";
