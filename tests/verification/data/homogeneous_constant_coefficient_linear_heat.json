@@ -6,7 +6,7 @@
 		    "time_step": 0.001,
 		    "use_adios2": false,
 		    "use_visit": false,
-		    "viz_steps": 10		     
+		    "viz_steps": 100000000
 		 },
     "HeatSolver":{
 		    "alpha": 0.0,

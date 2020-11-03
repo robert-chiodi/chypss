@@ -15,6 +15,7 @@
 #include <cmath>
 
 #include <mfem/mfem.hpp>
+#include <nlohmann_json/json.hpp>
 
 #include "tests/helper/command_line_input.hpp"
 #include "tests/helper/compute_error.hpp"
@@ -27,13 +28,11 @@ namespace {
 
 using namespace chyps;
 
-class DirichletVerificationSolution {
+class DecayingPulse {
  public:
-  DirichletVerificationSolution(const double a_coefficient,
-                                const double a_amplitude,
-                                const double a_domain_length,
-                                const double a_domain_height,
-                                const std::size_t a_series_length)
+  DecayingPulse(const double a_coefficient, const double a_amplitude,
+                const double a_domain_length, const double a_domain_height,
+                const std::size_t a_series_length)
       : coefficient_m(a_coefficient),
         amplitude_m(a_amplitude),
         domain_length_m(a_domain_length),
@@ -43,32 +42,31 @@ class DirichletVerificationSolution {
   double operator()(const double* a_position, double a_time) {
     double result = 0.0;
     for (std::size_t om = 1; om <= series_length_m; ++om) {
-      for (std::size_t on = 1; on <= series_length_m; ++on) {
+      for (std::size_t on = 1; on <= series_length_m / 2; ++on) {
         const std::size_t m = om;
-        const std::size_t n = on;
+        const std::size_t n = 2 * on - 1;
         const auto dn = static_cast<double>(n);
         const auto dm = static_cast<double>(m);
         const double ic_factor =
-            ((-1.0 + std::pow(-1, n)) * amplitude_m * domain_height_m *
-             domain_length_m *
+            (-2.0 * amplitude_m *
              (-8.0 * std::pow(domain_length_m, 2) +
               (-4.0 + std::pow(domain_length_m, 2)) * std::pow(dn, 2) *
                   std::pow(M_PI, 2)) *
-             std::sin((M_PI - 2.0 * dm * M_PI) / 4.0) *
-             (8.0 * std::pow(domain_height_m, 2) * (-1.0 + 2.0 * dm) * M_PI *
-                  std::cos((M_PI - 2.0 * dm * M_PI) / 4.0) +
-              (32.0 * std::pow(domain_height_m, 2) -
-               (-4.0 + std::pow(domain_height_m, 2)) *
-                   std::pow(1.0 - 2.0 * dm, 2) * std::pow(M_PI, 2)) *
-                  std::sin((M_PI - 2.0 * dm * M_PI) / 4.0))) /
-            (4.0 * std::pow(-1 + 2 * dm, 3) * std::pow(dn, 3) *
-             std::pow(M_PI, 3) * std::pow(M_PI, 3));
-        result +=
+             (4.0 * std::pow(1.0 - 2.0 * dm, 2) * std::pow(M_PI, 2) +
+              std::pow(domain_height_m, 2) *
+                  (32.0 +
+                   (-1.0 + 2.0 * dm) * M_PI *
+                       (8.0 * std::pow(-1.0, m) + M_PI - 2.0 * dm * M_PI)))) /
+            (2.0 * std::pow(-1.0 + 2.0 * dm, 3) * std::pow(dn, 3) *
+             std::pow(M_PI, 6));
+        const double new_term =
             ic_factor * std::sin(dn * M_PI * a_position[0] / domain_length_m) *
             std::sin((dm - 0.5) * M_PI * a_position[1] / domain_height_m) *
             std::exp(-coefficient_m * M_PI * M_PI * a_time *
                      (std::pow(dm - 0.5, 2) / std::pow(domain_height_m, 2) +
                       std::pow(dn / domain_length_m, 2)));
+
+        result += new_term;
       }
     }
     return result;
@@ -85,11 +83,19 @@ class DirichletVerificationSolution {
 TEST(LinearHeatEquation, HomogeneousAndConstantCoefficient) {
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
-  input_string.push_back(
+  std::string file_name =
       "tests/verification/data/"
-      "homogeneous_constant_coefficient_linear_heat.json");
+      "homogeneous_constant_coefficient_linear_heat.json";
+  input_string.push_back(file_name);
   input_string.push_back("-Mesh/parallel_refine");
   input_string.push_back("0");
+
+  std::ifstream myfile(file_name.c_str());
+  nlohmann::json input_file =
+      nlohmann::json::parse(myfile, nullptr, true, true);
+  myfile.close();
+
+  const double final_time = input_file["Simulation"]["end_time"].get<double>();
 
   static constexpr std::size_t res_levels = 3;
   std::array<std::array<double, 4>, res_levels> error_metrics;
@@ -112,10 +118,10 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficient) {
     assert(nvert[0] == point_field.size() / 2);
 
     std::vector<double> correct_solution(temperature_field.size());
-    DirichletVerificationSolution analytical_solution(0.5, 1.0, 2.0, 2.0, 20);
+    DecayingPulse analytical_solution(0.5, 1.0, 2.0, 2.0, 100);
     for (std::size_t n = 0; n < nvert[0]; ++n) {
       const double* position_2d = &(point_field[2 * n]);
-      correct_solution[n] = analytical_solution(position_2d, 0.01);
+      correct_solution[n] = analytical_solution(position_2d, final_time);
     }
 
     const double global_l1 = GlobalL1Diff_Normalized(
