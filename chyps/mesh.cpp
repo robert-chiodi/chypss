@@ -356,8 +356,8 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
           elem_indices[4 * elem_index] + (a_nx + 1);
       if (i == 0) {
         boundary_attrib[nbi] = 1;
-        boundary_indices[2 * nbi] = i + j * (a_nx + 1);
-        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + (a_nx + 1);
+        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + (a_nx + 1);
+        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] - (a_nx + 1);
         ++nbi;
       }
       if (i == a_nx - 1) {
@@ -374,8 +374,8 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
       }
       if (j == a_ny - 1) {
         boundary_attrib[nbi] = 4;
-        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + (a_nx + 1);
-        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + 1;
+        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + (a_nx + 1) + 1;
+        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] - 1;
         ++nbi;
       }
     }
@@ -433,6 +433,7 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateHexMesh(
   const int x_jump = 1;
   const int y_jump = a_nx + 1;
   const int z_jump = (a_ny + 1) * (a_nx + 1);
+  // FIXME: Boundary element orientations lead to normal pointing out of domain.
   for (int k = 0; k < a_nz; ++k) {
     for (int j = 0; j < a_ny; ++j) {
       for (int i = 0; i < a_nx; ++i) {
