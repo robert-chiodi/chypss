@@ -121,10 +121,20 @@ class InputParser {
 
   /// \brief Checks that all options added have been specified or have an
   /// available default value.
+  ///
+  /// NOTE: This function requires that the parser has not been cleared since
+  /// the options have been added.
   bool AllOptionsSet(void) const;
 
-  /// \brief Returns whether the option is set during parsing, including whether
-  /// the option was added with a default value.
+  /// \brief Checks that all required options for the name (or path)
+  /// a_name are supplied or have available default values.
+  ///
+  /// NOTE: This function requires that the parser has not been cleared since
+  /// the options have been added.
+  bool AllOptionsSet(const std::string& a_name) const;
+
+  /// \brief Returns whether the option is set during parsing, including
+  /// whether the option was added with a default value.
   bool OptionSet(const std::string& a_name) const;
 
   /// \brief Remove all option metadata used when initially setting up available
@@ -138,6 +148,8 @@ class InputParser {
  private:
   void RecursiveInsert(const nlohmann::json& a_input,
                        nlohmann::json& a_parsed_nest);
+  bool RecursiveOptionSetCheck(const nlohmann::json& a_input,
+                               const std::string& a_path_name) const;
 
   DirectoryJSON parsed_input_m;
   DirectoryJSON option_description_m;

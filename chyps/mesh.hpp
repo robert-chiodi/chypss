@@ -86,7 +86,6 @@ class Mesh {
   ~Mesh(void);
 
  private:
-  bool AllOptionsSupplied(void);
   void GatherOptions(void);
   void AddIOVariables(void);
   void ReadAndRefineMesh(void);

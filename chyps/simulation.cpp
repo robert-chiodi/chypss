@@ -109,8 +109,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   argc += -2;  // Skip executable and input file name
   input_parser.ParseCL(argc, argv + 2);
   input_parser.WriteToFile("simulation_configuration.json");
-  assert(input_parser.AllOptionsSet());
-  input_parser.ClearOptions();
+  assert(input_parser.AllOptionsSet("Simulation"));
 
   const auto in_data_name =
       input_parser["Simulation/in_data"].get<std::string>();
@@ -178,6 +177,10 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   // mesh.SetBoundaryCondition(3, condition);
   // mesh.CommitBoundaryConditions();
   solver.Initialize(mesh);
+
+  // Clear options from parser. Can still parse but
+  // can not check all options supplied.
+  input_parser.ClearOptions();
 
   int ti = 0;
   double time = 0.0;

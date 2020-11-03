@@ -64,9 +64,6 @@ class HeatSolver : public SolverInterface {
   ~HeatSolver(void);
 
  private:
-  // Confirms all runtime options have been specified or have default value;
-  bool AllOptionsSupplied(void) const;
-
   void GatherOptions(void);
 
   void ReadAndRefineMesh(void);

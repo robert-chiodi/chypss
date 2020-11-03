@@ -104,7 +104,6 @@ class BoundaryConditionManager {
 
  private:
   void GatherOptions(void);
-  bool AllOptionsSupplied(void) const;
   void SetBoundaryConditionsFromInput(void);
   bool HasBeenInitialized(void) const;
   static BoundaryConditionType BoundaryConditionNameToEnum(

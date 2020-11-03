@@ -133,21 +133,6 @@ void InputParser::AddOptionNoDefault(const std::string& a_name,
   }
 }
 
-void InputParser::RecursiveInsert(const nlohmann::json& a_input,
-                                  nlohmann::json& a_parsed_nest) {
-  // FIXME : Need way to make sure there is a corresponding option for this
-  // input.
-  for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
-       ++it) {
-    if (it->is_object()) {
-      // Is a nested object object
-      this->RecursiveInsert(*it, a_parsed_nest[it.key()]);
-    } else {
-      a_parsed_nest[it.key()] = it.value();
-    }
-  }
-}
-
 void InputParser::WriteToFile(const std::string& a_file_name) const {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Writing parser to JSON with filename {}",
                      a_file_name);
@@ -177,9 +162,51 @@ const nlohmann::json& InputParser::operator[](const std::string& a_name) const {
 
 bool InputParser::AllOptionsSet(void) const {
   // FIXME: Add test for this.
-  for (const auto& elem : parsed_input_m.json_m) {
-    if (elem.empty()) {
-      return false;
+  // Traverse over option_description as it has all available options.
+  // Can then compare to parsed_input_m to make sure all required options
+  // are indeed there.
+  return this->RecursiveOptionSetCheck(option_description_m.json_m, "");
+}
+
+bool InputParser::AllOptionsSet(const std::string& a_name) const {
+  assert(option_description_m.Contains(a_name));
+  return this->RecursiveOptionSetCheck(option_description_m[a_name],
+                                       a_name + '/');
+}
+
+bool InputParser::RecursiveOptionSetCheck(
+    const nlohmann::json& a_input, const std::string& a_path_name) const {
+  for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
+       ++it) {
+    if (it->is_object()) {
+      // Is a nested object object
+      const bool all_options_good =
+          this->RecursiveOptionSetCheck(*it, a_path_name + it.key() + '/');
+      if (!all_options_good) {
+        return false;
+      }
+    } else {
+      const std::string full_name = a_path_name + it.key();
+      const int required_status = option_required_status_m.at(full_name);
+      if (required_status == -1 && !parsed_input_m.Contains(full_name)) {
+        // Required option not found
+        std::cout << "The required option " << full_name << " is missing. "
+                  << std::endl;
+        return false;
+      } else if (required_status >= 0) {
+        if (parsed_input_m.Contains(dependencies_m[required_status]) &&
+            !parsed_input_m.Contains(full_name)) {
+          {
+            // This option depends on anoher. That option was supplied, so this
+            // one must be as well, but was not found.
+            std::cout
+                << "The option " << full_name
+                << " is missing. It is required due to use of the dependency "
+                << dependencies_m[required_status] << std::endl;
+            return false;
+          }
+        }
+      }
     }
   }
   return true;
@@ -198,6 +225,21 @@ void InputParser::ClearOptions(void) {
 void InputParser::PrintOptions(void) const {
   std::cout << option_description_m.json_m.dump(4);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished writing help to std::cout");
+}
+
+void InputParser::RecursiveInsert(const nlohmann::json& a_input,
+                                  nlohmann::json& a_parsed_nest) {
+  // FIXME : Need way to make sure there is a corresponding option for this
+  // input.
+  for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
+       ++it) {
+    if (it->is_object()) {
+      // Is a nested object object
+      this->RecursiveInsert(*it, a_parsed_nest[it.key()]);
+    } else {
+      a_parsed_nest[it.key()] = it.value();
+    }
+  }
 }
 
 }  // namespace chyps

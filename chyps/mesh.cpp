@@ -31,7 +31,7 @@ Mesh::Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser,
 }
 
 void Mesh::Initialize(BoundaryConditionManager& a_boundary_condition_manager) {
-  if (!this->AllOptionsSupplied()) {
+  if (!parser_m.AllOptionsSet("Mesh")) {
     std::cout << "Not all options needed in parser are supplied" << std::endl;
     std::cout << "Make sure that the InputParser has been parsed before "
                  "calling Initialize and that all required options are "
@@ -145,7 +145,6 @@ Mesh::~Mesh(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Mesh successfully destructed.");
 }
 
-bool Mesh::AllOptionsSupplied(void) { return parser_m.AllOptionsSet(); }
 void Mesh::GatherOptions(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Adding options to look for in parser");
   parser_m.AddOptionDefault("Mesh/mesh_file", "Mesh file to use.",

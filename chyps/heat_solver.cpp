@@ -36,7 +36,7 @@ HeatSolver::HeatSolver(InputParser& a_parser, IO* a_file_io)
 
 void HeatSolver::Initialize(Mesh& a_mesh) {
   // FIXME : make this an exception.
-  if (!this->AllOptionsSupplied()) {
+  if (!parser_m.AllOptionsSet("HeatSolver")) {
     std::cout << "Not all options needed for HeatSolver supplied" << std::endl;
     std::cout << "Make sure that the InputParser has been parsed before "
                  "calling Initialize and that all required options are "
@@ -121,10 +121,6 @@ void HeatSolver::GatherOptions(void) {
   // VisIt.
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Add all options to parser.");
-}
-
-bool HeatSolver::AllOptionsSupplied(void) const {
-  return parser_m.AllOptionsSet();
 }
 
 void HeatSolver::SetODESolver(void) {

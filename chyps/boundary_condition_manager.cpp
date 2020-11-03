@@ -45,7 +45,7 @@ BoundaryConditionManager::BoundaryConditionManager(InputParser& a_parser)
 
 void BoundaryConditionManager::Initialize(const Mesh& a_mesh) {
   // FIXME : make this an exception.
-  if (!this->AllOptionsSupplied()) {
+  if (!parser_m.AllOptionsSet("BCManager")) {
     std::cout << "Not all options needed for BoundaryConditionManager supplied"
               << std::endl;
     std::cout << "Make sure that the InputParser has been parsed before "
@@ -212,10 +212,6 @@ int BoundaryConditionManager::GetNumberOfTimeVaryingNeumannConditions(
   assert(boundary_condition_counts_m[details::BCType::TV_NEUMANN] <=
          boundary_condition_counts_m[details::BCType::NEUMANN]);
   return boundary_condition_counts_m[details::BCType::TV_NEUMANN];
-}
-
-bool BoundaryConditionManager::AllOptionsSupplied(void) const {
-  return parser_m.AllOptionsSet();
 }
 
 void BoundaryConditionManager::GatherOptions(void) {
