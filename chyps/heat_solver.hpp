@@ -18,11 +18,11 @@
 #include <mfem/mfem.hpp>
 
 #include "chyps/boundary_condition.hpp"
+#include "chyps/boundary_condition_manager.hpp"
 #include "chyps/conduction_operator.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/io.hpp"
 #include "chyps/mesh.hpp"
-#include "chyps/mfem_adios2_collection.hpp"
 #include "chyps/mfem_visit_collection.hpp"
 #include "chyps/solver_interface.hpp"
 
@@ -66,11 +66,13 @@ class HeatSolver : public SolverInterface {
  private:
   void GatherOptions(void);
 
-  void ReadAndRefineMesh(void);
+  void CreateBoundaryConditionManagers(void);
 
-  void SetODESolver(void);
+  void InitializeBoundaryConditions(void);
 
   void AllocateVariablesAndOperators(void);
+
+  void SetODESolver(void);
 
   void SetInitialConditions(void);
 
@@ -89,6 +91,8 @@ class HeatSolver : public SolverInterface {
   InputParser& parser_m;
   IO* file_io_m;
   Mesh* mesh_m;
+  std::unordered_map<std::string, BoundaryConditionManager>
+      boundary_conditions_m;
   mfem::ODESolver* ode_solver_m;
   mfem::FiniteElementCollection* element_collection_m;
   mfem::ParFiniteElementSpace* element_space_m;
@@ -97,7 +101,6 @@ class HeatSolver : public SolverInterface {
   ConductionOperatorBase* operator_m;
   mfem::Vector temperature_m;
   MfemVisItCollection* visit_collection_m;
-  MfemAdios2Collection* adios2_collection_m;
 };
 
 }  // namespace chyps

@@ -16,14 +16,16 @@
 
 namespace chyps {
 
-ConductionOperator::ConductionOperator(Mesh& a_mesh,
-                                       mfem::ParFiniteElementSpace& f_linear,
-                                       mfem::ParFiniteElementSpace& f,
-                                       mfem::Vector& u, const double a_alpha,
-                                       const double a_kappa)
+ConductionOperator::ConductionOperator(
+    Mesh& a_mesh,
+    const std::unordered_map<std::string, BoundaryConditionManager>&
+        a_boundary_conditions,
+    mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
+    mfem::Vector& u, const double a_alpha, const double a_kappa)
     : ConductionOperatorBase(f),
       fespace_linear_m(f_linear),
       mesh_m(a_mesh),
+      boundary_conditions_m(a_boundary_conditions),
       M(NULL),
       K(NULL),
       T(NULL),
@@ -63,7 +65,9 @@ ConductionOperator::ConductionOperator(Mesh& a_mesh,
   // Set initial boundary conditions.
   mfem::Array<int> tdof_list;
 
-  const auto& bc_manager = mesh_m.GetBoundaryConditionManager();
+  assert(boundary_conditions_m.find("temperature") !=
+         boundary_conditions_m.end());
+  const auto& bc_manager = boundary_conditions_m.at("temperature");
   if (bc_manager.GetNumberOfNeumannConditions() > 0) {
     SPDLOG_LOGGER_INFO(
         MAIN_LOG,
@@ -253,7 +257,9 @@ void ConductionOperator::SetParameters(const mfem::Vector& u) {
 
 void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Entered UpdateBoundaryConditions.");
-  const auto& bc_manager = mesh_m.GetBoundaryConditionManager();
+  assert(boundary_conditions_m.find("temperature") !=
+         boundary_conditions_m.end());
+  const auto& bc_manager = boundary_conditions_m.at("temperature");
   if (bc_manager.GetNumberOfTimeVaryingNeumannConditions() == 0) {
     if (bc_manager.GetNumberOfTimeVaryingDirichletConditions() == 0) {
       SPDLOG_LOGGER_INFO(MAIN_LOG, "No time-varying conditions to be updated");

@@ -26,7 +26,8 @@ class BoundaryConditionManager {
   /// \brief Constructor for boundary condition manager with a specified default
   /// BC type.
   ///
-  BoundaryConditionManager(InputParser& a_parser);
+  BoundaryConditionManager(InputParser& a_parser,
+                           const std::string& a_parser_prefix);
 
   /// \brief Initialize the boundary condition manager. Must be called after
   /// initializing the associated a_mesh.
@@ -111,6 +112,7 @@ class BoundaryConditionManager {
   static int GetConditionCountType(const BoundaryCondition& a_bc);
 
   InputParser& parser_m;
+  const std::string parser_prefix_m;
   const Mesh* mesh_m;
   std::vector<int> boundary_condition_counts_m;
   std::vector<BoundaryCondition> boundary_conditions_m;

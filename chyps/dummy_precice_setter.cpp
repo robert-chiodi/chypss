@@ -28,7 +28,6 @@ int main(int argc, char** argv, MPIParallel& a_mpi_session) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Beginning simulation.");
 
   InputParser input_parser;
-  BoundaryConditionManager bc_manager(input_parser);
   // Related to mesh generation and use with chyps_heat executable.
   // Should be given same command line options as chyps_heat to
   // behave correctly.
@@ -115,9 +114,7 @@ int main(int argc, char** argv, MPIParallel& a_mpi_session) {
       break;
     }
   }
-  mesh.Initialize(bc_manager);
-
-  // FIXME: Rewrite to use bc_manager ?
+  mesh.Initialize();
 
   PreciceAdapter precice("DummySolver", "DummyMesh",
                          input_parser["precice_config"], a_mpi_session.MyRank(),

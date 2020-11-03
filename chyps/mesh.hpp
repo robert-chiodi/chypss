@@ -38,7 +38,7 @@ class Mesh {
   Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser, IO* a_file_io);
 
   /// \brief Construct mesh for use by flow solvers.
-  void Initialize(BoundaryConditionManager& a_boundary_condition_manager);
+  void Initialize(void);
 
   /// \brief Return MPI Communicator used for this mesh.
   const MPI_Comm& GetMPIComm(void) const;
@@ -65,10 +65,6 @@ class Mesh {
   /// It is assumed that all tags from [1,ntags] are valid and exist on the
   /// mesh.
   int GetNumberOfBoundaryTagValues(void) const;
-
-  /// \brief Return the boundary condition manager to give solvers access to
-  /// boundary conditions.
-  const BoundaryConditionManager& GetBoundaryConditionManager(void) const;
 
   /// \brief Function computes and returns a std::vector of vertex positions for
   /// border vertices in a_mesh tagged with a_tag. Number of vertices is
@@ -126,7 +122,6 @@ class Mesh {
   const MPIParallel& mpi_session_m;
   IO* file_io_m;
   mfem::ParMesh* parallel_mesh_m;
-  BoundaryConditionManager* boundary_condition_manager_m;
   std::size_t element_offset_m;
 };
 

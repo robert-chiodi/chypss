@@ -20,6 +20,7 @@ HeatSolver::HeatSolver(InputParser& a_parser, IO* a_file_io)
     : parser_m(a_parser),
       file_io_m(a_file_io),
       mesh_m(nullptr),
+      boundary_conditions_m(),
       ode_solver_m(nullptr),
       element_collection_m(nullptr),
       element_space_m(nullptr),
@@ -27,11 +28,18 @@ HeatSolver::HeatSolver(InputParser& a_parser, IO* a_file_io)
       coarse_element_space_m(nullptr),
       operator_m(nullptr),
       temperature_m(),
-      visit_collection_m(nullptr),
-      adios2_collection_m(nullptr) {
+      visit_collection_m(nullptr) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing HeatSolver object.");
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Gathering options of HeatSolver class.");
   this->GatherOptions();
+  this->CreateBoundaryConditionManagers();
+}
+
+void HeatSolver::CreateBoundaryConditionManagers(void) {
+  boundary_conditions_m.emplace(std::make_pair(
+      "temperature",
+      BoundaryConditionManager(parser_m,
+                               "HeatSolver/BoundaryConditions/temperature")));
 }
 
 void HeatSolver::Initialize(Mesh& a_mesh) {
@@ -49,9 +57,16 @@ void HeatSolver::Initialize(Mesh& a_mesh) {
   // time advancement
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Initializing HeatSolver class.");
   mesh_m = &a_mesh;
+  this->InitializeBoundaryConditions();
   this->AllocateVariablesAndOperators();
   this->SetODESolver();
   this->RegisterFieldsForIO();
+}
+
+void HeatSolver::InitializeBoundaryConditions(void) {
+  for (auto& manager : boundary_conditions_m) {
+    manager.second.Initialize(*mesh_m);
+  }
 }
 
 double HeatSolver::AdjustTimeStep(const double a_proposed_dt) const {
@@ -84,22 +99,12 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
     visit_collection_m->WriteOutFields(a_cycle, a_time);
   }
 
-  if (parser_m["Simulation/use_adios2"].get<bool>()) {
-    adios2_collection_m->UpdateField("Temperature", temperature_m);
-    mfem::Vector temp_true_vector;
-    operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
-    adios2_collection_m->UpdateField("ThermalCoefficient", temp_true_vector);
-    adios2_collection_m->WriteOutFields(a_cycle, a_time);
-  }
-
   if (this->FileWritingEnabled()) {
     assert(file_io_m->IsWriteModeActive());
     assert(file_io_m->OngoingWriteStep());
     mfem::ParGridFunction temperature_gf(element_space_m);
     temperature_gf.SetFromTrueDofs(temperature_m);
     file_io_m->PutDeferred("HeatSolver/Temperature", temperature_gf);
-    file_io_m->PutDeferred("HeatSolver/ThermalCoefficient",
-                           operator_m->GetThermalCoefficient());
     file_io_m->PerformPuts();
   }
 }
@@ -222,8 +227,8 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
                      parser_m["HeatSolver/alpha"].get<double>(),
                      parser_m["HeatSolver/kappa"].get<double>());
   operator_m = new ConductionOperator(
-      *mesh_m, *coarse_element_space_m, *element_space_m, temperature_m,
-      parser_m["HeatSolver/alpha"].get<double>(),
+      *mesh_m, boundary_conditions_m, *coarse_element_space_m, *element_space_m,
+      temperature_m, parser_m["HeatSolver/alpha"].get<double>(),
       parser_m["HeatSolver/kappa"].get<double>());
 }
 
@@ -237,25 +242,11 @@ void HeatSolver::RegisterFieldsForIO(void) {
     SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
   }
 
-  if (parser_m["Simulation/use_adios2"].get<bool>()) {
-    SPDLOG_LOGGER_INFO(MAIN_LOG,
-                       "Registering fields for export via ADIOS2 Collection");
-    adios2_collection_m = new MfemAdios2Collection(
-        mesh_m->GetMPIComm(), "HeatSolver.bp", mesh_m->GetMfemMesh());
-    adios2_collection_m->RegisterField("Temperature", element_space_m);
-    adios2_collection_m->RegisterField("ThermalCoefficient", element_space_m);
-    SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
-  }
-
   // Below is ADIOS2 io calls. Will replace VisIt once working.
   if (this->FileWritingEnabled()) {
     file_io_m->AddVariableForGridFunction("HeatSolver/Temperature",
                                           *element_space_m, true);
     file_io_m->MarkAsPointVariable("HeatSolver/Temperature",
-                                   parser_m["HeatSolver/order"].get<double>());
-    file_io_m->AddVariableForGridFunction("HeatSolver/ThermalCoefficient",
-                                          *element_space_m, true);
-    file_io_m->MarkAsPointVariable("HeatSolver/ThermalCoefficient",
                                    parser_m["HeatSolver/order"].get<double>());
   }
 }
@@ -291,8 +282,6 @@ HeatSolver::~HeatSolver(void) {
                      "Destructing HeatSolver and freeing associated memory");
   delete visit_collection_m;
   visit_collection_m = nullptr;
-  delete adios2_collection_m;
-  adios2_collection_m = nullptr;
   delete ode_solver_m;
   ode_solver_m = nullptr;
   delete element_collection_m;

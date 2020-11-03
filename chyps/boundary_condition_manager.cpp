@@ -31,8 +31,10 @@ enum BCType {
 };
 }  // namespace details
 
-BoundaryConditionManager::BoundaryConditionManager(InputParser& a_parser)
+BoundaryConditionManager::BoundaryConditionManager(
+    InputParser& a_parser, const std::string& a_parser_prefix)
     : parser_m(a_parser),
+      parser_prefix_m(a_parser_prefix),
       mesh_m(nullptr),
       boundary_condition_counts_m(),
       boundary_conditions_m(),
@@ -45,7 +47,7 @@ BoundaryConditionManager::BoundaryConditionManager(InputParser& a_parser)
 
 void BoundaryConditionManager::Initialize(const Mesh& a_mesh) {
   // FIXME : make this an exception.
-  if (!parser_m.AllOptionsSet("BCManager")) {
+  if (!parser_m.AllOptionsSet(parser_prefix_m)) {
     std::cout << "Not all options needed for BoundaryConditionManager supplied"
               << std::endl;
     std::cout << "Make sure that the InputParser has been parsed before "
@@ -214,16 +216,16 @@ int BoundaryConditionManager::GetNumberOfTimeVaryingNeumannConditions(
   return boundary_condition_counts_m[details::BCType::TV_NEUMANN];
 }
 
-void BoundaryConditionManager::GatherOptions(void) {
+void BoundaryConditionManager::GatherOptions() {
   parser_m.AddOptionDefault(
-      "BCManager/bc_default",
+      parser_prefix_m + "/bc_default",
       "Default boundary condition type to use for the boundary "
       "conditions not "
       "explicitly supplied in the bc_list option. Options are "
       "HOMOGENEOUS_DIRICHLET or HOMOGENEOUS_NEUMANN",
       std::string("HOMOGENEOUS_DIRICHLET"));
   parser_m.AddOptionNoDefault(
-      "BCManager/bc_list",
+      parser_prefix_m + "/bc_list",
       "A nested JSON object describing the boundary conditions. The keys "
       "inside bc_list should be the tag of the boundary condition being set. "
       "Inside this tag their should be {key,value} pairs. Valid {key,value} "
@@ -234,7 +236,7 @@ void BoundaryConditionManager::GatherOptions(void) {
 
 void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
   const auto default_bc = this->BoundaryConditionNameToEnum(
-      parser_m["BCManager/bc_default"].get<std::string>());
+      parser_m[parser_prefix_m + "/bc_default"].get<std::string>());
   assert(default_bc == BoundaryConditionType::HOMOGENEOUS_DIRICHLET ||
          default_bc == BoundaryConditionType::HOMOGENEOUS_NEUMANN);
 
@@ -250,12 +252,12 @@ void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
         boundary_conditions_m.size();
   }
 
-  if (!parser_m.OptionSet("BCManager/bc_list")) {
+  if (!parser_m.OptionSet(parser_prefix_m + "/bc_list")) {
     // No list provided, use only default
     return;
   }
 
-  const auto& bc_list = parser_m["BCManager/bc_list"];
+  const auto& bc_list = parser_m[parser_prefix_m + "/bc_list"];
 
   for (const auto& el : bc_list.items()) {
     const auto& key = el.key();

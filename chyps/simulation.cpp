@@ -47,9 +47,6 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   input_parser.AddOptionDefault(
       "Simulation/use_visit",
       "Save data files for VisIt (visit.llnl.gov) visualization.", false);
-  input_parser.AddOptionDefault("Simulation/use_adios2",
-                                "Save data files for ADIOS2  visualization.",
-                                false);
 
   input_parser.AddOptionDefault("Simulation/viz_steps",
                                 "Visualize every n-th timestep.", 5);
@@ -69,7 +66,6 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
 
   IO file_io(mpi_session, "FILEIO");
   Mesh mesh(mpi_session, input_parser, &file_io);
-  BoundaryConditionManager bc_manager(input_parser);
   HeatSolver solver(input_parser, &file_io);
 
   const std::string input_file_name = argv[1];
@@ -125,8 +121,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
     file_io.RootWriteAttribute("InputFile", input_parser.WriteToString());
   }
 
-  mesh.Initialize(bc_manager);
-  bc_manager.Initialize(mesh);
+  mesh.Initialize();
 
   PreciceAdapter* precice = nullptr;
   const bool use_precice = input_parser["Simulation/use_precice"].get<bool>();

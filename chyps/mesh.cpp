@@ -24,13 +24,12 @@ Mesh::Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser,
       mpi_session_m(a_mpi_session),
       file_io_m(a_file_io),
       parallel_mesh_m(nullptr),
-      boundary_condition_manager_m(nullptr),
       element_offset_m(0) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing mesh object");
   this->GatherOptions();
 }
 
-void Mesh::Initialize(BoundaryConditionManager& a_boundary_condition_manager) {
+void Mesh::Initialize(void) {
   if (!parser_m.AllOptionsSet("Mesh")) {
     std::cout << "Not all options needed in parser are supplied" << std::endl;
     std::cout << "Make sure that the InputParser has been parsed before "
@@ -39,7 +38,6 @@ void Mesh::Initialize(BoundaryConditionManager& a_boundary_condition_manager) {
               << std::endl;
     std::exit(-1);
   }
-  boundary_condition_manager_m = &a_boundary_condition_manager;
   this->ReadAndRefineMesh();
   this->AllocateVariables();
 }
@@ -83,11 +81,6 @@ std::size_t Mesh::GetLocalCount<MeshElement::VERTEX>(void) const {
 int Mesh::GetNumberOfBoundaryTagValues(void) const {
   assert(parallel_mesh_m != nullptr);
   return parallel_mesh_m->bdr_attributes.Max();
-}
-
-const BoundaryConditionManager& Mesh::GetBoundaryConditionManager(void) const {
-  assert(boundary_condition_manager_m != nullptr);
-  return *boundary_condition_manager_m;
 }
 
 std::pair<std::vector<double>, std::vector<int>> Mesh::GetBoundaryVertices(

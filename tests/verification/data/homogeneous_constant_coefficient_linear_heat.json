@@ -12,16 +12,19 @@
 		    "alpha": 0.0,
 		    "kappa": 0.5,
 		    "order": 2,
-		    "time_advancement": 3
+		    "time_advancement": 3,
+		    "BoundaryConditions":{
+					 "temperature":{
+					    "bc_default": "HOMOGENEOUS_DIRICHLET",
+					    "bc_list":{
+        			        	"4":{
+			 	                   "type": "HOMOGENEOUS_NEUMANN"
+						    }
+			        	      }
+
+						       }
+					 }
 		 },
-    "BCManager":{
-		    "bc_default": "HOMOGENEOUS_DIRICHLET",
-		    "bc_list":{
-                	"4":{
- 	                   "type": "HOMOGENEOUS_NEUMANN"
-			    }
-        	      }
-		},
     "Mesh":{
 	    "gen_blx": 0.0,
 	    "gen_bly": 0.0,
