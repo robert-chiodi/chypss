@@ -31,6 +31,7 @@ target_sources(chyps PRIVATE mpi_parallel.hpp)
 target_sources(chyps PRIVATE mpi_parallel.cpp)
 target_sources(chyps PRIVATE simulation.hpp)
 target_sources(chyps PRIVATE simulation.cpp)
+target_sources(chyps PRIVATE debug_assert.hpp)
 
 
 target_sources(chyps_heat PRIVATE main.cpp)

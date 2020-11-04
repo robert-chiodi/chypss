@@ -12,7 +12,8 @@
 #define CHYPS_STORAGE_WRAPPER_TPP_
 
 #include <algorithm>
-#include <cassert>
+
+#include "chyps/debug_assert.hpp"
 
 namespace chyps {
 
@@ -125,8 +126,10 @@ void StorageWrapper<Type>::ClearData(void) {
 template <class Type>
 void StorageWrapper<Type>::AllocateAndCopyData(const std::size_t a_size,
                                                const Type* a_values) {
-  assert(stored_values_m == nullptr);
-  assert(referenced_values_m == nullptr);
+  DEBUG_ASSERT(stored_values_m == nullptr, global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(referenced_values_m == nullptr, global_assert{},
+               DebugLevel::CHEAP{});
   size_m = a_size;
   stored_values_m = new Type[size_m];
   std::copy(a_values, a_values + a_size, stored_values_m);

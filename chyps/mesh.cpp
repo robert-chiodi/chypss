@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <set>
 
+#include "chyps/debug_assert.hpp"
 #include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 
@@ -45,41 +46,46 @@ void Mesh::Initialize(void) {
 const MPI_Comm& Mesh::GetMPIComm(void) const { return mpi_session_m.GetComm(); }
 
 mfem::ParMesh& Mesh::GetMfemMesh(void) {
-  assert(parallel_mesh_m != nullptr);
+  DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
+               DebugLevel::CHEAP{});
   return *parallel_mesh_m;
 }
 
 int Mesh::GetDimension(void) const {
-  assert(parallel_mesh_m != nullptr);
+  DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
+               DebugLevel::CHEAP{});
   return parallel_mesh_m->Dimension();
 }
 
 template <>
 std::size_t Mesh::GetGlobalCount<MeshElement::ELEMENT>(void) const {
-  assert(parallel_mesh_m != nullptr);
+  DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
+               DebugLevel::CHEAP{});
   return static_cast<std::size_t>(parallel_mesh_m->GetGlobalNE());
 }
 
 template <>
 std::size_t Mesh::GetOffsetStart<MeshElement::ELEMENT>(void) const {
-  assert(parallel_mesh_m != nullptr);
   return element_offset_m;
 }
 
 template <>
 std::size_t Mesh::GetLocalCount<MeshElement::ELEMENT>(void) const {
-  assert(parallel_mesh_m != nullptr);
+  DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
+               DebugLevel::CHEAP{});
   return static_cast<std::size_t>(parallel_mesh_m->GetNE());
 }
 
 template <>
 std::size_t Mesh::GetLocalCount<MeshElement::VERTEX>(void) const {
-  assert(parallel_mesh_m != nullptr);
+  DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
+               DebugLevel::CHEAP{});
   return static_cast<std::size_t>(parallel_mesh_m->GetNV());
 }
 
 int Mesh::GetNumberOfBoundaryTagValues(void) const {
-  assert(parallel_mesh_m != nullptr);
+  DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
+               DebugLevel::CHEAP{});
   return parallel_mesh_m->bdr_attributes.Max();
 }
 
@@ -190,8 +196,12 @@ void Mesh::ReadAndRefineMesh(void) {
     const auto ny = parser_m["Mesh/gen_ny"].get<int>();
     const auto nz = parser_m["Mesh/gen_nz"].get<int>();
     if (ny <= 0) {
-      assert(nx > 0);
-      assert(nz <= 0);
+      DEBUG_ASSERT(
+          nx > 0, global_assert{}, DebugLevel::CHEAP{},
+          "nx must be strictly positive. Currently is: " + std::to_string(nx));
+      DEBUG_ASSERT(nz <= 0, global_assert{}, DebugLevel::CHEAP{},
+                   "1D mesh must have ny and nz < =0. nz currently is: " +
+                       std::to_string(nz));
       std::array<std::array<double, 1>, 2> bounding_box{
           {parser_m["Mesh/gen_blx"].get<double>(),
            parser_m["Mesh/gen_bly"].get<double>()}};
@@ -199,8 +209,12 @@ void Mesh::ReadAndRefineMesh(void) {
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
     } else if (nz <= 0) {
-      assert(nx > 0);
-      assert(ny > 0);
+      DEBUG_ASSERT(
+          nx > 0, global_assert{}, DebugLevel::CHEAP{},
+          "nx must be strictly positive. Currently is: " + std::to_string(nx));
+      DEBUG_ASSERT(
+          ny > 0, global_assert{}, DebugLevel::CHEAP{},
+          "ny must be strictly positive. Currently is: " + std::to_string(ny));
       // 2D Mesh with Quads
       std::array<std::array<double, 2>, 2> bounding_box{
           {{parser_m["Mesh/gen_blx"].get<double>(),
@@ -211,9 +225,15 @@ void Mesh::ReadAndRefineMesh(void) {
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
     } else {
-      assert(nx > 0);
-      assert(ny > 0);
-      assert(nz > 0);
+      DEBUG_ASSERT(
+          nx > 0, global_assert{}, DebugLevel::CHEAP{},
+          "nx must be strictly positive. Currently is: " + std::to_string(nx));
+      DEBUG_ASSERT(
+          ny > 0, global_assert{}, DebugLevel::CHEAP{},
+          "ny must be strictly positive. Currently is: " + std::to_string(ny));
+      DEBUG_ASSERT(
+          nz > 0, global_assert{}, DebugLevel::CHEAP{},
+          "nz must be strictly positive. Currently is: " + std::to_string(nz));
       // 3D Mesh with Hexs
       std::array<std::array<double, 3>, 2> bounding_box{
           {{parser_m["Mesh/gen_blx"].get<double>(),
@@ -585,11 +605,18 @@ void Mesh::WriteMesh(void) {
   if (!this->FileWritingEnabled()) {
     return;
   }
-  assert(file_io_m->IsWriteModeActive());
-  assert(file_io_m->OngoingWriteStep());
+  DEBUG_ASSERT(file_io_m->IsWriteModeActive(), global_assert{},
+               DebugLevel::CHEAP{},
+               "IO must be in write mode for writing to fields.");
+  DEBUG_ASSERT(file_io_m->OngoingWriteStep(), global_assert{},
+               DebugLevel::CHEAP{},
+               "An ongoing IO step is required for writing.");
   auto min_max_order = file_io_m->MinMaxVariableOrder();
   // Handle only constant order mesh/simulation for now
-  assert(min_max_order[0] == min_max_order[1]);
+  DEBUG_ASSERT(
+      min_max_order[0] == min_max_order[1], global_assert{},
+      DebugLevel::CHEAP{},
+      "Currenrtly only constant order mesh/simulations are supported.");
   mfem::H1_FECollection fec(min_max_order[0], this->GetDimension());
   mfem::ParFiniteElementSpace fes(parallel_mesh_m, &fec, this->GetDimension(),
                                   mfem::Ordering::byVDIM);
@@ -631,13 +658,14 @@ void Mesh::WriteMesh(void) {
               &connectivity_span[span_position + 1]);
     span_position += (1 + nvertices);
   }
-  assert(span_position ==
-         static_cast<std::size_t>(
-             (parallel_mesh_m->GetElement(0)->GetNVertices() + 1) *
-             number_of_elements));
+  DEBUG_ASSERT(span_position ==
+                   static_cast<std::size_t>(
+                       (parallel_mesh_m->GetElement(0)->GetNVertices() + 1) *
+                       number_of_elements),
+               global_assert{}, DebugLevel::CHEAP{},
+               "Span given wrong size or not completely filled.");
 
   file_io_m->PutDeferred("vertices", nodes.GetData());
-
   file_io_m->PerformPuts();
 }
 

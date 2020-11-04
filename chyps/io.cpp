@@ -10,6 +10,7 @@
 
 #include "chyps/io.hpp"
 
+#include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 
 namespace chyps {
@@ -117,8 +118,9 @@ void IO::AddVariableForGridFunction(
 
 void IO::BeginWriteStep(const int a_cycle, const double a_time,
                         const double a_dt) {
-  assert(!active_write_step_m);
-  assert(write_engine_m != nullptr);
+  DEBUG_ASSERT(!this->OngoingWriteStep(), global_assert{}, DebugLevel::CHEAP{},
+               "Already in middle of write step.");
+  DEBUG_ASSERT(write_engine_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   active_write_step_m = true;
   write_engine_m->BeginStep();
   this->RootPutDeferred("CYCLE", &a_cycle);
@@ -128,13 +130,15 @@ void IO::BeginWriteStep(const int a_cycle, const double a_time,
 }
 
 bool IO::OngoingWriteStep(void) const {
-  assert(write_engine_m != nullptr);
+  DEBUG_ASSERT(write_engine_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   return active_write_step_m;
 }
 
 void IO::EndWriteStep(void) {
-  assert(active_write_step_m);
-  assert(write_engine_m != nullptr);
+  DEBUG_ASSERT(
+      this->OngoingWriteStep(), global_assert{}, DebugLevel::CHEAP{},
+      "No write step has been started. Has BeginWriteStep been called?");
+  DEBUG_ASSERT(write_engine_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   active_write_step_m = false;
   write_engine_m->EndStep();
 }
@@ -149,20 +153,22 @@ void IO::CloseWriteEngine(void) {
 }
 
 void IO::BeginReadStep(void) {
-  assert(!active_read_step_m);
-  assert(read_engine_m != nullptr);
+  DEBUG_ASSERT(!this->OngoingReadStep(), global_assert{}, DebugLevel::CHEAP{},
+               "Already in middle of read step.");
+  DEBUG_ASSERT(read_engine_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   active_read_step_m = true;
   read_engine_m->BeginStep();
 }
 
 bool IO::OngoingReadStep(void) const {
-  assert(read_engine_m != nullptr);
+  DEBUG_ASSERT(read_engine_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   return active_read_step_m;
 }
 
 void IO::EndReadStep(void) {
-  assert(active_read_step_m);
-  assert(read_engine_m != nullptr);
+  DEBUG_ASSERT(this->OngoingReadStep(), global_assert{}, DebugLevel::CHEAP{},
+               "No read step has been started. Has BeginReadStep been called?");
+  DEBUG_ASSERT(read_engine_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   active_read_step_m = false;
   read_engine_m->EndStep();
 }
@@ -178,14 +184,18 @@ void IO::CloseReadEngine(void) {
 
 void IO::PutDeferred(const std::string& a_variable_name,
                      const mfem::ParGridFunction& a_grid_function) {
-  assert(this->IsWriteModeActive());
-  assert(this->OngoingWriteStep());
+  DEBUG_ASSERT(this->IsWriteModeActive(), global_assert{}, DebugLevel::CHEAP{},
+               "IO must be in write mode for writing to fields.");
+  DEBUG_ASSERT(this->OngoingWriteStep(), global_assert{}, DebugLevel::CHEAP{},
+               "An ongoing IO step is required for writing.");
   this->Put(a_variable_name, a_grid_function.GetData(), adios2::Mode::Deferred);
 }
 
 void IO::PerformPuts(void) {
-  assert(this->IsWriteModeActive());
-  assert(this->OngoingWriteStep());
+  DEBUG_ASSERT(this->IsWriteModeActive(), global_assert{}, DebugLevel::CHEAP{},
+               "IO must be in write mode for writing to fields.");
+  DEBUG_ASSERT(this->OngoingWriteStep(), global_assert{}, DebugLevel::CHEAP{},
+               "An ongoing IO step is required for writing.");
   write_engine_m->PerformPuts();
 }
 
@@ -242,6 +252,19 @@ std::array<std::size_t, 3> IO::GetMeshSizes(const Mesh& a_mesh,
                 << std::endl;
       std::exit(-1);
   }
+  DEBUG_ASSERT(mesh_sizes[1] < mesh_sizes[0], global_assert{},
+               DebugLevel::CHEAP{},
+               "Local offset must be less than the global size of the data.\n "
+               "Local offset: " +
+                   std::to_string(mesh_sizes[1]) +
+                   "\nGlobal size: " + std::to_string(mesh_sizes[0]));
+  DEBUG_ASSERT(
+      mesh_sizes[2] <= mesh_sizes[0], global_assert{}, DebugLevel::CHEAP{},
+      "Local size must be less than or equal to the global size of the data.\n"
+      "Local size: " +
+          std::to_string(mesh_sizes[2]) +
+          "\nGlobal size: " + std::to_string(mesh_sizes[0]));
+
   return mesh_sizes;
 }
 
@@ -306,7 +329,7 @@ std::array<int, 2> IO::MinMaxVariableOrder(void) const {
     min_max[0] = std::min(min_max[0], element);
     min_max[1] = std::max(min_max[1], element);
   }
-  assert(min_max[0] <= min_max[1]);
+  DEBUG_ASSERT(min_max[0] <= min_max[1], global_assert{}, DebugLevel::CHEAP{});
   return min_max;
 }
 

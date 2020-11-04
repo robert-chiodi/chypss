@@ -10,8 +10,7 @@
 
 #include "chyps/precice_adapter.hpp"
 
-#include <cassert>
-
+#include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 
 namespace chyps {
@@ -59,7 +58,9 @@ double PreciceAdapter::Initialize(void) {
 
 void PreciceAdapter::SetVertexPositions(
     const std::vector<double>& a_positions) {
-  assert(a_positions.size() % dimension_m == 0);
+  DEBUG_ASSERT(a_positions.size() % dimension_m == 0, global_assert{},
+               DebugLevel::CHEAP{},
+               "Vector of vertex positions must be of incorrect size.");
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Setting vertex positions for {} dimensional mesh.",
                      dimension_m);
@@ -82,8 +83,9 @@ bool PreciceAdapter::IsCouplingOngoing(void) const {
 
 void PreciceAdapter::AddData(const std::string& a_name,
                              const DataOperation a_operation) {
-  assert(data_m.find(a_name) ==
-         data_m.end());  // Data not added with name already
+  DEBUG_ASSERT(
+      data_m.find(a_name) == data_m.end(), global_assert{}, DebugLevel::CHEAP{},
+      "Data with name \"" + a_name + "\"already added to preCICE adapter.");
   const int data_id = interface_m.getDataID(a_name, mesh_id_m);
   data_m.emplace(a_name, PreciceData(data_id, a_operation));
   SPDLOG_LOGGER_INFO(
@@ -103,9 +105,12 @@ std::size_t PreciceAdapter::VectorDataSize(void) const {
 void PreciceAdapter::WriteBlockScalarData(const std::string& a_name,
                                           const double* a_data) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Writing data for {} to preCICE", a_name);
-  assert(data_m.find(a_name) != data_m.end());
+  DEBUG_ASSERT(data_m.find(a_name) != data_m.end(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" has not been added.");
   const auto& data_details = data_m[a_name];
-  assert(data_details.ForWriting());
+  DEBUG_ASSERT(data_details.ForWriting(), global_assert{}, DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" not marked for writing.");
   interface_m.writeBlockScalarData(data_details.GetDataID(),
                                    this->ScalarDataSize(), vertex_ids_m.data(),
                                    a_data);
@@ -115,9 +120,12 @@ void PreciceAdapter::WriteBlockScalarData(const std::string& a_name,
 void PreciceAdapter::ReadBlockScalarData(const std::string& a_name,
                                          double* a_data) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Reading data for {} from preCICE", a_name);
-  assert(data_m.find(a_name) != data_m.end());
+  DEBUG_ASSERT(data_m.find(a_name) != data_m.end(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" has not been added.");
   const auto data_details = data_m[a_name];
-  assert(data_details.ForReading());
+  DEBUG_ASSERT(data_details.ForReading(), global_assert{}, DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" not marked for reading.");
   interface_m.readBlockScalarData(data_details.GetDataID(),
                                   this->ScalarDataSize(), vertex_ids_m.data(),
                                   a_data);
@@ -127,9 +135,12 @@ void PreciceAdapter::ReadBlockScalarData(const std::string& a_name,
 void PreciceAdapter::WriteBlockVectorData(const std::string& a_name,
                                           const double* a_data) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Writing data for {} to preCICE", a_name);
-  assert(data_m.find(a_name) != data_m.end());
+  DEBUG_ASSERT(data_m.find(a_name) != data_m.end(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" has not been added.");
   const auto& data_details = data_m[a_name];
-  assert(data_details.ForWriting());
+  DEBUG_ASSERT(data_details.ForWriting(), global_assert{}, DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" not marked for writing.");
   interface_m.writeBlockVectorData(data_details.GetDataID(),
                                    this->VectorDataSize(), vertex_ids_m.data(),
                                    a_data);
@@ -139,9 +150,12 @@ void PreciceAdapter::WriteBlockVectorData(const std::string& a_name,
 void PreciceAdapter::ReadBlockVectorData(const std::string& a_name,
                                          double* a_data) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Reading data for {} from preCICE", a_name);
-  assert(data_m.find(a_name) != data_m.end());
+  DEBUG_ASSERT(data_m.find(a_name) != data_m.end(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" has not been added.");
   const auto data_details = data_m[a_name];
-  assert(data_details.ForReading());
+  DEBUG_ASSERT(data_details.ForReading(), global_assert{}, DebugLevel::CHEAP{},
+               "Data with name \"" + a_name + "\" not marked for reading.");
   interface_m.readBlockVectorData(data_details.GetDataID(),
                                   this->VectorDataSize(), vertex_ids_m.data(),
                                   a_data);

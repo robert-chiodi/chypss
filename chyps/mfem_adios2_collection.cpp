@@ -9,6 +9,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include "chyps/mfem_adios2_collection.hpp"
+
+#include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 
 namespace chyps {
@@ -31,8 +33,9 @@ void MfemAdios2Collection::RegisterField(
     const std::string& a_name, mfem::ParFiniteElementSpace* a_element_space) {
   auto grid_function = new mfem::ParGridFunction(a_element_space);
   // FIXME : Make this an exception
-  assert(name_data_map_m.find(a_name) ==
-         name_data_map_m.end());  // Make sure field with name not already added
+  DEBUG_ASSERT(name_data_map_m.find(a_name) == name_data_map_m.end(),
+               global_assert{}, DebugLevel::CHEAP{},
+               "Field with name \"" + a_name + "\" already registered");
   name_data_map_m[a_name] = grid_function;
   name_update_map_m[a_name] = false;
   adios2_collection_m.RegisterField(a_name, grid_function);
@@ -42,8 +45,9 @@ void MfemAdios2Collection::RegisterField(
 
 void MfemAdios2Collection::UpdateField(const std::string& a_name,
                                        const mfem::Vector& a_data) {
-  assert(name_data_map_m.find(a_name) !=
-         name_data_map_m.end());  // Make sure field with name exists
+  DEBUG_ASSERT(name_data_map_m.find(a_name) != name_data_map_m.end(),
+               global_assert{}, DebugLevel::CHEAP{},
+               "Field with name \"" + a_name + "\" is not registered");
   name_data_map_m[a_name]->SetFromTrueDofs(a_data);
   name_update_map_m[a_name] = true;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Updated field {} in ADIOS2 collection {}",
@@ -52,7 +56,9 @@ void MfemAdios2Collection::UpdateField(const std::string& a_name,
 
 void MfemAdios2Collection::WriteOutFields(const int a_cycle,
                                           const double a_time) {
-  assert(this->AllFieldsUpdatedSinceLastWrite());
+  DEBUG_ASSERT(this->AllFieldsUpdatedSinceLastWrite(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Not all fields updated since last field writing.");
   adios2_collection_m.SetCycle(a_cycle);
   adios2_collection_m.SetTime(a_time);
   adios2_collection_m.Save();

@@ -26,6 +26,7 @@ find_package(ADIOS2 REQUIRED)
 # Packages held in this repo in ./external
 set(NLOHMANN_JSON_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/nlohmann_json")
 set(GTEST_MPI_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/gtest-mpi-listener")
+set(DEBUG_ASSERT_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/debug_assert")
 
 
 set(CHYPS_SOURCE "./chyps")
@@ -34,6 +35,7 @@ add_library(chyps STATIC)
 set_property(TARGET chyps PROPERTY CXX_STANDARD 11)
 target_include_directories(chyps PUBLIC "./")
 target_include_directories(chyps PUBLIC "${NLOHMANN_JSON_SINGLE_HEADER}")
+target_include_directories(chyps PUBLIC "${DEBUG_ASSERT_SINGLE_HEADER}")
 target_link_libraries(chyps PUBLIC MPI::MPI_CXX)
 target_link_libraries(chyps PUBLIC Hypre::Hypre)
 target_link_libraries(chyps PUBLIC Metis::Metis)

@@ -50,8 +50,11 @@ int main(int argc, char** argv, MPIParallel& a_mpi_session) {
                          1.0e-2);
 
   input_parser.ParseCL(argc, argv);
-  assert(input_parser.AllOptionsSet());
-  assert(static_cast<std::string>(input_parser["mesh_file"]) == "generate");
+  DEBUG_ASSERT(input_parser.AllOptionsSet(), global_assert{},
+               DebugLevel::CHEAP{}, "Required input options are missing.");
+  DEBUG_ASSERT(input_parser["mesh_file"].get<std::string>() == "generate",
+               global_assert{}, DebugLevel::CHEAP{},
+               "preCICE dummy solver requires a generated mesh.");
 
   // Modify variables in parser to be for this mesh
   // as opposed to the base mesh used in chyps_heat

@@ -11,9 +11,9 @@
 #include "chyps/boundary_condition.hpp"
 
 #include <algorithm>
-#include <cassert>
 #include <iostream>
 
+#include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 
 namespace chyps {
@@ -40,7 +40,8 @@ BoundaryCondition::BoundaryCondition(const BoundaryConditionType a_type,
                      "spatial-varying({}), time-varying({})",
                      static_cast<int>(a_type), a_spatial_varying,
                      a_time_varying);
-  assert(this->LogicalConditionsSet());
+  DEBUG_ASSERT(this->LogicalConditionsSet(), global_assert{},
+               DebugLevel::CHEAP{});
 }
 
 void BoundaryCondition::SetValues(const double a_value) {
@@ -48,7 +49,8 @@ void BoundaryCondition::SetValues(const double a_value) {
       MAIN_LOG,
       "Setting constant value of {:8.6E} for boundary condition of type {}",
       a_value, static_cast<int>(this->GetBCType()));
-  assert(!this->IsSpatiallyVarying());
+  DEBUG_ASSERT(!this->IsSpatiallyVarying(), global_assert{},
+               DebugLevel::CHEAP{});
   values_m.SetValues(1, &a_value, true);
 }
 
@@ -57,7 +59,8 @@ void BoundaryCondition::SetValues(const double* a_value,
   SPDLOG_LOGGER_INFO(
       MAIN_LOG, "Setting reference to double for boundary condition of type {}",
       static_cast<int>(this->GetBCType()));
-  assert(!this->IsSpatiallyVarying());
+  DEBUG_ASSERT(!this->IsSpatiallyVarying(), global_assert{},
+               DebugLevel::CHEAP{});
   values_m.SetValues(1, a_value, a_deep_copy);
 }
 

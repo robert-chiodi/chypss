@@ -11,9 +11,7 @@
 #ifndef CHYPS_INPUT_PARSER_TPP_
 #define CHYPS_INPUT_PARSER_TPP_
 
-#include <cassert>
-
-#include <iostream>
+#include "chyps/debug_assert.hpp"
 
 namespace chyps {
 
@@ -28,8 +26,10 @@ void InputParser::AddOptionDefault(const std::string& a_name,
                                    const ValueType& a_default_value) {
   option_description_m[a_name] = a_description;
   parsed_input_m[a_name] = a_default_value;
-  assert(option_required_status_m.find(a_name) ==
-         option_required_status_m.end());
+  DEBUG_ASSERT(
+      option_required_status_m.find(a_name) == option_required_status_m.end(),
+      global_assert{}, DebugLevel::CHEAP{},
+      "Option \"" + a_name + "\" already exists in InputParser object");
   option_required_status_m[a_name] = -2;
 }
 

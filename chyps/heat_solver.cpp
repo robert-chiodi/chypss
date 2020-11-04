@@ -12,6 +12,7 @@
 
 #include <array>
 
+#include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 
 namespace chyps {
@@ -100,8 +101,12 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
   }
 
   if (this->FileWritingEnabled()) {
-    assert(file_io_m->IsWriteModeActive());
-    assert(file_io_m->OngoingWriteStep());
+    DEBUG_ASSERT(file_io_m->IsWriteModeActive(), global_assert{},
+                 DebugLevel::CHEAP{},
+                 "IO must be in write mode for writing to fields.");
+    DEBUG_ASSERT(file_io_m->OngoingWriteStep(), global_assert{},
+                 DebugLevel::CHEAP{},
+                 "An ongoing IO step is required for writing.");
     mfem::ParGridFunction temperature_gf(element_space_m);
     temperature_gf.SetFromTrueDofs(temperature_m);
     file_io_m->PutDeferred("HeatSolver/Temperature", temperature_gf);

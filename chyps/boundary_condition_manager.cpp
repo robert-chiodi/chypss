@@ -13,6 +13,7 @@
 #include <string>
 #include <utility>
 
+#include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/mesh.hpp"
 
@@ -75,9 +76,15 @@ int BoundaryConditionManager::GetNumberOfBoundaryConditions(void) const {
 void BoundaryConditionManager::SetBoundaryConditionType(
     const int a_tag, const BoundaryConditionType& a_bc_type,
     const bool a_spatially_varying, const bool a_time_varying) {
-  assert(this->HasBeenInitialized());
-  assert(a_tag > 0);
-  assert(a_tag <= this->GetNumberOfBoundaryConditions());
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
 
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Setting boundary condition for tag {}: type({}), "
@@ -114,73 +121,131 @@ void BoundaryConditionManager::SetBoundaryConditionType(
 
 std::pair<const std::vector<double>*, const std::vector<int>*>
 BoundaryConditionManager::GetBoundaryVertices(const int a_tag) const {
-  assert(this->HasBeenInitialized());
-  assert(a_tag > 0);
-  assert(a_tag <= this->GetNumberOfBoundaryConditions());
-  assert(boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::DIRICHLET ||
-         boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::NEUMANN);
-  assert(values_m[a_tag - 1].size() > 0);
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(boundary_conditions_m[a_tag - 1].GetBCType() ==
+                       BoundaryConditionType::DIRICHLET ||
+                   boundary_conditions_m[a_tag - 1].GetBCType() ==
+                       BoundaryConditionType::NEUMANN,
+               global_assert{}, DebugLevel::CHEAP{},
+               "This function can only be called for DIRICHLET or NEUMANN "
+               "boundary conditions.");
+  DEBUG_ASSERT(values_m[a_tag - 1].size() > 0, global_assert{},
+               DebugLevel::CHEAP{},
+               "Arrays have not been setup. Make sure to set the boundary "
+               "condition for the tag first with SetBoundaryConditionType.");
   return std::make_pair(&(vertex_positions_m[a_tag - 1]),
                         &(indices_m[a_tag - 1]));
 }
 
 void BoundaryConditionManager::SetBoundaryConditionValues(
     const int a_tag, const std::vector<double>& a_values) {
-  assert(this->HasBeenInitialized());
-  assert(a_tag > 0);
-  assert(a_tag <= this->GetNumberOfBoundaryConditions());
-  assert(boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::DIRICHLET ||
-         boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::NEUMANN);
-  assert(boundary_conditions_m[a_tag - 1].IsSpatiallyVarying() ||
-         a_values.size() == 1);
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(
+      boundary_conditions_m[a_tag - 1].GetBCType() ==
+              BoundaryConditionType::DIRICHLET ||
+          boundary_conditions_m[a_tag - 1].GetBCType() ==
+              BoundaryConditionType::NEUMANN,
+      global_assert{}, DebugLevel::CHEAP{},
+      "Boundary condition values can only be set for DIRICHLET or NEUMANN "
+      "boundary conditions.");
+  DEBUG_ASSERT(boundary_conditions_m[a_tag - 1].IsSpatiallyVarying() ||
+                   a_values.size() == 1,
+               global_assert{}, DebugLevel::CHEAP{});
   std::copy(a_values.begin(), a_values.end(), values_m[a_tag - 1].begin());
 }
 
 void BoundaryConditionManager::SetBoundaryConditionValues(
     const int a_tag, const double a_value) {
-  assert(this->HasBeenInitialized());
-  assert(a_tag > 0);
-  assert(a_tag <= this->GetNumberOfBoundaryConditions());
-  assert(boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::DIRICHLET ||
-         boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::NEUMANN);
-  assert(!boundary_conditions_m[a_tag - 1].IsSpatiallyVarying());
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(
+      boundary_conditions_m[a_tag - 1].GetBCType() ==
+              BoundaryConditionType::DIRICHLET ||
+          boundary_conditions_m[a_tag - 1].GetBCType() ==
+              BoundaryConditionType::NEUMANN,
+      global_assert{}, DebugLevel::CHEAP{},
+      "Boundary condition values can only be set for DIRICHLET or NEUMANN "
+      "boundary conditions.");
+  DEBUG_ASSERT(!boundary_conditions_m[a_tag - 1].IsSpatiallyVarying(),
+               global_assert{}, DebugLevel::CHEAP{});
   values_m[a_tag - 1][0] = a_value;
 }
 
 void BoundaryConditionManager::SetBoundaryConditionAsPrecice(const int a_tag) {
-  assert(this->HasBeenInitialized());
-  assert(a_tag > 0);
-  assert(a_tag <= this->GetNumberOfBoundaryConditions());
-  assert(boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::DIRICHLET ||
-         boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::NEUMANN);
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(boundary_conditions_m[a_tag - 1].GetBCType() ==
+                       BoundaryConditionType::DIRICHLET ||
+                   boundary_conditions_m[a_tag - 1].GetBCType() ==
+                       BoundaryConditionType::NEUMANN,
+               global_assert{}, DebugLevel::CHEAP{},
+               "Use of preCICE is only possible with boundary conditions set "
+               "as DIRICHLET or NEUMANN.");
   precice_condition_m[a_tag - 1] = true;
 }
 
 double* BoundaryConditionManager::GetDataBuffer(const int a_tag) {
-  assert(this->HasBeenInitialized());
-  assert(a_tag > 0);
-  assert(a_tag <= this->GetNumberOfBoundaryConditions());
-  assert(boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::DIRICHLET ||
-         boundary_conditions_m[a_tag - 1].GetBCType() ==
-             BoundaryConditionType::NEUMANN);
-  assert(precice_condition_m[a_tag - 1]);
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(boundary_conditions_m[a_tag - 1].GetBCType() ==
+                       BoundaryConditionType::DIRICHLET ||
+                   boundary_conditions_m[a_tag - 1].GetBCType() ==
+                       BoundaryConditionType::NEUMANN,
+               global_assert{}, DebugLevel::CHEAP{},
+               "Data buffer only exists for DIRICHLET and NEUMANN conditions.");
+  DEBUG_ASSERT(precice_condition_m[a_tag - 1], global_assert{},
+               DebugLevel::CHEAP{});
   return values_m[a_tag - 1].data();
 }
 
 const BoundaryCondition& BoundaryConditionManager::GetBoundaryCondition(
     const int a_tag) const {
-  assert(this->HasBeenInitialized());
-  assert(a_tag > 0);
-  assert(a_tag <= this->GetNumberOfBoundaryConditions());
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
   return boundary_conditions_m[a_tag - 1];
 }
 
@@ -195,8 +260,9 @@ int BoundaryConditionManager::GetNumberOfDirichletConditions(void) const {
 
 int BoundaryConditionManager::GetNumberOfTimeVaryingDirichletConditions(
     void) const {
-  assert(boundary_condition_counts_m[details::BCType::TV_DIRICHLET] <=
-         boundary_condition_counts_m[details::BCType::DIRICHLET]);
+  DEBUG_ASSERT(boundary_condition_counts_m[details::BCType::TV_DIRICHLET] <=
+                   boundary_condition_counts_m[details::BCType::DIRICHLET],
+               global_assert{}, DebugLevel::CHEAP{});
   return boundary_condition_counts_m[details::BCType::TV_DIRICHLET];
 }
 
@@ -211,8 +277,9 @@ int BoundaryConditionManager::GetNumberOfNeumannConditions(void) const {
 
 int BoundaryConditionManager::GetNumberOfTimeVaryingNeumannConditions(
     void) const {
-  assert(boundary_condition_counts_m[details::BCType::TV_NEUMANN] <=
-         boundary_condition_counts_m[details::BCType::NEUMANN]);
+  DEBUG_ASSERT(boundary_condition_counts_m[details::BCType::TV_NEUMANN] <=
+                   boundary_condition_counts_m[details::BCType::NEUMANN],
+               global_assert{}, DebugLevel::CHEAP{});
   return boundary_condition_counts_m[details::BCType::TV_NEUMANN];
 }
 
@@ -237,8 +304,9 @@ void BoundaryConditionManager::GatherOptions() {
 void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
   const auto default_bc = this->BoundaryConditionNameToEnum(
       parser_m[parser_prefix_m + "/bc_default"].get<std::string>());
-  assert(default_bc == BoundaryConditionType::HOMOGENEOUS_DIRICHLET ||
-         default_bc == BoundaryConditionType::HOMOGENEOUS_NEUMANN);
+  DEBUG_ASSERT(default_bc == BoundaryConditionType::HOMOGENEOUS_DIRICHLET ||
+                   default_bc == BoundaryConditionType::HOMOGENEOUS_NEUMANN,
+               global_assert{}, DebugLevel::CHEAP{});
 
   // Set default everywhere, then update (if needed) when calls to
   // SetBoundaryConditionType happen.
@@ -263,9 +331,15 @@ void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
     const auto& key = el.key();
     const auto& value = el.value();
     const int tag = std::stoi(key);
-    assert(tag > 0);
-    assert(tag <= this->GetNumberOfBoundaryConditions());
-    assert(value.contains("type"));
+    DEBUG_ASSERT(tag > 0, global_assert{}, DebugLevel::CHEAP{},
+                 "Tag value must be strictly positive. Current tag value is: " +
+                     std::to_string(tag));
+    DEBUG_ASSERT(tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+                 DebugLevel::CHEAP{},
+                 "Tag value must exist on mesh. Current tag value is: " +
+                     std::to_string(tag));
+    DEBUG_ASSERT(value.contains("type"), global_assert{}, DebugLevel::CHEAP{},
+                 "Each boundary condition must specify its type.");
     const auto bc_type =
         this->BoundaryConditionNameToEnum(value["type"].get<std::string>());
     this->SetBoundaryConditionType(tag, bc_type, false, false);
@@ -273,7 +347,10 @@ void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
     double bc_value = 0.0;
     if (bc_type == BoundaryConditionType::DIRICHLET ||
         bc_type == BoundaryConditionType::NEUMANN) {
-      assert(value.contains("value"));
+      DEBUG_ASSERT(value.contains("value"), global_assert{},
+                   DebugLevel::CHEAP{},
+                   "DIRICHLET and NEUMANN boundary conditions must specify "
+                   "their value.");
       bc_value = value["value"].get<double>();
       this->SetBoundaryConditionValues(tag, bc_value);
     }

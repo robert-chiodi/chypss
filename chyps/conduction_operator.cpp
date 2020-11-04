@@ -12,6 +12,7 @@
 
 #include <iostream>
 
+#include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 
 namespace chyps {
@@ -65,8 +66,10 @@ ConductionOperator::ConductionOperator(
   // Set initial boundary conditions.
   mfem::Array<int> tdof_list;
 
-  assert(boundary_conditions_m.find("temperature") !=
-         boundary_conditions_m.end());
+  DEBUG_ASSERT(
+      boundary_conditions_m.find("temperature") != boundary_conditions_m.end(),
+      global_assert{}, DebugLevel::CHEAP{},
+      "\"temperature\" not found in supplied boundary conditions.");
   const auto& bc_manager = boundary_conditions_m.at("temperature");
   if (bc_manager.GetNumberOfNeumannConditions() > 0) {
     SPDLOG_LOGGER_INFO(
@@ -257,8 +260,10 @@ void ConductionOperator::SetParameters(const mfem::Vector& u) {
 
 void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Entered UpdateBoundaryConditions.");
-  assert(boundary_conditions_m.find("temperature") !=
-         boundary_conditions_m.end());
+  DEBUG_ASSERT(
+      boundary_conditions_m.find("temperature") != boundary_conditions_m.end(),
+      global_assert{}, DebugLevel::CHEAP{},
+      "\"temperature\" not found in supplied boundary conditions.");
   const auto& bc_manager = boundary_conditions_m.at("temperature");
   if (bc_manager.GetNumberOfTimeVaryingNeumannConditions() == 0) {
     if (bc_manager.GetNumberOfTimeVaryingDirichletConditions() == 0) {
@@ -406,10 +411,14 @@ void ConductionOperator::ResetNeumannCondition(void) {
 
 void ConductionOperator::AddNeumannCondition(
     const int a_tag, const mfem::ParGridFunction& a_grid_function) {
-  assert(neumann_m != nullptr);
-
-  assert(a_tag > 0);
-  assert(a_tag - 1 < static_cast<int>(boundary_marker_m.size()));
+  DEBUG_ASSERT(neumann_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag - 1 < static_cast<int>(boundary_marker_m.size()),
+               global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
   neumann_coefficient_m[a_tag - 1] =
       new mfem::GridFunctionCoefficient(&a_grid_function);
   neumann_m->AddBoundaryIntegrator(
@@ -419,10 +428,15 @@ void ConductionOperator::AddNeumannCondition(
 
 void ConductionOperator::AddNeumannCondition(const int a_tag,
                                              const double a_value) {
-  assert(neumann_m != nullptr);
+  DEBUG_ASSERT(neumann_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag - 1 < static_cast<int>(boundary_marker_m.size()),
+               global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
 
-  assert(a_tag > 0);
-  assert(a_tag - 1 < static_cast<int>(boundary_marker_m.size()));
   neumann_coefficient_m[a_tag - 1] = new mfem::ConstantCoefficient(a_value);
   neumann_m->AddBoundaryIntegrator(
       new mfem::BoundaryLFIntegrator(*(neumann_coefficient_m[a_tag - 1])),

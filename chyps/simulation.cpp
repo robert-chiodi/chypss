@@ -18,6 +18,7 @@
 
 #include "chyps/boundary_condition.hpp"
 #include "chyps/boundary_condition_manager.hpp"
+#include "chyps/debug_assert.hpp"
 #include "chyps/heat_solver.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/io.hpp"
@@ -105,18 +106,22 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   argc += -2;  // Skip executable and input file name
   input_parser.ParseCL(argc, argv + 2);
   input_parser.WriteToFile("simulation_configuration.json");
-  assert(input_parser.AllOptionsSet("Simulation"));
+  DEBUG_ASSERT(input_parser.AllOptionsSet("Simulation"), global_assert{},
+               DebugLevel::ALWAYS{},
+               "Options required by  \"Simulation\" missing.");
 
   const auto in_data_name =
       input_parser["Simulation/in_data"].get<std::string>();
   const auto out_data_name =
       input_parser["Simulation/out_data"].get<std::string>();
   if (in_data_name != "ignore") {
-    assert(in_data_name != out_data_name);
+    DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
+                 DebugLevel::ALWAYS{}, "Cannot read and write from same file.");
     file_io.SetRead(in_data_name);
   }
   if (out_data_name != "ignore") {
-    assert(in_data_name != out_data_name);
+    DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
+                 DebugLevel::ALWAYS{}, "Cannot read and write from same file.");
     file_io.SetWrite(out_data_name);
     file_io.RootWriteAttribute("InputFile", input_parser.WriteToString());
   }

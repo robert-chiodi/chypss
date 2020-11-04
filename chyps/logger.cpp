@@ -58,7 +58,6 @@ void StartLogger(const int a_rank, const int a_world_size,
     } while (ws / 10 > 0);
 
     std::string number = std::to_string(a_rank);
-    assert(world_digits >= static_cast<int>(number.length()));
     std::string id_suffix =
         std::string(world_digits - number.length(), '0') + number;
     std::string log_name =

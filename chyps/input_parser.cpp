@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include <debug_assert/debug_assert.hpp>
 #include <mfem/mfem.hpp>
 
 #include "chyps/logger.hpp"
@@ -31,7 +32,9 @@ const nlohmann::json& DirectoryJSON::operator[](
   const nlohmann::json* lowest_dir;
   std::string lowest_name;
   std::tie(lowest_dir, lowest_name) = this->LowestObject(a_name);
-  assert(lowest_dir->contains(lowest_name));
+  DEBUG_ASSERT(lowest_dir->contains(lowest_name), global_assert{},
+               DebugLevel::CHEAP{},
+               "DirectoryJSON object does not contain \"" + a_name + "\"");
   return (*lowest_dir)[lowest_name];
 }
 
@@ -71,17 +74,23 @@ std::pair<const nlohmann::json*, std::string> DirectoryJSON::LowestObject(
 }
 
 void InputParser::ParseCL(int argc, char** argv) {
-  assert(argc % 2 ==
-         0);  // Always expect flag, value in ordering, therefore must be even
+  DEBUG_ASSERT(argc % 2 == 0, global_assert{}, DebugLevel::ALWAYS{},
+               "Even number of command line arguments required due to use of "
+               "flag, value paring. Number of arguments supplied:" +
+                   std::to_string(argc));
 
   for (int n = 0; n < argc; n += 2) {
     std::string argument(argv[n]);
     std::string value(argv[n + 1]);
 
-    assert(argument[0] == '-');
+    DEBUG_ASSERT(
+        argument[0] == '-', global_assert{}, DebugLevel::ALWAYS{},
+        "Flag requires first character of -. Flag passed: " + argument);
     const std::string name = argument.substr(1);
 
-    assert(option_description_m.Contains(name));
+    DEBUG_ASSERT(option_description_m.Contains(name), global_assert{},
+                 DebugLevel::ALWAYS{},
+                 "Option with key " + name + " is unknown.");
     if (isdigit(value[0]) || value[0] == '-' || value[0] == '+') {
       std::size_t decimal_location = 0;
       decimal_location = value.find('.');
@@ -123,8 +132,11 @@ void InputParser::AddOptionNoDefault(const std::string& a_name,
                                      const std::string& a_dependency) {
   option_description_m[a_name] = a_description;
   parsed_input_m[a_name] = nlohmann::json::object();
-  assert(option_required_status_m.find(a_name) ==
-         option_required_status_m.end());
+  DEBUG_ASSERT(
+      option_required_status_m.find(a_name) == option_required_status_m.end(),
+      global_assert{}, DebugLevel::CHEAP{},
+      "Option \"" + a_name + "\" already exists in InputParser object");
+
   if (a_dependency != "") {
     option_required_status_m[a_name] = static_cast<int>(dependencies_m.size());
     dependencies_m.push_back(a_dependency);
@@ -169,9 +181,12 @@ bool InputParser::AllOptionsSet(void) const {
 }
 
 bool InputParser::AllOptionsSet(const std::string& a_name) const {
-  assert(option_description_m.Contains(a_name));
-  return this->RecursiveOptionSetCheck(option_description_m[a_name],
-                                       a_name + '/');
+  if (!option_description_m.Contains(a_name)) {
+    return false;
+  } else {
+    return this->RecursiveOptionSetCheck(option_description_m[a_name],
+                                         a_name + '/');
+  }
 }
 
 bool InputParser::OptionSet(const std::string& a_name) const {
