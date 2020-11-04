@@ -104,10 +104,8 @@ void IO::AddVariableForGridFunction(
       write_m.DefineVariable<double>(a_variable_name, {}, {},
                                      {ndofs, components}, a_dimensions_static);
     } else {
-      // FIXME : Make an exception.
-      std::cout << "Unkown node ordering for GridFunction when adding to IO"
-                << std::endl;
-      std::exit(-1);
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Unkown node ordering for GridFunction when adding to IO");
     }
   }
   std::vector<std::string> a_element_space_name{
@@ -239,18 +237,17 @@ std::array<std::size_t, 3> IO::GetMeshSizes(const Mesh& a_mesh,
       break;
     }
     case MeshElement::VERTEX: {
-      std::cout << "Output of vertex data is not yet handled." << std::endl;
-      std::exit(-1);
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Output of vertex data is not yet handled.");
       // global_length = a_mesh.GetGlobalCount<MeshElement::VERTEX>();
       // local_offset = a_mesh.GetOffsetStart<MeshElement::VERTEX>();
       // local_count = a_mesh.GetLocalCount<MeshElement::VERTEX>();
       break;
     }
     default:
-      // FIXME : Replace with actual error handler.
-      std::cout << "Unknown mesh element type of : " << static_cast<int>(a_type)
-                << std::endl;
-      std::exit(-1);
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Unknown mesh element type of : " +
+                       std::to_string(static_cast<int>(a_type)));
   }
   DEBUG_ASSERT(mesh_sizes[1] < mesh_sizes[0], global_assert{},
                DebugLevel::CHEAP{},

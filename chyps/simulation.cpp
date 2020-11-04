@@ -82,17 +82,13 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
     int size = 0;
     if (mpi_session.IAmRoot()) {
       const bool good_read = input_parser.ParseFromFile(input_file_name);
-      if (!good_read) {
-        std::cout << "Trouble reading input file " << input_file_name
-                  << std::endl;
-        std::cout << "First argument should be name of input file. \n";
-        std::cout
-            << "Use the input file name \"ignore\" to use no input file. \n";
-        std::cout
-            << "Use the input file name \"help\" to export available options."
-            << std::endl;
-        std::exit(-1);
-      }
+      DEBUG_ASSERT(
+          good_read, global_assert{}, DebugLevel::ALWAYS{},
+          "Trouble reading input file: " + input_file_name + '\n' +
+              "First argument should be name of input file.\n" +
+              "Use the input file name \"ignore\" to use no input file.\n" +
+              "Use the input file name \"help\" to export available "
+              "options.");
       v_bson = input_parser.ToBSON();
       size = static_cast<int>(v_bson.size());
     }

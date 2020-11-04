@@ -48,15 +48,13 @@ BoundaryConditionManager::BoundaryConditionManager(
 
 void BoundaryConditionManager::Initialize(const Mesh& a_mesh) {
   // FIXME : make this an exception.
-  if (!parser_m.AllOptionsSet(parser_prefix_m)) {
-    std::cout << "Not all options needed for BoundaryConditionManager supplied"
-              << std::endl;
-    std::cout << "Make sure that the InputParser has been parsed before "
-                 "calling Initialize and that all required options are "
-                 "specified or have a valid default value."
-              << std::endl;
-    std::exit(-1);
-  }
+  DEBUG_ASSERT(parser_m.AllOptionsSet(parser_prefix_m), global_assert{},
+               DebugLevel::ALWAYS{},
+               "Not all options needed for BoundaryConditionManager supplied\n"
+               "Make sure that the InputParser has been parsed before "
+               "calling Initialize and that all required options are "
+               "specified or have a valid default value. This is for prefix: " +
+                   parser_prefix_m);
   mesh_m = &a_mesh;
   std::size_t number_of_bcs =
       static_cast<std::size_t>(mesh_m->GetNumberOfBoundaryTagValues());
@@ -409,10 +407,10 @@ int BoundaryConditionManager::GetConditionCountType(
       break;
     }
     default:
-      // FIXME: Make actual error handler.
-      std::cout << "Unknown BC type in BoundaryConditionManager of: "
-                << static_cast<int>(a_bc.GetBCType()) << std::endl;
-      std::exit(-1);
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Unknown BoundaryConditionType. Set type is: " +
+                       std::to_string(static_cast<int>(a_bc.GetBCType())));
+      return details::BCType::NEUMANN;  // NOTE: This will never happen
   }
 }
 

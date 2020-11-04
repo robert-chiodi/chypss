@@ -143,10 +143,10 @@ ConductionOperator::ConductionOperator(
         break;
       }
       default:
-        std::cout << "Unknown BoundaryConditionType in ConductionOperator. "
-                     "Set type is: "
-                  << static_cast<int>(condition.GetBCType()) << std::endl;
-        std::exit(-1);
+        DEBUG_ASSERT(
+            false, global_assert{}, DebugLevel::ALWAYS{},
+            "Unknown BoundaryConditionType. Set type is: " +
+                std::to_string(static_cast<int>(condition.GetBCType())));
     }
   }
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished commiting boundary conditions");
@@ -353,10 +353,10 @@ void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
         break;
       }
       default:
-        std::cout << "Unknown BoundaryConditionType in ConductionOperator. "
-                     "Set type is: "
-                  << static_cast<int>(condition.GetBCType()) << std::endl;
-        std::exit(-1);
+        DEBUG_ASSERT(
+            false, global_assert{}, DebugLevel::ALWAYS{},
+            "Unknown BoundaryConditionType. Set type is: " +
+                std::to_string(static_cast<int>(condition.GetBCType())));
     }
   }
 

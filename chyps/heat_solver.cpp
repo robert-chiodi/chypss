@@ -44,15 +44,12 @@ void HeatSolver::CreateBoundaryConditionManagers(void) {
 }
 
 void HeatSolver::Initialize(Mesh& a_mesh) {
-  // FIXME : make this an exception.
-  if (!parser_m.AllOptionsSet("HeatSolver")) {
-    std::cout << "Not all options needed for HeatSolver supplied" << std::endl;
-    std::cout << "Make sure that the InputParser has been parsed before "
-                 "calling Initialize and that all required options are "
-                 "specified or have a valid default value."
-              << std::endl;
-    std::exit(-1);
-  }
+  DEBUG_ASSERT(parser_m.AllOptionsSet("HeatSolver"), global_assert{},
+               DebugLevel::ALWAYS{},
+               "Not all options needed for HeatSolver supplied\n"
+               "Make sure that the InputParser has been parsed before "
+               "calling Initialize and that all required options are "
+               "specified or have a valid default value.");
 
   // Construct mesh, allocate and construct operators, and perform all setup for
   // time advancement
@@ -196,9 +193,9 @@ void HeatSolver::SetODESolver(void) {
     default:
       SPDLOG_LOGGER_CRITICAL(MAIN_LOG, "Unknown ODE solver type: {}",
                              ode_solver_type);
-      // FIXME : Make actual error handler
-      std::cout << "Unknown ODE solver type: " << ode_solver_type << '\n';
-      std::exit(-1);
+      DEBUG_ASSERT(
+          false, global_assert{}, DebugLevel::ALWAYS{},
+          "Unknown ODE solver type: " + std::to_string(ode_solver_type));
   }
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Initializing ode_solver");

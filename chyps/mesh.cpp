@@ -31,14 +31,12 @@ Mesh::Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser,
 }
 
 void Mesh::Initialize(void) {
-  if (!parser_m.AllOptionsSet("Mesh")) {
-    std::cout << "Not all options needed in parser are supplied" << std::endl;
-    std::cout << "Make sure that the InputParser has been parsed before "
-                 "calling Initialize and that all required options are "
-                 "specified or have a valid default value."
-              << std::endl;
-    std::exit(-1);
-  }
+  DEBUG_ASSERT(parser_m.AllOptionsSet("Mesh"), global_assert{},
+               DebugLevel::ALWAYS{},
+               "Not all options needed for Mesh supplied\n"
+               "Make sure that the InputParser has been parsed before "
+               "calling Initialize and that all required options are "
+               "specified or have a valid default value.");
   this->ReadAndRefineMesh();
   this->AllocateVariables();
 }
