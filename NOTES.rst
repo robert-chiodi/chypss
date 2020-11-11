@@ -1,3 +1,5 @@
+How to handle boundary condition on a node that is shared by two sides of different conditions? I.E., bottom side Neumann left side Dirichlet, what does bottom-left node have set as a BC?
+
 For large problems, HYPRE must be built with --enable-bigint, which makes it use long long int for offsets. 
 Otherwise, MFEM will produce the error:
 
@@ -58,11 +60,18 @@ HYPRE
 ./configure --prefix=/Users/rmc298/lib_builds/hypre
 
 MFEM -- DEBUG
- cmake -DMFEM_USE_MPI=YES -D HYPRE_DIR=/Users/rmc298/lib_builds/hypre -DMETIS_DIR=/Users/rmc298/lib_builds/metis_built -DMFEM_DEBUG=YES -DMFEM_USE_METIS_5=YES -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=/Users/rmc298/lib_builds/mfem_built -D MFEM_USE_ADIOS2=YES -D ADIOS2_DIR=/Users/rmc298/lib_builds/adios2_built/  ..
+ cmake -DMFEM_USE_MPI=YES -D HYPRE_DIR=/Users/rmc298/lib_builds/hypre -DMETIS_DIR=/Users/rmc298/lib_builds/metis_built -DMFEM_DEBUG=YES -DMFEM_USE_METIS_5=YES -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=/Users/rmc298/lib_builds/mfem_built_debug -D MFEM_USE_ADIOS2=YES -D ADIOS2_DIR=/Users/rmc298/lib_builds/adios2_built/  ..
+
+MFEM -- OPT
+cmake -DMFEM_USE_MPI=YES -D HYPRE_DIR=/Users/rmc298/lib_builds/hypre -DMETIS_DIR=/Users/rmc298/lib_builds/metis_built -DMFEM_DEBUG=NO -DMFEM_USE_METIS_5=YES -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/Users/rmc298/lib_builds/mfem_built -D MFEM_USE_ADIOS2=YES -D ADIOS2_DIR=/Users/rmc298/lib_builds/adios2_built/  ..
 
 SPDLOG
 cmake -DCMAKE_INSTALL_PREFIX=/Users/rmc298/lib_builds/spdlog_built -DCMAKE_BUILD_TYPE=Release ..
 
 
 Building CHyPS
+DEBUG
 cmake -D CMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -D Boost_DIR=/Users/rmc298/lib_builds/boost_built/ -D Boost_INCLUDE_DIR=/Users/rmc298/lib_builds/boost_built/include -D Precice_DIR=/Users/rmc298/lib_builds/precice_built/ -D Petsc_DIR=/Users/rmc298/lib_builds/petsc_built/ -D Spdlog_DIR=/Users/rmc298/lib_builds/spdlog_built/ -D Hypre_DIR=/Users/rmc298/lib_builds/hypre -D Metis_DIR=/Users/rmc298/lib_builds/metis_built -D Mfem_DIR=/Users/rmc298/lib_builds/mfem_built -D ADIOS2_DIR=/Users/rmc298/lib_builds/adios2_built/lib/cmake/adios2/ -DCMAKE_CXX_FLAGS="-Wall -Werror" -D GCOV_PATH=/usr/local/bin/gcov-10 ..
+
+OPT with Tests
+cmake -D CMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -D Boost_DIR=/Users/rmc298/lib_builds/boost_built/ -D Boost_INCLUDE_DIR=/Users/rmc298/lib_builds/boost_built/include -D Precice_DIR=/Users/rmc298/lib_builds/precice_built/ -D Petsc_DIR=/Users/rmc298/lib_builds/petsc_built/ -D Spdlog_DIR=/Users/rmc298/lib_builds/spdlog_built/ -D Hypre_DIR=/Users/rmc298/lib_builds/hypre -D Metis_DIR=/Users/rmc298/lib_builds/metis_built -D Mfem_DIR=/Users/rmc298/lib_builds/mfem_built -D ADIOS2_DIR=/Users/rmc298/lib_builds/adios2_built/lib/cmake/adios2/ -DCMAKE_CXX_FLAGS="-DNDEBUG -DCHYPS_LOGGER_OFF" ..

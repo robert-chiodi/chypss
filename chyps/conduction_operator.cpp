@@ -22,7 +22,7 @@ ConductionOperator::ConductionOperator(
     const std::unordered_map<std::string, BoundaryConditionManager>&
         a_boundary_conditions,
     mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-    mfem::Vector& u, const double a_alpha, const double a_kappa)
+    mfem::Vector& u, const double a_kappa)
     : ConductionOperatorBase(f),
       fespace_linear_m(f_linear),
       mesh_m(a_mesh),
@@ -36,14 +36,14 @@ ConductionOperator::ConductionOperator(
       M_prec(nullptr),
       T_solver(f.GetComm()),
       T_prec(nullptr),
-      alpha(a_alpha),
       kappa(a_kappa),
-      z(height),  // Note, inherited from mfem::TimeDependentOperator
+      z(height),  // Note, height inherited from mfem::TimeDependentOperator
       neumann_coefficient_m(a_mesh.GetMfemMesh().bdr_attributes.Max(), nullptr),
       boundary_marker_m(a_mesh.GetMfemMesh().bdr_attributes.Max()),
-      thermal_coefficient_m(&f),
+      tensor_thermal_coeff_m(nullptr),
+      dt_tensor_thermal_coeff_m(nullptr),
       inhomogeneous_neumann_active_m(false) {
-  const double rel_tol = 1e-8;
+  const double rel_tol = 1e-12;
   M_solver.iterative_mode = false;
   M_solver.SetRelTol(rel_tol);
   M_solver.SetAbsTol(0.0);
@@ -200,13 +200,13 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
   // for du_dt
   if (T == nullptr) {
     T = new mfem::ParBilinearForm(&fespace);
+
     T->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
     T->AddDomainIntegrator(new mfem::MassIntegrator());
 
-    mfem::ConstantCoefficient dt_coeff(dt);
-    mfem::GridFunctionCoefficient k_coeff(&thermal_coefficient_m);
-    mfem::ProductCoefficient prod(dt_coeff, k_coeff);
-    T->AddDomainIntegrator(new mfem::DiffusionIntegrator(prod));
+    dt_tensor_thermal_coeff_m->SetAConst(dt);
+    T->AddDomainIntegrator(
+        new mfem::DiffusionIntegrator(*dt_tensor_thermal_coeff_m));
     T->Assemble();
     T->FormSystemMatrix(ess_tdof_list, T_op);
     if (UsesTensorBasis(fespace)) {
@@ -218,8 +218,7 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
     T->Finalize();
     current_dt = dt;
   }
-  MFEM_VERIFY(dt == current_dt || alpha == 0.0,
-              "");  // SDIRK methods use the same dt
+  MFEM_VERIFY(dt == current_dt, "");  // SDIRK methods use the same dt
 
   mfem::ParGridFunction tmp_u(&fespace);
   mfem::ParLinearForm tmp_z(&fespace);
@@ -240,20 +239,27 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
 }
 
 void ConductionOperator::SetParameters(const mfem::Vector& u) {
-  if (alpha != 0.0 || K == nullptr) {
-    thermal_coefficient_m.SetFromTrueDofs(u);
-    for (int i = 0; i < thermal_coefficient_m.Size(); ++i) {
-      thermal_coefficient_m(i) = kappa + alpha * thermal_coefficient_m(i);
-    }
-
-    delete K;
-    K = new mfem::ParBilinearForm(&fespace);
-    K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
-    mfem::GridFunctionCoefficient grid_coeff(&thermal_coefficient_m);
-    K->AddDomainIntegrator(new mfem::DiffusionIntegrator(grid_coeff));
-    K->Assemble();  // keep sparsity pattern of M and K the same
-    K->Finalize();
+  mfem::DenseMatrix full_value(mesh_m.GetDimension());
+  full_value = 0.0;
+  for (int n = 0; n < mesh_m.GetDimension(); ++n) {
+    full_value(n, n) = kappa;
   }
+  full_value(1, 1) = 0.5 * kappa;
+  // Make assert that this is positive definite
+  delete tensor_thermal_coeff_m;
+  tensor_thermal_coeff_m = new mfem::MatrixConstantCoefficient(full_value);
+  // dt will be reset on below in implicit solve
+  delete dt_tensor_thermal_coeff_m;
+  dt_tensor_thermal_coeff_m =
+      new mfem::ScalarMatrixProductCoefficient(1.0, *tensor_thermal_coeff_m);
+
+  delete K;
+  K = new mfem::ParBilinearForm(&fespace);
+  K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+  K->AddDomainIntegrator(
+      new mfem::DiffusionIntegrator(*tensor_thermal_coeff_m));
+  K->Assemble();  // keep sparsity pattern of M and K the same
+  K->Finalize();
   delete T;
   T = nullptr;  // Delete here to be reset on first entrance to SolveImplicit
 }
@@ -368,11 +374,6 @@ void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
   }
 }
 
-const mfem::ParGridFunction& ConductionOperator::GetThermalCoefficient(
-    void) const {
-  return thermal_coefficient_m;
-}
-
 ConductionOperator::~ConductionOperator(void) {
   delete M;
   delete K;
@@ -384,6 +385,8 @@ ConductionOperator::~ConductionOperator(void) {
     elem = nullptr;
   }
   delete neumann_m;
+  delete tensor_thermal_coeff_m;
+  delete dt_tensor_thermal_coeff_m;
 }
 
 void ConductionOperator::SetTrueDofsFromVertexData(

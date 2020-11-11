@@ -35,8 +35,6 @@ class ConductionOperatorBase : public mfem::TimeDependentOperator {
 
   virtual void UpdateBoundaryConditions(mfem::Vector& u) = 0;
 
-  virtual const mfem::ParGridFunction& GetThermalCoefficient(void) const = 0;
-
   virtual ~ConductionOperatorBase(void) = default;
 };
 }  // namespace chyps

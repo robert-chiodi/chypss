@@ -61,12 +61,6 @@ void HeatSolver::Initialize(Mesh& a_mesh) {
   this->RegisterFieldsForIO();
 }
 
-void HeatSolver::InitializeBoundaryConditions(void) {
-  for (auto& manager : boundary_conditions_m) {
-    manager.second.Initialize(*mesh_m);
-  }
-}
-
 double HeatSolver::AdjustTimeStep(const double a_proposed_dt) const {
   const double adjusted_dt = a_proposed_dt;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Proposed dt of {:8.6E} adjusted to {:8.6E}",
@@ -91,9 +85,6 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
 void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
   if (parser_m["Simulation/use_visit"].get<bool>()) {
     visit_collection_m->UpdateField("Temperature", temperature_m);
-    mfem::Vector temp_true_vector;
-    operator_m->GetThermalCoefficient().GetTrueDofs(temp_true_vector);
-    visit_collection_m->UpdateField("ThermalCoefficient", temp_true_vector);
     visit_collection_m->WriteOutFields(a_cycle, a_time);
   }
 
@@ -121,7 +112,6 @@ void HeatSolver::GatherOptions(void) {
       "ODE solver: 1 - Backward Euler, 2 - SDIRK2, 3 - SDIRK3,\n\t"
       "\t   11 - Forward Euler, 12 - RK2, 13 - RK3 SSP, 14 - RK4.",
       3);
-  parser_m.AddOptionDefault("HeatSolver/alpha", "Alpha coefficient.", 1.0e-2);
   parser_m.AddOptionDefault("HeatSolver/kappa", "Kappa coefficient offset.",
                             0.5);
   // TODO Add a flag and way to specify which variables we wish to export to
@@ -225,13 +215,11 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
 
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Creating new variable thermal coefficient conduction "
-                     "operator with alpha = {} and kappa = {}",
-                     parser_m["HeatSolver/alpha"].get<double>(),
+                     "operator with kappa = {}",
                      parser_m["HeatSolver/kappa"].get<double>());
   operator_m = new ConductionOperator(
       *mesh_m, boundary_conditions_m, *coarse_element_space_m, *element_space_m,
-      temperature_m, parser_m["HeatSolver/alpha"].get<double>(),
-      parser_m["HeatSolver/kappa"].get<double>());
+      temperature_m, parser_m["HeatSolver/kappa"].get<double>());
 }
 
 void HeatSolver::RegisterFieldsForIO(void) {
@@ -240,7 +228,6 @@ void HeatSolver::RegisterFieldsForIO(void) {
     visit_collection_m = new MfemVisItCollection(
         mesh_m->GetMPIComm(), "HeatSolver", mesh_m->GetMfemMesh());
     visit_collection_m->RegisterField("Temperature", element_space_m);
-    visit_collection_m->RegisterField("ThermalCoefficient", element_space_m);
     SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
   }
 
@@ -254,8 +241,21 @@ void HeatSolver::RegisterFieldsForIO(void) {
 }
 
 static double SetInitialTemperature(const mfem::Vector& x) {
-  return (1.0 - std::pow(x(0) - 1.0, 2)) * (1.0 - std::pow(x(1) - 1.0, 2)) *
-         1.0;
+  const double* a_position = x.GetData();
+  const std::size_t m = 2;
+  const std::size_t n = 1;
+  const auto dn = static_cast<double>(n);
+  const auto dm = static_cast<double>(m);
+  const double domain_length = 2.0;
+  const double domain_height = 2.0;
+  const double amplitude = 1.0;
+  const double ic_factor =
+      (amplitude * std::pow(domain_height, 2) *
+       (-4.0 * std::pow(M_PI, 2) +
+        std::pow(domain_length, 2) * (-8.0 + std::pow(M_PI, 2)))) /
+      std::pow(M_PI, 5);
+  return ic_factor * std::sin(dn * M_PI * a_position[0] / domain_length) *
+         std::cos(dm * M_PI * a_position[1] / domain_height);
 }
 
 void HeatSolver::SetInitialConditions(void) {
@@ -297,6 +297,12 @@ HeatSolver::~HeatSolver(void) {
   delete operator_m;
   operator_m = nullptr;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "HeatSolver successfully destructed");
+}
+
+void HeatSolver::InitializeBoundaryConditions(void) {
+  for (auto& manager : boundary_conditions_m) {
+    manager.second.Initialize(*mesh_m);
+  }
 }
 
 bool HeatSolver::FileWritingEnabled(void) const {

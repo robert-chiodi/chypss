@@ -27,7 +27,7 @@ class ConductionOperator : public ConductionOperatorBase {
       const std::unordered_map<std::string, BoundaryConditionManager>&
           a_boundary_conditions,
       mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-      mfem::Vector& u, const double a_alpha, const double a_kappa);
+      mfem::Vector& u, const double a_kappa);
 
   virtual void Mult(const mfem::Vector& u,
                     mfem::Vector& du_dt) const override final;
@@ -43,10 +43,6 @@ class ConductionOperator : public ConductionOperatorBase {
   /// \brief Update boundary conditions if they are time-varying. Might require
   /// changing boundaries in u.
   virtual void UpdateBoundaryConditions(mfem::Vector& u) override final;
-
-  /// \brief Return a vector of the Thermal Coefficient for each element.
-  virtual const mfem::ParGridFunction& GetThermalCoefficient(
-      void) const override final;
 
   virtual ~ConductionOperator(void) override final;
 
@@ -73,7 +69,7 @@ class ConductionOperator : public ConductionOperatorBase {
 
   mfem::OperatorPtr T_op, M_op, K_op;
 
-  double alpha, kappa;
+  double kappa;
 
   mutable mfem::Vector z;  // auxiliary vector
   mutable mfem::OperatorHandle A;
@@ -96,7 +92,8 @@ class ConductionOperator : public ConductionOperatorBase {
   void AddNeumannCondition(const int a_tag, const double a_value);
   void FinalizeNeumannCondition(void);
 
-  mfem::ParGridFunction thermal_coefficient_m;
+  mfem::MatrixConstantCoefficient* tensor_thermal_coeff_m;
+  mfem::ScalarMatrixProductCoefficient* dt_tensor_thermal_coeff_m;
   bool inhomogeneous_neumann_active_m;
 };
 }  // namespace chyps

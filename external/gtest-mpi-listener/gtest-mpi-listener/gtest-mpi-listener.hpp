@@ -261,12 +261,12 @@ class MPIWrapperPrinter : public ::testing::TestEventListener {
   MPIWrapperPrinter(::testing::TestEventListener* l, MPI_Comm comm_)
       : ::testing::TestEventListener(), listener(l), result_vector() {
     int is_mpi_initialized;
-    assert(MPI_Initialized(&is_mpi_initialized) == MPI_SUCCESS);
+    MPI_Initialized(&is_mpi_initialized);
     if (!is_mpi_initialized) {
       printf("MPI must be initialized before RUN_ALL_TESTS!\n");
       printf("Add '::testing::InitGoogleTest(&argc, argv);\n");
       printf("     MPI_Init(&argc, &argv);' to your 'main' function!\n");
-      assert(0);
+      std::exit(-1);
     }
 
     MPI_Comm_dup(comm_, &comm);
@@ -276,12 +276,12 @@ class MPIWrapperPrinter : public ::testing::TestEventListener {
   MPIWrapperPrinter(const MPIWrapperPrinter& printer)
       : listener(printer.listener), result_vector(printer.result_vector) {
     int is_mpi_initialized;
-    assert(MPI_Initialized(&is_mpi_initialized) == MPI_SUCCESS);
+    MPI_Initialized(&is_mpi_initialized);
     if (!is_mpi_initialized) {
       printf("MPI must be initialized before RUN_ALL_TESTS!\n");
       printf("Add '::testing::InitGoogleTest(&argc, argv);\n");
       printf("     MPI_Init(&argc, &argv);' to your 'main' function!\n");
-      assert(0);
+      std::exit(-1);
     }
 
     MPI_Comm_dup(printer.comm, &comm);
