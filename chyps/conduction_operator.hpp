@@ -27,7 +27,7 @@ class ConductionOperator : public ConductionOperatorBase {
       const std::unordered_map<std::string, BoundaryConditionManager>&
           a_boundary_conditions,
       mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-      mfem::Vector& u, const double a_kappa);
+      mfem::Vector& u, const std::vector<double>& a_tensor_kappa);
 
   virtual void Mult(const mfem::Vector& u,
                     mfem::Vector& du_dt) const override final;
@@ -69,7 +69,7 @@ class ConductionOperator : public ConductionOperatorBase {
 
   mfem::OperatorPtr T_op, M_op, K_op;
 
-  double kappa;
+  std::vector<double> tensor_kappa_m;
 
   mutable mfem::Vector z;  // auxiliary vector
   mutable mfem::OperatorHandle A;

@@ -22,7 +22,7 @@ ConductionOperator::ConductionOperator(
     const std::unordered_map<std::string, BoundaryConditionManager>&
         a_boundary_conditions,
     mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-    mfem::Vector& u, const double a_kappa)
+    mfem::Vector& u, const std::vector<double>& a_tensor_kappa)
     : ConductionOperatorBase(f),
       fespace_linear_m(f_linear),
       mesh_m(a_mesh),
@@ -36,13 +36,20 @@ ConductionOperator::ConductionOperator(
       M_prec(nullptr),
       T_solver(f.GetComm()),
       T_prec(nullptr),
-      kappa(a_kappa),
+      tensor_kappa_m(a_tensor_kappa),
       z(height),  // Note, height inherited from mfem::TimeDependentOperator
       neumann_coefficient_m(a_mesh.GetMfemMesh().bdr_attributes.Max(), nullptr),
       boundary_marker_m(a_mesh.GetMfemMesh().bdr_attributes.Max()),
       tensor_thermal_coeff_m(nullptr),
       dt_tensor_thermal_coeff_m(nullptr),
       inhomogeneous_neumann_active_m(false) {
+  DEBUG_ASSERT(
+      tensor_kappa_m.size() == static_cast<std::size_t>(mesh_m.GetDimension() *
+                                                        mesh_m.GetDimension()),
+      global_assert{}, DebugLevel::CHEAP{},
+      "Thermal coefficient tensor (kappa) of incorrect size. Provide as a "
+      "column-major array of size MESH_DIM*MESH_DIM.");
+
   const double rel_tol = 1e-12;
   M_solver.iterative_mode = false;
   M_solver.SetRelTol(rel_tol);
@@ -240,15 +247,14 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
 
 void ConductionOperator::SetParameters(const mfem::Vector& u) {
   if (K == nullptr) {
-    mfem::DenseMatrix full_value(mesh_m.GetDimension());
-    const double kappa_x = kappa;
-    const double kappa_y = kappa_x;
-    full_value(0, 0) = std::cos(0.25 * M_PI) * kappa_x;
-    full_value(0, 1) = -std::sin(0.25 * M_PI) * kappa_y;
-    full_value(1, 0) = std::sin(0.25 * M_PI) * kappa_x;
-    full_value(1, 1) = std::cos(0.25 * M_PI) * kappa_y;
+    mfem::DenseMatrix full_value(tensor_kappa_m.data(), mesh_m.GetDimension(),
+                                 mesh_m.GetDimension());
+
     // Make assert that this (full_value) is positive definite
-    std::cout << full_value.Det() << std::endl;
+    DEBUG_ASSERT(full_value.Det() > 0.0, global_assert{}, DebugLevel::CHEAP{},
+                 "Negative determinant value for tensor thermal coefficient. "
+                 "Not Positive Definite. Determinant value: " +
+                     std::to_string(full_value.Det()));
 
     delete tensor_thermal_coeff_m;
     tensor_thermal_coeff_m = new mfem::MatrixConstantCoefficient(full_value);

@@ -51,12 +51,13 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
 
   input_parser.AddOptionDefault("Simulation/viz_steps",
                                 "Visualize every n-th timestep.", 5);
-  input_parser.AddOptionDefault(
+  input_parser.AddOptionNoDefault(
       "Simulation/in_data",
       "Name of file (or BP4 directory) holding "
-      "data for restart. Do not include extension. Pass ignore if you "
-      "do not wish to restart from a file.",
-      std::string("ignore"));
+      "initial data. Do not include extension. Initial data can be generated "
+      "from a previous simulation check point or using the tool "
+      "chyps_initializer.",
+      true);
   input_parser.AddOptionDefault(
       "Simulation/out_data",
       "Name of file (or BP4 directory) to write that holds "
@@ -77,27 +78,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
     return 0;
   }
   if (input_file_name != "ignore") {
-    // Just have root processor parse file, then communicate
-    std::vector<std::uint8_t> v_bson;
-    int size = 0;
-    if (mpi_session.IAmRoot()) {
-      const bool good_read = input_parser.ParseFromFile(input_file_name);
-      DEBUG_ASSERT(
-          good_read, global_assert{}, DebugLevel::ALWAYS{},
-          "Trouble reading input file: " + input_file_name + '\n' +
-              "First argument should be name of input file.\n" +
-              "Use the input file name \"ignore\" to use no input file.\n" +
-              "Use the input file name \"help\" to export available "
-              "options.");
-      v_bson = input_parser.ToBSON();
-      size = static_cast<int>(v_bson.size());
-    }
-    MPI_Bcast(&size, 1, MPI_INT, 0, mpi_session.GetComm());
-    v_bson.resize(size);  // Will do nothing for rank 0
-    MPI_Bcast(v_bson.data(), size, MPI_BYTE, 0, mpi_session.GetComm());
-    if (mpi_session.IAmNotRoot()) {
-      input_parser.SetFromBSON(v_bson);
-    }
+    input_parser.ParseFromFile(input_file_name, mpi_session);
   }
   argc += -2;  // Skip executable and input file name
   input_parser.ParseCL(argc, argv + 2);
@@ -110,11 +91,10 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
       input_parser["Simulation/in_data"].get<std::string>();
   const auto out_data_name =
       input_parser["Simulation/out_data"].get<std::string>();
-  if (in_data_name != "ignore") {
-    DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
-                 DebugLevel::ALWAYS{}, "Cannot read and write from same file.");
-    file_io.SetRead(in_data_name);
-  }
+  DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
+               DebugLevel::ALWAYS{}, "Cannot read and write from same file.");
+  file_io.SetRead(in_data_name);
+
   if (out_data_name != "ignore") {
     DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
                  DebugLevel::ALWAYS{}, "Cannot read and write from same file.");
@@ -186,7 +166,9 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
     file_io.GetImmediateValue("TIME", &time);
     double read_in_dt;
     file_io.GetImmediateValue("DT", &read_in_dt);
-    dt = std::min(dt, read_in_dt);
+    if (read_in_dt > 0.0) {  // Initializer tool writes out a negative dt
+      dt = std::min(dt, read_in_dt);
+    }
   }
   double max_dt = dt;
   if (use_precice) {

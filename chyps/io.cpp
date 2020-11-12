@@ -108,10 +108,13 @@ void IO::AddVariableForGridFunction(
                    "Unkown node ordering for GridFunction when adding to IO");
     }
   }
-  std::vector<std::string> a_element_space_name{
-      std::string(a_element_space.FEColl()->Name())};
-  this->WriteAttributeForVariable(a_variable_name, "FiniteElementSpace",
-                                  a_element_space_name);
+  this->WriteAttributeForVariable(
+      a_variable_name, "FiniteElementSpace",
+      std::string(a_element_space.FEColl()->Name()));
+  // Assumes constant order elements below
+  this->WriteAttributeForVariable(a_variable_name, "FiniteElementOrder",
+                                  a_element_space.GetOrder(0));
+  this->MarkAsPointVariable(a_variable_name, a_element_space.GetOrder(0));
 }
 
 void IO::BeginWriteStep(const int a_cycle, const double a_time,
@@ -321,13 +324,19 @@ std::string IO::VTKSchema(void) const {
 }
 
 std::array<int, 2> IO::MinMaxVariableOrder(void) const {
-  std::array<int, 2> min_max{{INT_MAX, -INT_MAX}};
-  for (const auto element : point_data_orders_m) {
-    min_max[0] = std::min(min_max[0], element);
-    min_max[1] = std::max(min_max[1], element);
+  if (point_data_orders_m.size() == 0) {
+    return std::array<int, 2>{1, 1};
+  } else {
+    std::array<int, 2> min_max{{INT_MAX, -INT_MAX}};
+    for (const auto element : point_data_orders_m) {
+      min_max[0] = std::min(min_max[0], element);
+      min_max[1] = std::max(min_max[1], element);
+    }
+    DEBUG_ASSERT(min_max[0] <= min_max[1], global_assert{}, DebugLevel::CHEAP{},
+                 "minimum value= " + std::to_string(min_max[0]) +
+                     " maximum value= " + std::to_string(min_max[1]));
+    return min_max;
   }
-  DEBUG_ASSERT(min_max[0] <= min_max[1], global_assert{}, DebugLevel::CHEAP{});
-  return min_max;
 }
 
 }  // namespace chyps

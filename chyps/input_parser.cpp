@@ -126,11 +126,39 @@ bool InputParser::ParseFromFile(const std::string& a_file_name) {
   return true;
 }
 
+bool InputParser::ParseFromFile(const std::string& a_file_name,
+                                const MPIParallel& a_mpi_session) {
+  std::vector<std::uint8_t> v_bson;
+  std::size_t size = 0;
+  if (a_mpi_session.IAmRoot()) {
+    const bool good_read = this->ParseFromFile(a_file_name);
+    if (!good_read) {
+      DEBUG_ASSERT(
+          good_read, global_assert{}, DebugLevel::ALWAYS{},
+          "Trouble reading input file: " + a_file_name + '\n' +
+              "First argument should be name of input file.\n" +
+              "Use the input file name \"ignore\" to use no input file.\n" +
+              "Use the input file name \"help\" to export available "
+              "options.");
+    }
+    v_bson = this->ToBSON();
+    size = v_bson.size();
+  }
+  MPI_Bcast(&size, 1, my_MPI_SIZE_T, 0, a_mpi_session.GetComm());
+  v_bson.resize(size);  // Will do nothing for rank 0
+  MPI_Bcast(v_bson.data(), size, MPI_BYTE, 0, a_mpi_session.GetComm());
+  if (a_mpi_session.IAmNotRoot()) {
+    this->SetFromBSON(v_bson);
+  }
+  return true;
+}
+
 void InputParser::AddOptionNoDefault(const std::string& a_name,
                                      const std::string& a_description,
                                      const bool a_required,
                                      const std::string& a_dependency) {
   option_description_m[a_name] = a_description;
+  // Do not overwrite if already added via parsing.
   parsed_input_m[a_name] = nlohmann::json::object();
   DEBUG_ASSERT(
       option_required_status_m.find(a_name) == option_required_status_m.end(),
@@ -168,7 +196,9 @@ void InputParser::SetFromBSON(const std::vector<std::uint8_t>& a_bson) {
 }
 
 const nlohmann::json& InputParser::operator[](const std::string& a_name) const {
-  // FIXME : Make an exception.
+  DEBUG_ASSERT(parsed_input_m.Contains(a_name), global_assert{},
+               DebugLevel::CHEAP{},
+               "Could not find \"" + a_name + "\" in parsed options.");
   return parsed_input_m[a_name];
 }
 

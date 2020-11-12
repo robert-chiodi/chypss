@@ -33,9 +33,17 @@ target_sources(chyps PRIVATE simulation.hpp)
 target_sources(chyps PRIVATE simulation.cpp)
 target_sources(chyps PRIVATE debug_assert.hpp)
 
+target_sources(chyps PRIVATE simulation_initializer.hpp)
+target_sources(chyps PRIVATE simulation_initializer.cpp)
+target_sources(chyps PRIVATE simulation_configurations/configuration_initializer_interface.hpp)
+target_sources(chyps PRIVATE simulation_configurations/quadratic_pulse.hpp)
+target_sources(chyps PRIVATE simulation_configurations/quadratic_pulse.cpp)
+
+
 
 target_sources(chyps_heat PRIVATE main.cpp)
 
 target_sources(dummy_precice PRIVATE dummy_precice_setter.cpp)
 
-target_sources(example PRIVATE example_copy.cpp)
+target_sources(chyps_initializer PRIVATE initializer_main.cpp)
+

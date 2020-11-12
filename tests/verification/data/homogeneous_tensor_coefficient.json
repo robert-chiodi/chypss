@@ -1,7 +1,16 @@
 {
+    "SimulationInitializer":{
+        "simulation_configuration": "quadratic_pulse" ,
+	"out_data": "tests/verification/data/HomogeneousCCInit",
+        "QuadraticPulse":{
+                        "pulse_amplitude": 1.0,
+                        "approximation_terms": 2,
+                        "boundary_configuration":"DDNN"
+                        }
+                 },
     "Simulation":{
-		    "in_data":"ignore",
-		    "out_data":"tests/verification/data/HomogeneousTCSolution",
+		    "in_data":"tests/verification/data/HomogeneousCCInit",
+		    "out_data":"tests/verification/data/HomogeneousCCSolution",
 		    "end_time": 0.01,
 		    "time_step": 0.001,
 		    "use_adios2": false,
@@ -9,8 +18,7 @@
 		    "viz_steps": 100000000
 		 },
     "HeatSolver":{
-		    "alpha": 0.0,
-		    "kappa": 0.5,
+		    "kappa": [0.5, 0.0, 0.0, 0.25],
 		    "order": 2,
 		    "time_advancement": 3,
 		    "BoundaryConditions":{
@@ -29,6 +37,7 @@
 					 }
 		 },
     "Mesh":{
+  	    "rotation": 0.0,
 	    "gen_blx": 0.0,
 	    "gen_bly": 0.0,
 	    "gen_blz": -1.0,

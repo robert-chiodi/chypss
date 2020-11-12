@@ -65,7 +65,9 @@ class IO {
                           const MeshElement a_type);
 
   /// \brief Add ParGridFunction variable for later export (through PutDeferred
-  /// or PutImmediate). Underlying data assumed to be of type double.
+  /// or PutImmediate). Underlying data assumed to be of type double. The data
+  /// is also marked as a point variable using the MarkAsPointVariableMethod.
+  /// It is assumed the GridFunction is on a constant element-order mesh.
   ///
   /// NOTE: Currently only implemented as all ranks write to their own section.
   void AddVariableForGridFunction(
@@ -149,6 +151,16 @@ class IO {
   void WriteAttributeForVariable(const std::string& a_variable_name,
                                  const std::string& a_name,
                                  const std::vector<T>& a_data);
+
+  /// \brief Writes attribute (with a_name) for the given variable (with name
+  /// a_variable_name). This variable must have been previously added with the
+  /// AddVariable method. The data a_data is written with the attribute.
+  ///
+  /// NOTE: a_name must be a unique attribute name, not used before.
+  /// NOTE: Attribute will be written once per MPI process.
+  template <class T>
+  void WriteAttributeForVariable(const std::string& a_variable_name,
+                                 const std::string& a_name, const T& a_data);
 
   /// \brief Writes attribute (with a_name) and the associated a_data from the
   /// Root MPI rank. Does nothing for all other ranks.

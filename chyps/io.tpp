@@ -86,6 +86,13 @@ void IO::WriteAttributeForVariable(const std::string& a_variable_name,
 }
 
 template <class T>
+void IO::WriteAttributeForVariable(const std::string& a_variable_name,
+                                   const std::string& a_name, const T& a_data) {
+  auto adios_attribute =
+      write_m.DefineAttribute(a_name, a_data, a_variable_name);
+}
+
+template <class T>
 void IO::RootWriteAttribute(const std::string& a_name, const T& a_data) {
   if (mpi_session_m.IAmRoot()) {
     auto adios_attribute = write_m.DefineAttribute(a_name, a_data);

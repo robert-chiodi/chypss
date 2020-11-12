@@ -60,14 +60,14 @@ add_executable(chyps_heat)
 target_link_libraries(chyps_heat PRIVATE chyps)
 set_property(TARGET chyps_heat PROPERTY CXX_STANDARD 11)
 
+add_executable(chyps_initializer)
+target_link_libraries(chyps_initializer PRIVATE chyps)
+set_property(TARGET chyps_initializer PROPERTY CXX_STANDARD 11)
+
+
 add_executable(dummy_precice)
 target_link_libraries(dummy_precice PRIVATE chyps)
 set_property(TARGET dummy_precice PROPERTY CXX_STANDARD 11)
-
-add_executable(example)
-target_link_libraries(example PRIVATE chyps)
-
-set_property(TARGET example PROPERTY CXX_STANDARD 11)
 
 add_subdirectory("${CHYPS_SOURCE}")
 

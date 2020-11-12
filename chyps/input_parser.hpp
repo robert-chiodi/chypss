@@ -21,6 +21,8 @@
 
 #include <nlohmann_json/json.hpp>
 
+#include "chyps/mpi_parallel.hpp"
+
 namespace chyps {
 
 /// \class DirectoryJSON input_parser.hpp chyps/input_parser.hpp
@@ -62,6 +64,11 @@ class InputParser {
 
   /// \brief Parse input from a supplied input file in JSON format.
   bool ParseFromFile(const std::string& a_file_name);
+
+  /// \brief Parse and communicate file. Reads file in on root processor only
+  /// and broadcasts to all others.
+  bool ParseFromFile(const std::string& a_file_name,
+                     const MPIParallel& a_mpi_session);
 
   /// \brief Write parsed input to file at a_file_name.
   void WriteToFile(const std::string& a_file_name) const;

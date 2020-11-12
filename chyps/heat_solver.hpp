@@ -86,7 +86,7 @@ class HeatSolver : public SolverInterface {
                                  mfem::ParGridFunction& a_temperature_gf);
 
   bool FileWritingEnabled(void) const;
-  bool RestartFromFile(void) const;
+  bool RestartFileActive(void) const;
 
   InputParser& parser_m;
   IO* file_io_m;

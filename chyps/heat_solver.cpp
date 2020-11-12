@@ -84,7 +84,7 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
 
 void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
   if (parser_m["Simulation/use_visit"].get<bool>()) {
-    visit_collection_m->UpdateField("Temperature", temperature_m);
+    visit_collection_m->UpdateField("temperature", temperature_m);
     visit_collection_m->WriteOutFields(a_cycle, a_time);
   }
 
@@ -97,7 +97,7 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
                  "An ongoing IO step is required for writing.");
     mfem::ParGridFunction temperature_gf(element_space_m);
     temperature_gf.SetFromTrueDofs(temperature_m);
-    file_io_m->PutDeferred("HeatSolver/Temperature", temperature_gf);
+    file_io_m->PutDeferred("HeatSolver/temperature", temperature_gf);
     file_io_m->PerformPuts();
   }
 }
@@ -112,8 +112,11 @@ void HeatSolver::GatherOptions(void) {
       "ODE solver: 1 - Backward Euler, 2 - SDIRK2, 3 - SDIRK3,\n\t"
       "\t   11 - Forward Euler, 12 - RK2, 13 - RK3 SSP, 14 - RK4.",
       3);
-  parser_m.AddOptionDefault("HeatSolver/kappa", "Kappa coefficient offset.",
-                            0.5);
+  parser_m.AddOptionNoDefault(
+      "HeatSolver/kappa",
+      "Array of thermal coefficients representing tensor in column major "
+      "ordering. Should be MESH_DIM*MESH_DIM in size.",
+      true);
   // TODO Add a flag and way to specify which variables we wish to export to
   // VisIt.
 
@@ -213,13 +216,12 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   // Allocates temperature and sets initial values.
   this->SetInitialConditions();
 
-  SPDLOG_LOGGER_INFO(MAIN_LOG,
-                     "Creating new variable thermal coefficient conduction "
-                     "operator with kappa = {}",
-                     parser_m["HeatSolver/kappa"].get<double>());
-  operator_m = new ConductionOperator(
-      *mesh_m, boundary_conditions_m, *coarse_element_space_m, *element_space_m,
-      temperature_m, parser_m["HeatSolver/kappa"].get<double>());
+  const std::vector<double> tensor_kappa =
+      parser_m["HeatSolver/kappa"].get<std::vector<double>>();
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating new conduction operator with kappa.");
+  operator_m = new ConductionOperator(*mesh_m, boundary_conditions_m,
+                                      *coarse_element_space_m, *element_space_m,
+                                      temperature_m, tensor_kappa);
 }
 
 void HeatSolver::RegisterFieldsForIO(void) {
@@ -227,61 +229,28 @@ void HeatSolver::RegisterFieldsForIO(void) {
     SPDLOG_LOGGER_INFO(MAIN_LOG, "Registering fields for export via VisIt");
     visit_collection_m = new MfemVisItCollection(
         mesh_m->GetMPIComm(), "HeatSolver", mesh_m->GetMfemMesh());
-    visit_collection_m->RegisterField("Temperature", element_space_m);
+    visit_collection_m->RegisterField("temperature", element_space_m);
     SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
   }
 
   // Below is ADIOS2 io calls. Will replace VisIt once working.
   if (this->FileWritingEnabled()) {
-    file_io_m->AddVariableForGridFunction("HeatSolver/Temperature",
+    file_io_m->AddVariableForGridFunction("HeatSolver/temperature",
                                           *element_space_m, true);
-    file_io_m->MarkAsPointVariable("HeatSolver/Temperature",
-                                   parser_m["HeatSolver/order"].get<double>());
   }
-}
-
-static double SetInitialTemperature(const mfem::Vector& x) {
-  const double* a_true_position = x.GetData();
-  const std::size_t m = 2;
-  const std::size_t n = 1;
-  const auto dn = static_cast<double>(n);
-  const auto dm = static_cast<double>(m);
-  const double domain_length = 2.0;
-  const double domain_height = 2.0;
-  const double amplitude = 1.0;
-  std::array<double, 2> a_position;
-  a_position[0] = std::cos(-0.25 * M_PI) * a_true_position[0] -
-                  std::sin(-0.25 * M_PI) * a_true_position[1];
-  a_position[1] = std::sin(-0.25 * M_PI) * a_true_position[0] +
-                  std::cos(-0.25 * M_PI) * a_true_position[1];
-  const double ic_factor =
-      (amplitude * std::pow(domain_height, 2) *
-       (-4.0 * std::pow(M_PI, 2) +
-        std::pow(domain_length, 2) * (-8.0 + std::pow(M_PI, 2)))) /
-      std::pow(M_PI, 5);
-  return ic_factor * std::sin(dn * M_PI * a_position[0] / domain_length) *
-         std::cos(dm * M_PI * a_position[1] / domain_height);
 }
 
 void HeatSolver::SetInitialConditions(void) {
   mfem::ParGridFunction temperature_grid_function(element_space_m);
-  if (this->RestartFromFile()) {
-    temperature_grid_function = 0.0;
-    file_io_m->GetImmediateBlock(
-        "HeatSolver/Temperature", {0},
-        {static_cast<std::size_t>(temperature_grid_function.Size())},
-        temperature_grid_function.GetData());
-  } else {
-    SPDLOG_LOGGER_INFO(
-        MAIN_LOG, "Creating and imposing initial temperature field conditions");
-    mfem::FunctionCoefficient initial_temperature(SetInitialTemperature);
-    temperature_grid_function.ProjectCoefficient(initial_temperature);
-
-    SPDLOG_LOGGER_INFO(MAIN_LOG,
-                       "Projecting initial conditions onto temperature field");
-  }
+  DEBUG_ASSERT(this->RestartFileActive(), global_assert{}, DebugLevel::CHEAP{},
+               "Cannot read from restart file.");
+  temperature_grid_function = 0.0;
+  file_io_m->GetImmediateBlock(
+      "HeatSolver/temperature", {0},
+      {static_cast<std::size_t>(temperature_grid_function.Size())},
+      temperature_grid_function.GetData());
   temperature_grid_function.GetTrueDofs(temperature_m);
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Temperature field allocated and set");
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "temperature field allocated and set");
 }
 
 HeatSolver::~HeatSolver(void) {
@@ -314,7 +283,7 @@ bool HeatSolver::FileWritingEnabled(void) const {
   return file_io_m != nullptr && file_io_m->IsWriteModeActive();
 }
 
-bool HeatSolver::RestartFromFile(void) const {
+bool HeatSolver::RestartFileActive(void) const {
   return file_io_m != nullptr && file_io_m->IsReadModeActive();
 }
 
