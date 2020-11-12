@@ -239,27 +239,33 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
 }
 
 void ConductionOperator::SetParameters(const mfem::Vector& u) {
-  mfem::DenseMatrix full_value(mesh_m.GetDimension());
-  full_value = 0.0;
-  for (int n = 0; n < mesh_m.GetDimension(); ++n) {
-    full_value(n, n) = kappa;
-  }
-  full_value(1, 1) = 0.5 * kappa;
-  // Make assert that this is positive definite
-  delete tensor_thermal_coeff_m;
-  tensor_thermal_coeff_m = new mfem::MatrixConstantCoefficient(full_value);
-  // dt will be reset on below in implicit solve
-  delete dt_tensor_thermal_coeff_m;
-  dt_tensor_thermal_coeff_m =
-      new mfem::ScalarMatrixProductCoefficient(1.0, *tensor_thermal_coeff_m);
+  if (K == nullptr) {
+    mfem::DenseMatrix full_value(mesh_m.GetDimension());
+    const double kappa_x = kappa;
+    const double kappa_y = kappa_x;
+    full_value(0, 0) = std::cos(0.25 * M_PI) * kappa_x;
+    full_value(0, 1) = -std::sin(0.25 * M_PI) * kappa_y;
+    full_value(1, 0) = std::sin(0.25 * M_PI) * kappa_x;
+    full_value(1, 1) = std::cos(0.25 * M_PI) * kappa_y;
+    // Make assert that this (full_value) is positive definite
+    std::cout << full_value.Det() << std::endl;
 
-  delete K;
-  K = new mfem::ParBilinearForm(&fespace);
-  K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
-  K->AddDomainIntegrator(
-      new mfem::DiffusionIntegrator(*tensor_thermal_coeff_m));
-  K->Assemble();  // keep sparsity pattern of M and K the same
-  K->Finalize();
+    delete tensor_thermal_coeff_m;
+    tensor_thermal_coeff_m = new mfem::MatrixConstantCoefficient(full_value);
+
+    // dt will be reset instead of 1.0 in below in implicit solve
+    delete dt_tensor_thermal_coeff_m;
+    dt_tensor_thermal_coeff_m =
+        new mfem::ScalarMatrixProductCoefficient(1.0, *tensor_thermal_coeff_m);
+
+    delete K;
+    K = new mfem::ParBilinearForm(&fespace);
+    K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+    K->AddDomainIntegrator(
+        new mfem::DiffusionIntegrator(*tensor_thermal_coeff_m));
+    K->Assemble();  // keep sparsity pattern of M and K the same
+    K->Finalize();
+  }
   delete T;
   T = nullptr;  // Delete here to be reset on first entrance to SolveImplicit
 }

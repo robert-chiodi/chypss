@@ -29,6 +29,7 @@
 					 }
 		 },
     "Mesh":{
+	    "rotation": 45.0,
 	    "gen_blx": 0.0,
 	    "gen_bly": 0.0,
 	    "gen_blz": -1.0,

@@ -195,6 +195,18 @@ class DecayingPulse_TC {
                      coefficient_y_m * std::pow(dm / domain_height, 2)));
   }
 
+  double NeumannTopBot_Rotated(const double* a_true_position,
+                               const double a_time,
+                               const double a_mesh_rotation_deg) {
+    std::array<double, 2> a_position;
+    const double mesh_rotation_rad = a_mesh_rotation_deg * M_PI / 180.0;
+    a_position[0] = std::cos(-mesh_rotation_rad) * a_true_position[0] -
+                    std::sin(-mesh_rotation_rad) * a_true_position[1];
+    a_position[1] = std::sin(-mesh_rotation_rad) * a_true_position[0] +
+                    std::cos(-mesh_rotation_rad) * a_true_position[1];
+    return this->NeumannTopBot(a_position.data(), a_time);
+  }
+
  private:
   const double coefficient_x_m;
   const double coefficient_y_m;
@@ -598,6 +610,94 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficient) {
       const double* position_2d = &(point_field[2 * n]);
       correct_solution[n] =
           analytical_solution.NeumannTopBot(position_2d, final_time);
+    }
+
+    const double global_l1 = GlobalL1Diff_Normalized(
+        temperature_field, correct_solution, *mpi_session);
+    const double global_l2 = GlobalL2Diff_Normalized(
+        temperature_field, correct_solution, *mpi_session);
+    const double global_linf =
+        GlobalLinfDiff(temperature_field, correct_solution, *mpi_session);
+    error_metrics[r][0] = static_cast<double>(std::sqrt(nvert[0]) - 1);
+    error_metrics[r][1] = global_l1;
+    error_metrics[r][2] = global_l2;
+    error_metrics[r][3] = global_linf;
+
+    DeleteCommandLineInput(input_char);
+  }
+
+  if (mpi_session->IAmRoot()) {
+    printf("%16s %16s %16s %16s %16s %16s %16s\n", "Resolution", "L1_err",
+           "L1_conv", "L2_err", "L2_conv", "Linf_err", "Linf_conv");
+    for (std::size_t r = 0; r < res_levels; ++r) {
+      if (r == 0) {
+        printf("%16d %16.8E %16s %16.8E %16s %16.8E %16s\n",
+               static_cast<int>(error_metrics[r][0]), error_metrics[r][1],
+               "N/A", error_metrics[r][2], "N/A", error_metrics[r][3], "N/A");
+
+      } else {
+        const double l1_conv =
+            log(error_metrics[r - 1][1] / error_metrics[r][1] /
+                (error_metrics[r - 1][0] / error_metrics[r][0]));
+        const double l2_conv =
+            log(error_metrics[r - 1][2] / error_metrics[r][2] /
+                (error_metrics[r - 1][0] / error_metrics[r][0]));
+        const double linf_conv =
+            log(error_metrics[r - 1][3] / error_metrics[r][3] /
+                (error_metrics[r - 1][0] / error_metrics[r][0]));
+        printf("%16d %16.8E %16.8f %16.8E %16.8f %16.8E %16.8f\n",
+               static_cast<int>(error_metrics[r][0]), error_metrics[r][1],
+               l1_conv, error_metrics[r][2], l2_conv, error_metrics[r][3],
+               linf_conv);
+      }
+    }
+  }
+}
+
+TEST(LinearHeatEquation, HomogeneousAndTensorCoefficientRot45) {
+  std::vector<std::string> input_string;
+  input_string.push_back("Executable_name");
+  std::string file_name =
+      "tests/verification/data/"
+      "homogeneous_tensor_coefficient_rotated.json";
+  input_string.push_back(file_name);
+  input_string.push_back("-Mesh/parallel_refine");
+  input_string.push_back("0");
+
+  std::ifstream myfile(file_name.c_str());
+  nlohmann::json input_file =
+      nlohmann::json::parse(myfile, nullptr, true, true);
+  myfile.close();
+
+  const double final_time = input_file["Simulation"]["end_time"].get<double>();
+  const double rotation = input_file["Mesh"]["rotation"].get<double>();
+
+  static constexpr std::size_t res_levels = 3;
+  std::array<std::array<double, 4>, res_levels> error_metrics;
+  for (std::size_t r = 0; r < res_levels; ++r) {
+    input_string[3] = std::to_string(r);
+    auto input_char = FakeCommandLineInput(input_string);
+    int argc = static_cast<int>(input_char.size());
+    char** argv = input_char.data();
+    chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
+
+    IO run_file(*mpi_session, "Run");
+    run_file.SetRead("tests/verification/data/HomogeneousTCSolution");
+    std::vector<double> temperature_field;
+    run_file.GetImmediateBlock("HeatSolver/Temperature", temperature_field);
+    std::vector<double> point_field;
+    run_file.GetImmediateBlock("vertices", point_field);
+    ASSERT_EQ(point_field.size() / 2, temperature_field.size());
+    std::vector<uint32_t> nvert(1);
+    run_file.GetImmediateBlock("NumOfVertices", {0}, {1}, nvert.data());
+    assert(nvert[0] == point_field.size() / 2);
+
+    std::vector<double> correct_solution(temperature_field.size());
+    DecayingPulse_TC analytical_solution(0.5, 0.5, 1.0, 2.0, 2.0);
+    for (std::size_t n = 0; n < nvert[0]; ++n) {
+      const double* position_2d = &(point_field[2 * n]);
+      correct_solution[n] = analytical_solution.NeumannTopBot_Rotated(
+          position_2d, final_time, rotation);
     }
 
     const double global_l1 = GlobalL1Diff_Normalized(

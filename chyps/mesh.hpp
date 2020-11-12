@@ -103,7 +103,7 @@ class Mesh {
   /// user.
   std::pair<mfem::Mesh*, double*> GenerateQuadMesh(
       const std::array<std::array<double, 2>, 2>& a_bounding_box,
-      const int a_nx, const int a_ny);
+      const int a_nx, const int a_ny, const double a_rotation_deg = 0.0);
 
   /// \brief Generate hex mesh of a cuboid domain for use by MFEM.
   ///

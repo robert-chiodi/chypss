@@ -179,6 +179,9 @@ void Mesh::GatherOptions(void) {
   parser_m.AddOptionDefault(
       "Mesh/gen_buz",
       "If using generated mesh, upper z dimension of the cuboid domain", 1.0);
+  parser_m.AddOptionDefault(
+      "Mesh/rotation", "Degrees to rotate mesh in xy-plane by (along +z axis).",
+      0.0);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "All options added to parser for Mesh class");
 }
 
@@ -219,7 +222,8 @@ void Mesh::ReadAndRefineMesh(void) {
             parser_m["Mesh/gen_bly"].get<double>()},
            {parser_m["Mesh/gen_bux"].get<double>(),
             parser_m["Mesh/gen_buy"].get<double>()}}};
-      auto mesh_and_vertices = this->GenerateQuadMesh(bounding_box, nx, ny);
+      auto mesh_and_vertices = this->GenerateQuadMesh(
+          bounding_box, nx, ny, parser_m["Mesh/rotation"].get<double>());
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
     } else {
@@ -335,7 +339,7 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateLineMesh(
 
 std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
     const std::array<std::array<double, 2>, 2>& a_bounding_box, const int a_nx,
-    const int a_ny) {
+    const int a_ny, const double a_rotation_deg) {
   SPDLOG_LOGGER_INFO(
       MAIN_LOG,
       "Creating 2D Quad Mesh from ({},{}) to ({},{}) with ({},{}) elements.",
@@ -395,6 +399,7 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
       (a_bounding_box[1][0] - a_bounding_box[0][0]) / static_cast<double>(a_nx);
   const double dy =
       (a_bounding_box[1][1] - a_bounding_box[0][1]) / static_cast<double>(a_ny);
+  const double rotate_rad = a_rotation_deg * M_PI / 180.0;
   // Apparently a vertex is always 3D in MFEM but they ignore the third
   // dimension of each vertex in 2D
   for (int j = 0; j < a_ny + 1; ++j) {
@@ -402,8 +407,12 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
       const int node_index = j * (a_nx + 1) + i;
       const double x_loc = a_bounding_box[0][0] + static_cast<double>(i) * dx;
       const double y_loc = a_bounding_box[0][1] + static_cast<double>(j) * dy;
-      vertices[3 * node_index] = x_loc;
-      vertices[3 * node_index + 1] = y_loc;
+      const double rot_x_loc =
+          std::cos(rotate_rad) * x_loc - std::sin(rotate_rad) * y_loc;
+      const double rot_y_loc =
+          std::sin(rotate_rad) * x_loc + std::cos(rotate_rad) * y_loc;
+      vertices[3 * node_index] = rot_x_loc;
+      vertices[3 * node_index + 1] = rot_y_loc;
       vertices[3 * node_index + 2] = 0.0;
     }
   }

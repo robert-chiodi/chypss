@@ -22,7 +22,7 @@ find_package(Boost 1.65.1 REQUIRED
 find_package(PETSC REQUIRED)
 find_package(SPDLOG REQUIRED)
 find_package(ADIOS2 REQUIRED)
-
+find_package(LAPACK REQUIRED)
 # Packages held in this repo in ./external
 set(NLOHMANN_JSON_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/nlohmann_json")
 set(GTEST_MPI_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/gtest-mpi-listener")
@@ -54,6 +54,7 @@ target_link_libraries(chyps PUBLIC
 target_link_libraries(chyps PUBLIC Petsc::Petsc)
 target_link_libraries(chyps PUBLIC Spdlog::Spdlog)
 target_link_libraries(chyps PUBLIC adios2::cxx11_mpi)
+target_link_libraries(chyps PUBLIC ${LAPACK_LIBRARIES})
 
 add_executable(chyps_heat)
 target_link_libraries(chyps_heat PRIVATE chyps)

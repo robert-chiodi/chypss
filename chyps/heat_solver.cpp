@@ -241,7 +241,7 @@ void HeatSolver::RegisterFieldsForIO(void) {
 }
 
 static double SetInitialTemperature(const mfem::Vector& x) {
-  const double* a_position = x.GetData();
+  const double* a_true_position = x.GetData();
   const std::size_t m = 2;
   const std::size_t n = 1;
   const auto dn = static_cast<double>(n);
@@ -249,6 +249,11 @@ static double SetInitialTemperature(const mfem::Vector& x) {
   const double domain_length = 2.0;
   const double domain_height = 2.0;
   const double amplitude = 1.0;
+  std::array<double, 2> a_position;
+  a_position[0] = std::cos(-0.25 * M_PI) * a_true_position[0] -
+                  std::sin(-0.25 * M_PI) * a_true_position[1];
+  a_position[1] = std::sin(-0.25 * M_PI) * a_true_position[0] +
+                  std::cos(-0.25 * M_PI) * a_true_position[1];
   const double ic_factor =
       (amplitude * std::pow(domain_height, 2) *
        (-4.0 * std::pow(M_PI, 2) +
