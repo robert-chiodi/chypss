@@ -94,7 +94,7 @@ class Mesh {
   /// user.
   std::pair<mfem::Mesh*, double*> GenerateLineMesh(
       const std::array<std::array<double, 1>, 2>& a_bounding_box,
-      const int a_nx);
+      const int a_nx, const std::string& a_periodic = "");
 
   /// \brief Generate quad mesh of a rectangular domain for use by MFEM.
   ///
@@ -103,7 +103,8 @@ class Mesh {
   /// user.
   std::pair<mfem::Mesh*, double*> GenerateQuadMesh(
       const std::array<std::array<double, 2>, 2>& a_bounding_box,
-      const int a_nx, const int a_ny, const double a_rotation_deg = 0.0);
+      const int a_nx, const int a_ny, const std::string& a_periodic = "",
+      const double a_rotation_deg = 0.0);
 
   /// \brief Generate hex mesh of a cuboid domain for use by MFEM.
   ///
@@ -112,7 +113,8 @@ class Mesh {
   /// user.
   std::pair<mfem::Mesh*, double*> GenerateHexMesh(
       const std::array<std::array<double, 3>, 2>& a_bounding_box,
-      const int a_nx, const int a_ny, const int a_nz);
+      const int a_nx, const int a_ny, const int a_nz,
+      const std::string& a_periodic = "");
 
   bool FileWritingEnabled(void) const;
 

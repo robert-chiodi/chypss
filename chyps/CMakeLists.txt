@@ -38,6 +38,10 @@ target_sources(chyps PRIVATE simulation_initializer.cpp)
 target_sources(chyps PRIVATE simulation_configurations/configuration_initializer_interface.hpp)
 target_sources(chyps PRIVATE simulation_configurations/quadratic_pulse.hpp)
 target_sources(chyps PRIVATE simulation_configurations/quadratic_pulse.cpp)
+target_sources(chyps PRIVATE simulation_configurations/constant.hpp)
+target_sources(chyps PRIVATE simulation_configurations/constant.cpp)
+target_sources(chyps PRIVATE simulation_configurations/cooled_rod.hpp)
+target_sources(chyps PRIVATE simulation_configurations/cooled_rod.cpp)
 
 
 

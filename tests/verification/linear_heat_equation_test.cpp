@@ -32,12 +32,13 @@ using namespace chyps;
 
 template <class SolutionFunctor>
 int ConvergenceRunner(const std::string& a_input_name,
+                      const std::string& a_configuration,
                       const SolutionFunctor& a_analytical_solution_lambda,
                       const int a_number_of_refines) {
   std::vector<std::string> init_input_string;
   init_input_string.push_back("Executable_name");
   init_input_string.push_back(a_input_name);
-  init_input_string.push_back("quadratic_pulse");
+  init_input_string.push_back(a_configuration);
   init_input_string.push_back("-Mesh/parallel_refine");
   init_input_string.push_back("0");
 
@@ -98,7 +99,7 @@ int ConvergenceRunner(const std::string& a_input_name,
         temperature_field, correct_solution, *mpi_session);
     const double global_linf =
         GlobalLinfDiff(temperature_field, correct_solution, *mpi_session);
-    error_metrics[r][0] = static_cast<double>(std::sqrt(nvert[0]) - 1);
+    error_metrics[r][0] = static_cast<double>(nvert[0]);
     error_metrics[r][1] = global_l1;
     error_metrics[r][2] = global_l2;
     error_metrics[r][3] = global_linf;
@@ -110,12 +111,11 @@ int ConvergenceRunner(const std::string& a_input_name,
   if (mpi_session->IAmRoot()) {
     printf("%16s %16s %16s %16s %16s %16s %16s\n", "Resolution", "L1_err",
            "L1_conv", "L2_err", "L2_conv", "Linf_err", "Linf_conv");
-    for (int r = 0; r < a_number_of_refines; ++r) {
+    for (int r = 0; r <= a_number_of_refines; ++r) {
       if (r == 0) {
         printf("%16d %16.8E %16s %16.8E %16s %16.8E %16s\n",
                static_cast<int>(error_metrics[r][0]), error_metrics[r][1],
                "N/A", error_metrics[r][2], "N/A", error_metrics[r][3], "N/A");
-
       } else {
         const double l1_conv =
             log(error_metrics[r - 1][1] / error_metrics[r][1] /
@@ -197,8 +197,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientTop) {
     return result;
   };
 
-  int test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
+                                      solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -264,7 +264,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientBot) {
     return result;
   };
 
-  int test_result = ConvergenceRunner(file_name, solution_lambda, 5);
+  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
+                                      solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -331,8 +332,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientRight) {
     return result;
   };
 
-  int test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
+                                      solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -399,8 +400,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientLeft) {
     return result;
   };
 
-  int test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
+                                      solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -462,8 +463,8 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficient) {
     return result;
   };
 
-  int test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
+                                      solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -525,8 +526,50 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficientRot45) {
     return result;
   };
 
-  int test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
+                                      solution_lambda, number_of_refinements);
+  EXPECT_EQ(test_result, 1);
+}
+
+TEST(LinearHeatEquation, CooledRod) {
+  std::string file_name =
+      "tests/verification/data/"
+      "neumann_cooled_rod.json";
+  static constexpr int number_of_refinements = 3;
+
+  std::ifstream myfile(file_name.c_str());
+  nlohmann::json input_file =
+      nlohmann::json::parse(myfile, nullptr, true, true);
+  myfile.close();
+
+  const double domain_length = input_file["Mesh"]["gen_bux"].get<double>() -
+                               input_file["Mesh"]["gen_blx"].get<double>();
+  DEBUG_ASSERT(std::fabs(domain_length - 1.0) < 1.0e-15, global_assert{},
+               DebugLevel::ALWAYS{}, "Test requires domain length of 1.0");
+
+  const std::vector<double> tensor_kappa =
+      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+  const double coefficient = tensor_kappa[0];
+  DEBUG_ASSERT(std::fabs(coefficient - 1.0) < 1.0e-15, global_assert{},
+               DebugLevel::ALWAYS{},
+               "Test requires thermal coefficient of 1.0");
+  const int approximation_terms =
+      input_file["SimulationInitializer"]["CooledRod"]["approximation_terms"]
+          .get<int>();
+
+  auto solution_lambda = [=](const double* a_position, const double a_time) {
+    double result = 0.0;
+    for (std::size_t n = 1; n <= approximation_terms; ++n) {
+      const double dn = static_cast<double>(n);
+      const double ic_factor = 8.0 / std::pow(M_PI * (1.0 - 2.0 * dn), 2);
+      result += ic_factor * std::cos((dn - 0.5) * M_PI * a_position[0]) *
+                std::exp(-std::pow(dn - 0.5, 2) * M_PI * M_PI * a_time);
+    }
+    return result + 24.0 + a_position[0];
+  };
+
+  int test_result = ConvergenceRunner(file_name, "cooled_rod", solution_lambda,
+                                      number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 

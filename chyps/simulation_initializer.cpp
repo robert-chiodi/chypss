@@ -14,6 +14,10 @@
 
 #include "chyps/debug_assert.hpp"
 #include "chyps/io.hpp"
+
+// List of configuration header files
+#include "chyps/simulation_configurations/constant.hpp"
+#include "chyps/simulation_configurations/cooled_rod.hpp"
 #include "chyps/simulation_configurations/quadratic_pulse.hpp"
 
 namespace chyps {
@@ -21,7 +25,12 @@ namespace chyps {
 namespace chyps_details {
 ConfigurationInitializer* GetConfigurationInitializer(
     const std::string& a_configuration_name, InputParser& a_parser) {
-  if (a_configuration_name == "quadratic_pulse") {
+  if (a_configuration_name == "constant") {
+    return new Constant(a_parser);
+  } else if (a_configuration_name == "cooled_rod") {
+    return new CooledRod(a_parser);
+
+  } else if (a_configuration_name == "quadratic_pulse") {
     return new QuadraticPulse(a_parser);
   } else {
     DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},

@@ -84,7 +84,9 @@ std::size_t Mesh::GetLocalCount<MeshElement::VERTEX>(void) const {
 int Mesh::GetNumberOfBoundaryTagValues(void) const {
   DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
                DebugLevel::CHEAP{});
-  return parallel_mesh_m->bdr_attributes.Max();
+  return parallel_mesh_m->bdr_attributes.Size() > 0
+             ? parallel_mesh_m->bdr_attributes.Max()
+             : 0;
 }
 
 std::pair<std::vector<double>, std::vector<int>> Mesh::GetBoundaryVertices(
@@ -182,6 +184,12 @@ void Mesh::GatherOptions(void) {
   parser_m.AddOptionDefault(
       "Mesh/rotation", "Degrees to rotate mesh in xy-plane by (along +z axis).",
       0.0);
+  parser_m.AddOptionDefault(
+      "Mesh/periodicity",
+      "If using generated mesh (currently only 2D quad mesh), marks the "
+      "boundaries to be periodic. Provided as string with axis names (e.g., "
+      "\"xy\" to mark as periodic.",
+      "");
   SPDLOG_LOGGER_INFO(MAIN_LOG, "All options added to parser for Mesh class");
 }
 
@@ -196,6 +204,7 @@ void Mesh::ReadAndRefineMesh(void) {
     const auto nx = parser_m["Mesh/gen_nx"].get<int>();
     const auto ny = parser_m["Mesh/gen_ny"].get<int>();
     const auto nz = parser_m["Mesh/gen_nz"].get<int>();
+    const auto periodicity = parser_m["Mesh/periodicity"].get<std::string>();
     if (ny <= 0) {
       DEBUG_ASSERT(
           nx > 0, global_assert{}, DebugLevel::CHEAP{},
@@ -222,8 +231,9 @@ void Mesh::ReadAndRefineMesh(void) {
             parser_m["Mesh/gen_bly"].get<double>()},
            {parser_m["Mesh/gen_bux"].get<double>(),
             parser_m["Mesh/gen_buy"].get<double>()}}};
-      auto mesh_and_vertices = this->GenerateQuadMesh(
-          bounding_box, nx, ny, parser_m["Mesh/rotation"].get<double>());
+      auto mesh_and_vertices =
+          this->GenerateQuadMesh(bounding_box, nx, ny, periodicity,
+                                 parser_m["Mesh/rotation"].get<double>());
       serial_mesh = mesh_and_vertices.first;
       vertices = mesh_and_vertices.second;
     } else {
@@ -282,9 +292,6 @@ void Mesh::ReadAndRefineMesh(void) {
 }
 
 void Mesh::AllocateVariables(void) {
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Allocating space for {} boundary conditions",
-                     parallel_mesh_m->bdr_attributes.Max());
-
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Computing offsets for mesh elements.");
   std::size_t local_elems = this->GetLocalCount<MeshElement::ELEMENT>();
   MPI_Scan(&local_elems, &element_offset_m, 1, MPI_LONG, MPI_SUM,
@@ -293,11 +300,15 @@ void Mesh::AllocateVariables(void) {
 }
 
 std::pair<mfem::Mesh*, double*> Mesh::GenerateLineMesh(
-    const std::array<std::array<double, 1>, 2>& a_bounding_box,
-    const int a_nx) {
+    const std::array<std::array<double, 1>, 2>& a_bounding_box, const int a_nx,
+    const std::string& a_periodic) {
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Creating 1D Line Mesh from {} to {} with {} elements.",
                      a_bounding_box[0][0], a_bounding_box[1][0], a_nx);
+
+  DEBUG_ASSERT(a_periodic.size() == 0, global_assert{}, DebugLevel::ALWAYS{},
+               "Periodicity not working in 1D.");
+
   const int nvert = a_nx + 1;
   const int nelem = a_nx;
   double* vertices = new double[nvert * 3];
@@ -339,14 +350,25 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateLineMesh(
 
 std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
     const std::array<std::array<double, 2>, 2>& a_bounding_box, const int a_nx,
-    const int a_ny, const double a_rotation_deg) {
+    const int a_ny, const std::string& a_periodic,
+    const double a_rotation_deg) {
   SPDLOG_LOGGER_INFO(
       MAIN_LOG,
       "Creating 2D Quad Mesh from ({},{}) to ({},{}) with ({},{}) elements.",
       a_bounding_box[0][0], a_bounding_box[0][1], a_bounding_box[1][0],
       a_bounding_box[1][1], a_nx, a_ny);
 
-  const int nvert = (a_nx + 1) * (a_ny + 1);
+  // Requires mesh provided as L2 nodes, see
+  // https://github.com/mfem/mfem/issues/898
+  DEBUG_ASSERT(a_periodic.size() == 0, global_assert{}, DebugLevel::ALWAYS{},
+               "Periodicity not working in 2D.");
+
+  const bool periodic_x = a_periodic.find('x') != a_periodic.npos;
+  const bool periodic_y = a_periodic.find('y') != a_periodic.npos;
+
+  const int nvert_x = periodic_x ? a_nx : a_nx + 1;
+  const int nvert_y = periodic_y ? a_ny : a_ny + 1;
+  const int nvert = nvert_x * nvert_y;
   const int nelem = a_nx * a_ny;
   double* vertices = new double[nvert * 3];
 
@@ -355,41 +377,56 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
   std::vector<int> elem_attrib(nelem);
   std::fill(elem_attrib.begin(), elem_attrib.end(), 1);
 
-  const int nboundary = 2 * a_nx + 2 * a_ny;
+  const int nboundary_x = periodic_x ? 0 : 2 * a_ny;
+  const int nboundary_y = periodic_y ? 0 : 2 * a_nx;
+  const int nboundary = nboundary_x + nboundary_y;
   std::vector<int> boundary_indices(2 * nboundary);
   std::vector<int> boundary_attrib(nboundary);
+
+  const int y_jump = periodic_x ? a_nx : a_nx + 1;
   int nbi = 0;
   for (int j = 0; j < a_ny; ++j) {
     for (int i = 0; i < a_nx; ++i) {
       const int elem_index = j * a_nx + i;
-      elem_indices[4 * elem_index] = i + j * (a_nx + 1);
+      elem_indices[4 * elem_index] = i + j * y_jump;
       elem_indices[4 * elem_index + 1] = elem_indices[4 * elem_index] + 1;
       elem_indices[4 * elem_index + 2] =
-          elem_indices[4 * elem_index] + (a_nx + 1) + 1;
-      elem_indices[4 * elem_index + 3] =
-          elem_indices[4 * elem_index] + (a_nx + 1);
-      if (i == 0) {
+          elem_indices[4 * elem_index] + y_jump + 1;
+      elem_indices[4 * elem_index + 3] = elem_indices[4 * elem_index] + y_jump;
+
+      // Correct element if periodic
+      if (periodic_x && i == a_nx - 1) {
+        elem_indices[4 * elem_index + 1] -= a_nx;
+        elem_indices[4 * elem_index + 2] -= a_nx;
+      }
+
+      if (periodic_y && j == a_ny - 1) {
+        elem_indices[4 * elem_index + 2] -= a_ny * y_jump;
+        elem_indices[4 * elem_index + 3] -= a_ny * y_jump;
+      }
+
+      if (!periodic_x && i == 0) {
         boundary_attrib[nbi] = 1;
-        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + (a_nx + 1);
-        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] - (a_nx + 1);
+        boundary_indices[2 * nbi] = elem_indices[4 * elem_index + 3];
+        boundary_indices[2 * nbi + 1] = elem_indices[4 * elem_index];
         ++nbi;
       }
-      if (i == a_nx - 1) {
+      if (!periodic_x && i == a_nx - 1) {
         boundary_attrib[nbi] = 2;
-        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + 1;
-        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + (a_nx + 1);
+        boundary_indices[2 * nbi] = elem_indices[4 * elem_index + 1];
+        boundary_indices[2 * nbi + 1] = elem_indices[4 * elem_index + 2];
         ++nbi;
       }
-      if (j == 0) {
+      if (!periodic_y && j == 0) {
         boundary_attrib[nbi] = 3;
-        boundary_indices[2 * nbi] = i + j * (a_nx + 1);
-        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] + 1;
+        boundary_indices[2 * nbi] = elem_indices[4 * elem_index];
+        boundary_indices[2 * nbi + 1] = elem_indices[4 * elem_index + 1];
         ++nbi;
       }
-      if (j == a_ny - 1) {
+      if (!periodic_y && j == a_ny - 1) {
         boundary_attrib[nbi] = 4;
-        boundary_indices[2 * nbi] = i + j * (a_nx + 1) + (a_nx + 1) + 1;
-        boundary_indices[2 * nbi + 1] = boundary_indices[2 * nbi] - 1;
+        boundary_indices[2 * nbi] = elem_indices[4 * elem_index + 2];
+        boundary_indices[2 * nbi + 1] = elem_indices[4 * elem_index + 3];
         ++nbi;
       }
     }
@@ -402,9 +439,9 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
   const double rotate_rad = a_rotation_deg * M_PI / 180.0;
   // Apparently a vertex is always 3D in MFEM but they ignore the third
   // dimension of each vertex in 2D
-  for (int j = 0; j < a_ny + 1; ++j) {
-    for (int i = 0; i < a_nx + 1; ++i) {
-      const int node_index = j * (a_nx + 1) + i;
+  for (int j = 0; j < nvert_y; ++j) {
+    for (int i = 0; i < nvert_x; ++i) {
+      const int node_index = j * nvert_x + i;
       const double x_loc = a_bounding_box[0][0] + static_cast<double>(i) * dx;
       const double y_loc = a_bounding_box[0][1] + static_cast<double>(j) * dy;
       const double rot_x_loc =
@@ -426,7 +463,7 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateQuadMesh(
 
 std::pair<mfem::Mesh*, double*> Mesh::GenerateHexMesh(
     const std::array<std::array<double, 3>, 2>& a_bounding_box, const int a_nx,
-    const int a_ny, const int a_nz) {
+    const int a_ny, const int a_nz, const std::string& a_periodic) {
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Creating 3D Hex Mesh from ({},{},{}) to ({},{},{}) with "
                      "({},{},{}) elements.",
@@ -434,6 +471,9 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateHexMesh(
                      a_bounding_box[0][2], a_bounding_box[1][0],
                      a_bounding_box[1][1], a_bounding_box[1][2], a_nx, a_ny,
                      a_nz);
+
+  DEBUG_ASSERT(a_periodic.size() == 0, global_assert{}, DebugLevel::ALWAYS{},
+               "Periodicity not implemented for 3D.");
 
   const int nvert = (a_nx + 1) * (a_ny + 1) * (a_nz + 1);
   const int nelem = a_nx * a_ny * a_nz;

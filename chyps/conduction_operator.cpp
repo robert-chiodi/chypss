@@ -38,8 +38,8 @@ ConductionOperator::ConductionOperator(
       T_prec(nullptr),
       tensor_kappa_m(a_tensor_kappa),
       z(height),  // Note, height inherited from mfem::TimeDependentOperator
-      neumann_coefficient_m(a_mesh.GetMfemMesh().bdr_attributes.Max(), nullptr),
-      boundary_marker_m(a_mesh.GetMfemMesh().bdr_attributes.Max()),
+      neumann_coefficient_m(a_mesh.GetNumberOfBoundaryTagValues(), nullptr),
+      boundary_marker_m(a_mesh.GetNumberOfBoundaryTagValues()),
       tensor_thermal_coeff_m(nullptr),
       dt_tensor_thermal_coeff_m(nullptr),
       inhomogeneous_neumann_active_m(false) {
@@ -50,18 +50,18 @@ ConductionOperator::ConductionOperator(
       "Thermal coefficient tensor (kappa) of incorrect size. Provide as a "
       "column-major array of size MESH_DIM*MESH_DIM.");
 
-  const double rel_tol = 1e-12;
+  const double rel_tol = 1.0e-8;
   M_solver.iterative_mode = false;
   M_solver.SetRelTol(rel_tol);
   M_solver.SetAbsTol(0.0);
   M_solver.SetMaxIter(100);
-  M_solver.SetPrintLevel(0);
+  M_solver.SetPrintLevel(-1);
 
   T_solver.iterative_mode = false;
   T_solver.SetRelTol(rel_tol);
   T_solver.SetAbsTol(0.0);
   T_solver.SetMaxIter(100);
-  T_solver.SetPrintLevel(0);
+  T_solver.SetPrintLevel(-1);
 
   // Preset boundary arrays
   for (int n = 0; n < static_cast<int>(boundary_marker_m.size()); ++n) {

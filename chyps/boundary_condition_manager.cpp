@@ -374,7 +374,7 @@ BoundaryConditionType BoundaryConditionManager::BoundaryConditionNameToEnum(
     return BoundaryConditionType::HOMOGENEOUS_NEUMANN;
   } else if (a_bc_name == "DIRICHLET") {
     return BoundaryConditionType::DIRICHLET;
-  } else if (a_bc_name == "HOMOGENEOUS_DIRICHLET") {
+  } else if (a_bc_name == "NEUMANN") {
     return BoundaryConditionType::NEUMANN;
   } else {
     // FIXME: Make proper error

@@ -65,8 +65,11 @@ std::pair<const nlohmann::json*, std::string> DirectoryJSON::LowestObject(
   std::size_t name_start_location = 0;
   std::size_t slash_location = a_name.find('/');
   while (slash_location != a_name.npos) {
-    lowest_dir = &((*lowest_dir)[a_name.substr(
-        name_start_location, slash_location - name_start_location)]);
+    const std::string& next_object_name = a_name.substr(
+        name_start_location, slash_location - name_start_location);
+    DEBUG_ASSERT(lowest_dir->contains(next_object_name), global_assert{},
+                 DebugLevel::CHEAP{}, "Cannot find \"" + a_name + "\".");
+    lowest_dir = &((*lowest_dir)[next_object_name]);
     name_start_location = slash_location + 1;
     slash_location = a_name.find('/', name_start_location);
   }

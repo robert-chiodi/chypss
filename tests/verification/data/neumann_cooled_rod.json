@@ -1,0 +1,72 @@
+/*
+This input file sets up a test case for a 1D heat equation solution solved in 2D.
+            
+             Periodic
+         -----------------
+         |                |
+Neumann  |                |
+-1.0 <---|   u(x,0) = 25  | Dirichlet = 25.0
+	 |                |
+         |                |
+         -----------------
+            Periodic
+
+This is an example given in the mathematica FEM tutorial and has an analytical solution.
+http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatTransferVerificationTests.html#706915164
+*/
+
+{
+    "SimulationInitializer":{
+        "simulation_configuration": "cooled_rod",
+	"out_data": "tests/verification/data/CooledRod",
+        "CooledRod":{
+                        "approximation_terms": 1
+                        }
+                 },
+    "Simulation":{
+		    "in_data":"tests/verification/data/CooledRod",
+		    "out_data":"tests/verification/data/CooledRodSolution",
+		    "end_time": 0.02,
+		    "time_step": 0.001,
+		    "use_adios2": false,
+		    "use_visit": false,
+		    "viz_steps": 100000
+		 },
+    "HeatSolver":{
+		    "kappa": [1.0, 0.0, 0.0, 1.0],
+		    "order": 2,
+		    "time_advancement": 3,
+		    "BoundaryConditions":{
+					 "temperature":{
+					    "bc_default": "HOMOGENEOUS_NEUMANN",
+					    "bc_list":{
+        			        	"1":{
+			 	                   "type": "NEUMANN",
+						   "value": -1.0
+						    },
+        			        	"2":{
+			 	                   "type": "DIRICHLET",
+						   "value": 25.0
+						    }
+			        	      }
+
+						       }
+					 }
+		 },
+    "Mesh":{
+  	    "rotation": 0.0,
+	    "periodicity": "",
+	    "gen_blx": 0.0,
+	    "gen_bly": 0.0,
+	    "gen_blz": -1.0,
+	    "gen_bux": 1.0,
+	    "gen_buy": 0.01,
+	    "gen_buz": 1.0,
+	    "gen_nx": 8,
+	    "gen_ny": 1,
+	    "gen_nz": -1,
+	    "mesh_file": "generate",
+	    "parallel_refine": 0,
+	    "serial_refine": 0
+	   }
+}
