@@ -246,6 +246,7 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
 }
 
 void ConductionOperator::SetParameters(const mfem::Vector& u) {
+  // Since thermal coefficient is not time varying (for now)
   if (K == nullptr) {
     mfem::DenseMatrix full_value(tensor_kappa_m.data(), mesh_m.GetDimension(),
                                  mesh_m.GetDimension());
