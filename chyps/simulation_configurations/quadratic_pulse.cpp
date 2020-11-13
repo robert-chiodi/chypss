@@ -203,7 +203,7 @@ QuadraticPulse::SelectInitialConditions(void) const {
           const double dm = static_cast<double>(m);
           const double dn = static_cast<double>(n);
           const double ic_factor =
-              -(((1.0 + std::pow(-1.0, m)) * (-1.0 + std::pow(-1.0, dn)) *
+              -(((1.0 + std::pow(-1.0, dm)) * (-1.0 + std::pow(-1.0, dn)) *
                  amplitude * std::pow(domain_height, 2) *
                  (-8.0 * std::pow(domain_length, 2) +
                   (-4.0 + std::pow(domain_length, 2)) * std::pow(dn, 2) *
