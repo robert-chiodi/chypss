@@ -11,6 +11,20 @@ Verification failed: ((*offsets[i])[0] >= 0 && (*offsets[i])[1] >= 0) is false:
 
 For export, it seems like MFEM duplicates points shared by neighboring elements. This means that these points and ParGridFunction data will not be equivalent in size, since the data also needs to be duplicated for these points. I think this might be necessary for discontinuous solutions? Either way, it will make it so that it is not possible to do I/O that can be visualized (atleast it will require more thought).
 
+Using GMSH
+=============
+For 2D 
+--------
+Create boundaries of mesh
+Create Plane Surface
+Mesh in 2D
+Reclassify 2D
+Add Curve attributes
+Add Surface Attribute
+Save as gmsh using file->Export
+Use GMSH 2.0 format
+
+
 BUILDING INSTRUCTIONS BELOW
 ===========================
 
