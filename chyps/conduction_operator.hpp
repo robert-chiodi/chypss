@@ -60,12 +60,11 @@ class ConductionOperator : public ConductionOperatorBase {
   double current_dt;
 
   mutable mfem::CGSolver
-      M_solver;  // Krylov solver for inverting the mass matrix M
-  mfem::OperatorJacobiSmoother* M_prec;  // Preconditioner for the mass matrix M
+      M_solver;          // Krylov solver for inverting the mass matrix M
+  mfem::Solver* M_prec;  // Preconditioner for the mass matrix M
 
   mfem::CGSolver T_solver;  // Implicit solver for T = M + dt K
-  mfem::OperatorJacobiSmoother*
-      T_prec;  // Preconditioner for the implicit solver
+  mfem::Solver* T_prec;     // Preconditioner for the implicit solver
 
   mfem::OperatorPtr T_op, M_op, K_op;
 
@@ -95,6 +94,8 @@ class ConductionOperator : public ConductionOperatorBase {
   mfem::MatrixConstantCoefficient* tensor_thermal_coeff_m;
   mfem::ScalarMatrixProductCoefficient* dt_tensor_thermal_coeff_m;
   bool inhomogeneous_neumann_active_m;
+  bool tensor_basis;
+  bool use_partial_assembly;
 };
 }  // namespace chyps
 

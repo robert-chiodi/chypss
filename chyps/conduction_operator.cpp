@@ -42,13 +42,19 @@ ConductionOperator::ConductionOperator(
       boundary_marker_m(a_mesh.GetNumberOfBoundaryTagValues()),
       tensor_thermal_coeff_m(nullptr),
       dt_tensor_thermal_coeff_m(nullptr),
-      inhomogeneous_neumann_active_m(false) {
+      inhomogeneous_neumann_active_m(false),
+      tensor_basis(false),
+      use_partial_assembly(false) {
   DEBUG_ASSERT(
       tensor_kappa_m.size() == static_cast<std::size_t>(mesh_m.GetDimension() *
                                                         mesh_m.GetDimension()),
       global_assert{}, DebugLevel::CHEAP{},
       "Thermal coefficient tensor (kappa) of incorrect size. Provide as a "
-      "column-major array of size MESH_DIM*MESH_DIM.");
+      "column-major array of size MESH_DIM*MESH_DIM= " +
+          std::to_string(mesh_m.GetDimension() * mesh_m.GetDimension()));
+
+  tensor_basis = mfem::UsesTensorBasis(fespace);
+  use_partial_assembly = tensor_basis;
 
   const double rel_tol = 1.0e-8;
   M_solver.iterative_mode = false;
@@ -166,12 +172,22 @@ ConductionOperator::ConductionOperator(
       MAIN_LOG, "Forming system matrices with updated essential True DOF list.",
       number_of_boundary_conditions);
   M = new mfem::ParBilinearForm(&fespace);
-  M->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+  if (use_partial_assembly) {
+    M->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+  } else {
+    M->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
+  }
   M->AddDomainIntegrator(new mfem::MassIntegrator());
   M->Assemble();  // keep sparsity pattern of M and K the same
   M->FormSystemMatrix(ess_tdof_list, M_op);
 
-  M_prec = new mfem::OperatorJacobiSmoother(*M, ess_tdof_list);
+  if (use_partial_assembly) {
+    M_prec = new mfem::OperatorJacobiSmoother(*M, ess_tdof_list);
+  } else {
+    auto boomer_amg = new mfem::HypreBoomerAMG;
+    boomer_amg->SetPrintLevel(-1);
+    M_prec = boomer_amg;
+  }
   M_solver.SetPreconditioner(*M_prec);
   M_solver.SetOperator(*M_op);
 
@@ -208,7 +224,11 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
   if (T == nullptr) {
     T = new mfem::ParBilinearForm(&fespace);
 
-    T->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+    if (use_partial_assembly) {
+      T->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+    } else {
+      T->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
+    }
     T->AddDomainIntegrator(new mfem::MassIntegrator());
 
     dt_tensor_thermal_coeff_m->SetAConst(dt);
@@ -216,17 +236,23 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
         new mfem::DiffusionIntegrator(*dt_tensor_thermal_coeff_m));
     T->Assemble();
     T->FormSystemMatrix(ess_tdof_list, T_op);
-    if (UsesTensorBasis(fespace)) {
-      delete T_prec;
+
+    delete T_prec;
+    if (use_partial_assembly) {
       T_prec = new mfem::OperatorJacobiSmoother(*T, ess_tdof_list);
       T_solver.SetPreconditioner(*T_prec);
+      T_solver.SetOperator(*T_op);
+      T->Finalize();
+    } else {
+      auto boomer_amg = new mfem::HypreBoomerAMG;
+      boomer_amg->SetPrintLevel(-1);
+      T_prec = boomer_amg;
+      T_solver.SetPreconditioner(*T_prec);
+      T_solver.SetOperator(*T_op);
     }
-    T_solver.SetOperator(*T_op);
-    T->Finalize();
     current_dt = dt;
   }
   MFEM_VERIFY(dt == current_dt, "");  // SDIRK methods use the same dt
-
   mfem::ParGridFunction tmp_u(&fespace);
   mfem::ParLinearForm tmp_z(&fespace);
   tmp_u.SetFromTrueDofs(u);
@@ -267,7 +293,11 @@ void ConductionOperator::SetParameters(const mfem::Vector& u) {
 
     delete K;
     K = new mfem::ParBilinearForm(&fespace);
-    K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+    if (use_partial_assembly) {
+      K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+    } else {
+      K->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
+    }
     K->AddDomainIntegrator(
         new mfem::DiffusionIntegrator(*tensor_thermal_coeff_m));
     K->Assemble();  // keep sparsity pattern of M and K the same
