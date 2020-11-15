@@ -38,11 +38,20 @@ const nlohmann::json& DirectoryJSON::operator[](
   return (*lowest_dir)[lowest_name];
 }
 
+const nlohmann::json* DirectoryJSON::find(const std::string& a_name) const {
+  const nlohmann::json* lowest_dir;
+  std::string lowest_name;
+  std::tie(lowest_dir, lowest_name) = this->LowestObject(a_name);
+  return lowest_dir != nullptr && lowest_dir->contains(lowest_name)
+             ? &((*lowest_dir)[lowest_name])
+             : nullptr;
+}
+
 bool DirectoryJSON::Contains(const std::string& a_name) const {
   const nlohmann::json* lowest_dir;
   std::string lowest_name;
   std::tie(lowest_dir, lowest_name) = this->LowestObject(a_name);
-  return lowest_dir->contains(lowest_name);
+  return lowest_dir != nullptr ? lowest_dir->contains(lowest_name) : false;
 }
 
 std::pair<nlohmann::json*, std::string> DirectoryJSON::LowestObject(
@@ -67,8 +76,9 @@ std::pair<const nlohmann::json*, std::string> DirectoryJSON::LowestObject(
   while (slash_location != a_name.npos) {
     const std::string& next_object_name = a_name.substr(
         name_start_location, slash_location - name_start_location);
-    DEBUG_ASSERT(lowest_dir->contains(next_object_name), global_assert{},
-                 DebugLevel::CHEAP{}, "Cannot find \"" + a_name + "\".");
+    if (!(lowest_dir->contains(next_object_name))) {
+      return std::make_pair(nullptr, "");
+    }
     lowest_dir = &((*lowest_dir)[next_object_name]);
     name_start_location = slash_location + 1;
     slash_location = a_name.find('/', name_start_location);
@@ -94,6 +104,7 @@ void InputParser::ParseCL(int argc, char** argv) {
     DEBUG_ASSERT(option_description_m.Contains(name), global_assert{},
                  DebugLevel::ALWAYS{},
                  "Option with key " + name + " is unknown.");
+
     if (isdigit(value[0]) || value[0] == '-' || value[0] == '+') {
       std::size_t decimal_location = 0;
       decimal_location = value.find('.');
@@ -104,7 +115,13 @@ void InputParser::ParseCL(int argc, char** argv) {
         parsed_input_m[name] = std::stod(value);
       }
     } else {
-      parsed_input_m[name] = value;
+      if (value == "true") {
+        parsed_input_m[name] = true;
+      } else if (value == "false") {
+        parsed_input_m[name] = false;
+      } else {
+        parsed_input_m[name] = value;
+      }
     }
   }
 }
@@ -156,24 +173,13 @@ bool InputParser::ParseFromFile(const std::string& a_file_name,
   return true;
 }
 
-void InputParser::AddOptionNoDefault(const std::string& a_name,
-                                     const std::string& a_description,
-                                     const bool a_required,
-                                     const std::string& a_dependency) {
-  option_description_m[a_name] = a_description;
-  // Do not overwrite if already added via parsing.
-  parsed_input_m[a_name] = nlohmann::json::object();
+void InputParser::AddOption(const std::string& a_name,
+                            const std::string& a_description) {
   DEBUG_ASSERT(
-      option_required_status_m.find(a_name) == option_required_status_m.end(),
-      global_assert{}, DebugLevel::CHEAP{},
+      !option_description_m.Contains(a_name), global_assert{},
+      DebugLevel::CHEAP{},
       "Option \"" + a_name + "\" already exists in InputParser object");
-
-  if (a_dependency != "") {
-    option_required_status_m[a_name] = static_cast<int>(dependencies_m.size());
-    dependencies_m.push_back(a_dependency);
-  } else {
-    option_required_status_m[a_name] = a_required ? -1 : -2;
-  }
+  option_description_m[a_name] = a_description;
 }
 
 void InputParser::WriteToFile(const std::string& a_file_name) const {
@@ -199,38 +205,23 @@ void InputParser::SetFromBSON(const std::vector<std::uint8_t>& a_bson) {
 }
 
 const nlohmann::json& InputParser::operator[](const std::string& a_name) const {
-  DEBUG_ASSERT(parsed_input_m.Contains(a_name), global_assert{},
-               DebugLevel::CHEAP{},
-               "Could not find \"" + a_name + "\" in parsed options.");
-  return parsed_input_m[a_name];
-}
-
-bool InputParser::AllOptionsSet(void) const {
-  // FIXME: Add test for this.
-  // Traverse over option_description as it has all available options.
-  // Can then compare to parsed_input_m to make sure all required options
-  // are indeed there.
-  return this->RecursiveOptionSetCheck(option_description_m.json_m, "");
-}
-
-bool InputParser::AllOptionsSet(const std::string& a_name) const {
-  if (!option_description_m.Contains(a_name)) {
-    return false;
-  } else {
-    return this->RecursiveOptionSetCheck(option_description_m[a_name],
-                                         a_name + '/');
+  const auto given_object = parsed_input_m.find(a_name);
+  if (given_object == nullptr) {
+    // Check default options
+    const auto default_object = default_values_m.find(a_name);
+    DEBUG_ASSERT(
+        default_object != nullptr, global_assert{}, DebugLevel::CHEAP{},
+        "Cannot find \"" + a_name + "\" as a given or default option.");
+    return *default_object;
   }
+  return *given_object;
 }
 
 bool InputParser::OptionSet(const std::string& a_name) const {
   return parsed_input_m.Contains(a_name);
 }
 
-void InputParser::ClearOptions(void) {
-  option_description_m.json_m.clear();
-  option_required_status_m.clear();
-  dependencies_m.clear();
-}
+void InputParser::ClearOptions(void) { option_description_m.json_m.clear(); }
 
 void InputParser::PrintOptions(void) const {
   std::cout << "\n\n// NOTE: This is not a valid JSON File.\n\n";
@@ -254,7 +245,6 @@ void InputParser::RecursiveOptionPrint(const nlohmann::json& a_input,
                 << it.key() << "\"\n\n ";
     } else {
       const std::string full_name = a_path_name + it.key();
-      const int required_status = option_required_status_m.at(full_name);
       std::cout << InputParser::AddTabs(a_nest_level, 4) << '"' << it.key()
                 << "\":"
                 << "\n";
@@ -263,22 +253,13 @@ void InputParser::RecursiveOptionPrint(const nlohmann::json& a_input,
                                           a_input[it.key()].get<std::string>()),
                                       a_nest_level + 2, 4)
                 << '\n';
-      std::cout << InputParser::AddTabs(a_nest_level + 2, 4) << "OPTION TYPE: ";
-      if (required_status == -2) {
-        std::cout << "OPTIONAL";
-      } else if (required_status == -1) {
-        std::cout << "REQUIRED";
-      } else if (required_status >= 0) {
-        std::cout << "DEPENDENT ON " << dependencies_m[required_status];
-      }
-      std::cout << '\n';
 
       std::cout << InputParser::AddTabs(a_nest_level + 2, 4)
                 << "DEFAULT VALUE: ";
-      if (parsed_input_m[full_name].empty()) {
+      if (!default_values_m.Contains(full_name)) {
         std::cout << "NONE";
       } else {
-        std::cout << parsed_input_m[full_name].dump();
+        std::cout << default_values_m[full_name].dump();
       }
       std::cout << "\n\n";
     }
@@ -338,42 +319,6 @@ void InputParser::RecursiveInsert(const nlohmann::json& a_input,
       a_parsed_nest[it.key()] = it.value();
     }
   }
-}
-
-bool InputParser::RecursiveOptionSetCheck(
-    const nlohmann::json& a_input, const std::string& a_path_name) const {
-  for (nlohmann::json::const_iterator it = a_input.begin(); it != a_input.end();
-       ++it) {
-    if (it->is_object()) {
-      // Is a nested object object
-      const bool all_options_good =
-          this->RecursiveOptionSetCheck(*it, a_path_name + it.key() + '/');
-      if (!all_options_good) {
-        return false;
-      }
-    } else {
-      const std::string full_name = a_path_name + it.key();
-      const int required_status = option_required_status_m.at(full_name);
-      if (required_status == -1 && !parsed_input_m.Contains(full_name)) {
-        // Required option not found
-        std::cout << "The required option " << full_name << " is missing. "
-                  << std::endl;
-        return false;
-      } else if (required_status >= 0) {
-        if (parsed_input_m.Contains(dependencies_m[required_status]) &&
-            !parsed_input_m.Contains(full_name)) {
-          // This option depends on anoher. That option was supplied, so this
-          // one must be as well, but was not found.
-          std::cout
-              << "The option " << full_name
-              << " is missing. It is required due to use of the dependency "
-              << dependencies_m[required_status] << std::endl;
-          return false;
-        }
-      }
-    }
-  }
-  return true;
 }
 
 }  // namespace chyps

@@ -18,7 +18,7 @@ namespace chyps {
 
 CooledRod::CooledRod(InputParser& a_parser)
     : ConfigurationInitializer(a_parser) {
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "SimulationInitializer/CooledRod/approximation_terms",
       "Number of terms to use in CooledRod solution approximation", 1);
 }

@@ -137,13 +137,11 @@ SimulationInitializer::SimulationInitializer(int argc, char** argv,
                "Command line options should be provided as [input_file_name] "
                "[initializer_name] [...command line parser flags...]");
 
-  parser_m.AddOptionNoDefault("SimulationInitializer/initializer",
-                              "Name of initializer to use.", true);
-  parser_m.AddOptionDefault(
-      "SimulationInitializer/out_data",
-      "Name of file (or BP4 directory) to write that holds "
-      "data to start from. Do not include extension.",
-      std::string("CHyPSInitData"));
+  parser_m.AddOption("SimulationInitializer/initializer",
+                     "Name of initializer to use.");
+  parser_m.AddOption("SimulationInitializer/out_data",
+                     "Name of file (or BP4 directory) to write that holds "
+                     "data to start from. Do not include extension.");
 
   const std::string input_file_name = argv[1];
   const std::string initializer = argv[2];

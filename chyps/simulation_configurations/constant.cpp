@@ -17,8 +17,8 @@
 namespace chyps {
 
 Constant::Constant(InputParser& a_parser) : ConfigurationInitializer(a_parser) {
-  parser_m.AddOptionNoDefault("SimulationInitializer/Constant/value",
-                              "Value to set at all node locations", true);
+  parser_m.AddOption("SimulationInitializer/Constant/value",
+                     "Value to set at all node locations");
 }
 
 void Constant::Initialize(void) {}

@@ -39,36 +39,33 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Beginning simulation.");
 
   InputParser input_parser;
-  input_parser.AddOptionDefault(
-      "Simulation/use_precice",
-      "If preCICE will be used to couple to another solver.", false);
-  input_parser.AddOptionDefault(
-      "Simulation/precice_config",
-      "XML File holding the configuration for preCICE",
-      std::string("../data/precice-config.xml"));
-  input_parser.AddOptionDefault("Simulation/end_time",
-                                "Final time; start time is 0.", 0.5);
-  input_parser.AddOptionDefault("Simulation/time_step", "Time step.", 1.0e-2);
-  input_parser.AddOptionDefault(
+  input_parser.AddOption("Simulation/use_precice",
+                         "If preCICE will be used to couple to another solver.",
+                         false);
+  input_parser.AddOption("Simulation/precice_config",
+                         "XML File holding the configuration for preCICE",
+                         std::string("../data/precice-config.xml"));
+  input_parser.AddOption("Simulation/end_time", "Final time; start time is 0.",
+                         0.5);
+  input_parser.AddOption("Simulation/time_step", "Time step.", 1.0e-2);
+  input_parser.AddOption(
       "Simulation/use_visit",
       "Save data files for VisIt (visit.llnl.gov) visualization.", false);
 
-  input_parser.AddOptionDefault("Simulation/viz_steps",
-                                "Visualize every n-th timestep.", 5);
-  input_parser.AddOptionNoDefault(
+  input_parser.AddOption("Simulation/viz_steps",
+                         "Visualize every n-th timestep.", 5);
+  input_parser.AddOption(
       "Simulation/in_data",
       "Name of file (or BP4 directory) holding "
       "initial data. Do not include extension. Initial data can be generated "
       "from a previous simulation check point or using the tool "
-      "chyps_initializer.",
-      true);
-  input_parser.AddOptionDefault(
+      "chyps_initializer.");
+  input_parser.AddOption(
       "Simulation/out_data",
       "Name of file (or BP4 directory) to write that holds "
       "data to restart from. Do not include extension. Pass ignore if you "
-      "do not wish to write files.",
-      "CHyPSDataOut");
-  input_parser.AddOptionDefault(
+      "do not wish to write files.");
+  input_parser.AddOption(
       "Simulation/option_output_name",
       "Name of file to write the options used for the simulation. Provides way "
       "to rerun the same simulation. Should end in the extension .json",
@@ -90,7 +87,7 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   if (input_file_name != "ignore") {
     input_parser.ParseFromFile(input_file_name, mpi_session);
   }
-  argc += -2;  // Skip executable and input file name
+  argc -= 2;  // Skip executable and input file name
   input_parser.ParseCL(argc, argv + 2);
   if (mpi_session.IAmRoot()) {
     std::ofstream options_used(
@@ -104,10 +101,6 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
     options_used << input_parser.WriteToString();
     options_used.close();
   }
-  DEBUG_ASSERT(input_parser.AllOptionsSet("Simulation"), global_assert{},
-               DebugLevel::ALWAYS{},
-               "Options required by  \"Simulation\" missing.");
-
   const auto in_data_name =
       input_parser["Simulation/in_data"].get<std::string>();
   const auto out_data_name =

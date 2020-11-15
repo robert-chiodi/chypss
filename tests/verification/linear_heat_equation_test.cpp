@@ -559,7 +559,7 @@ TEST(LinearHeatEquation, CooledRod) {
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
     double result = 0.0;
-    for (std::size_t n = 1; n <= approximation_terms; ++n) {
+    for (int n = 1; n <= approximation_terms; ++n) {
       const double dn = static_cast<double>(n);
       const double ic_factor = 8.0 / std::pow(M_PI * (1.0 - 2.0 * dn), 2);
       result += ic_factor * std::cos((dn - 0.5) * M_PI * a_position[0]) *

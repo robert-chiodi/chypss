@@ -47,14 +47,6 @@ BoundaryConditionManager::BoundaryConditionManager(
 }
 
 void BoundaryConditionManager::Initialize(const Mesh& a_mesh) {
-  // FIXME : make this an exception.
-  DEBUG_ASSERT(parser_m.AllOptionsSet(parser_prefix_m), global_assert{},
-               DebugLevel::ALWAYS{},
-               "Not all options needed for BoundaryConditionManager supplied\n"
-               "Make sure that the InputParser has been parsed before "
-               "calling Initialize and that all required options are "
-               "specified or have a valid default value. This is for prefix: " +
-                   parser_prefix_m);
   mesh_m = &a_mesh;
   std::size_t number_of_bcs =
       static_cast<std::size_t>(mesh_m->GetNumberOfBoundaryTagValues());
@@ -282,21 +274,19 @@ int BoundaryConditionManager::GetNumberOfTimeVaryingNeumannConditions(
 }
 
 void BoundaryConditionManager::GatherOptions() {
-  parser_m.AddOptionDefault(
-      parser_prefix_m + "/bc_default",
-      "Default boundary condition type to use for the boundary "
-      "conditions not "
-      "explicitly supplied in the bc_list option. Options are "
-      "HOMOGENEOUS_DIRICHLET or HOMOGENEOUS_NEUMANN",
-      std::string("HOMOGENEOUS_DIRICHLET"));
-  parser_m.AddOptionNoDefault(
+  parser_m.AddOption(parser_prefix_m + "/bc_default",
+                     "Default boundary condition type to use for the boundary "
+                     "conditions not "
+                     "explicitly supplied in the bc_list option. Options are "
+                     "HOMOGENEOUS_DIRICHLET or HOMOGENEOUS_NEUMANN",
+                     std::string("HOMOGENEOUS_DIRICHLET"));
+  parser_m.AddOption(
       parser_prefix_m + "/bc_list",
       "A nested JSON object describing the boundary conditions. The keys "
       "inside bc_list should be the tag of the boundary condition being set. "
       "Inside this tag their should be {key,value} pairs. Valid {key,value} "
       "pairs are: {type, HOMOGENEOUS_DIRICHLET || HOMOGENEOUS_NEUMANN || "
-      "DIRICHLET || NEUMANN}, {value, double}, {precice, true || false}",
-      false);
+      "DIRICHLET || NEUMANN}, {value, double}, {precice, true || false}");
 }
 
 void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {

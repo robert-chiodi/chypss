@@ -1,30 +1,50 @@
 {
-    "alpha": 0.01,
-    "end_time": 0.5,
-    "gen_blx": -1.0,
-    "gen_bly": -1.0,
-    "gen_blz": -1.0,
-    "gen_bux": 1.0,
-    "gen_buy": 1.0,
-    "gen_buz": 1.0,
-    "gen_nx": 20,
-    "gen_ny": 20,
-    "gen_nz": -1,
-    "kappa": 0.5,
-    "mesh_file": "generate",
-    "order": 2,
-    "parallel_refine": 0,
-    "serial_refine": 0,
-    "time_advancement": 3,
-    "time_step": 0.01,
-    "use_adios2": false,
-    "use_visit": false,
-    "viz_steps": 25,
-    "bc_default": "HOMOGENEOUS_NEUMANN",
-    "bc_list":{
-                "4":{
-                    "type": "DIRICHLET",
-                    "value": 8.0
-                    }
-              }
+    "SimulationInitializer":{
+        "initializer": "constant",
+	"out_data": "tests/verification/data/DirichletInit",
+        "Constant":{
+                        "value": 0.0
+                   }
+                 },
+    "Simulation":{
+		    "in_data":"tests/verification/data/DirichletInit",
+		    "out_data":"tests/verification/data/Dirichlet",
+		    "end_time": 0.01,
+		    "time_step": 0.001,
+		    "use_visit": false,
+		    "viz_steps": 10000000
+		 },
+    "HeatSolver":{
+		    "kappa": [1.0, 0.0, 0.0, 1.0],
+		    "order": 2,
+		    "time_advancement": 3,
+		    "BoundaryConditions":{
+					 "temperature":{
+					    "bc_default": "HOMOGENEOUS_DIRICHLET",
+					    "bc_list":{
+        			        	"4":{
+			 	                   "type": "DIRICHLET",
+						   "value": 8.0
+						    }
+			        	      }
+
+						       }
+					 }
+		 },
+    "Mesh":{
+  	    "rotation": 0.0,
+	    "periodicity": "",
+	    "gen_blx": 0.0,
+	    "gen_bly": 0.0,
+	    "gen_blz": -1.0,
+	    "gen_bux": 1.0,
+	    "gen_buy": 0.01,
+	    "gen_buz": 1.0,
+	    "gen_nx": 25,
+	    "gen_ny": 1,
+	    "gen_nz": -1,
+	    "mesh_file": "generate",
+	    "parallel_refine": 0,
+	    "serial_refine": 0
+	   }
 }

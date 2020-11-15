@@ -44,13 +44,6 @@ void HeatSolver::CreateBoundaryConditionManagers(void) {
 }
 
 void HeatSolver::Initialize(Mesh& a_mesh) {
-  DEBUG_ASSERT(parser_m.AllOptionsSet("HeatSolver"), global_assert{},
-               DebugLevel::ALWAYS{},
-               "Not all options needed for HeatSolver supplied\n"
-               "Make sure that the InputParser has been parsed before "
-               "calling Initialize and that all required options are "
-               "specified or have a valid default value.");
-
   // Construct mesh, allocate and construct operators, and perform all setup for
   // time advancement
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Initializing HeatSolver class.");
@@ -105,18 +98,17 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
 void HeatSolver::GatherOptions(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Gathering options to look for in parser.");
 
-  parser_m.AddOptionDefault("HeatSolver/order",
-                            "Order (degree) of the finite elements.", 2);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption("HeatSolver/order",
+                     "Order (degree) of the finite elements.", 2);
+  parser_m.AddOption(
       "HeatSolver/time_advancement",
       "ODE solver: 1 - Backward Euler, 2 - SDIRK2, 3 - SDIRK3,\n\t"
       "\t   11 - Forward Euler, 12 - RK2, 13 - RK3 SSP, 14 - RK4.",
       3);
-  parser_m.AddOptionNoDefault(
+  parser_m.AddOption(
       "HeatSolver/kappa",
       "Array of thermal coefficients representing tensor in column major "
-      "ordering. Should be MESH_DIM*MESH_DIM in size.",
-      true);
+      "ordering. Should be MESH_DIM*MESH_DIM in size.");
   // TODO Add a flag and way to specify which variables we wish to export to
   // VisIt.
 

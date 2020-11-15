@@ -37,6 +37,10 @@ class DirectoryJSON {
   const nlohmann::json& operator[](const std::string& a_name) const;
   bool Contains(const std::string& a_name) const;
 
+  /// \brief Finds the directory-formatted name `a_name`. If it does not
+  /// exist, returns nullptr, otherwise returns pointer to the object.
+  const nlohmann::json* find(const std::string& a_name) const;
+
   ~DirectoryJSON(void) = default;
 
   nlohmann::json json_m;
@@ -97,7 +101,7 @@ class InputParser {
 
   /// \brief Add option with a_name and the given description. The default value
   /// will be used if the option is not provided in the input file or on the
-  /// command line. It is assumed that supplying the option is optional.
+  /// command line.
   ///
   /// In order to indicate nesting inside the input file (JSON), use '/'
   /// in a_name.
@@ -105,47 +109,25 @@ class InputParser {
   /// NOTE: Use of '/' is not valid in a_name and will be assumed to represent
   /// nesting.
   template <class ValueType>
-  void AddOptionDefault(const std::string& a_name,
-                        const std::string& a_description,
-                        const ValueType& a_default_value);
+  void AddOption(const std::string& a_name, const std::string& a_description,
+                 const ValueType& a_default_value);
 
-  /// \brief Add option with a_name and the given description. The bool
-  /// a_required indicates whether a value must be provided for the option (via
-  /// input file or command line) or can be ommitted. The string a_dependency
-  /// should be supplied if the option can normally be ommitted, UNLESS the
-  /// option a_dependency is given in the input file. This is used to enforce
-  /// declaration of certain options in case some other options are declared.
+  /// \brief Add option with a_name and the given description. A value must be
+  /// supplied via the input file or command line since no default exists.
   ///
   /// In order to indicate nesting inside the input file (JSON), use '/'
   /// in a_name.
   ///
   /// NOTE: Use of '/' is not valid in a_name and will be assumed to represent
   /// nesting.
-  void AddOptionNoDefault(const std::string& a_name,
-                          const std::string& a_description,
-                          const bool a_required,
-                          const std::string& a_dependency = "");
-
-  /// \brief Checks that all options added have been specified or have an
-  /// available default value.
-  ///
-  /// NOTE: This function requires that the parser has not been cleared since
-  /// the options have been added.
-  bool AllOptionsSet(void) const;
-
-  /// \brief Checks that all required options for the name (or path)
-  /// a_name are supplied or have available default values.
-  ///
-  /// NOTE: This function requires that the parser has not been cleared since
-  /// the options have been added.
-  bool AllOptionsSet(const std::string& a_name) const;
+  void AddOption(const std::string& a_name, const std::string& a_description);
 
   /// \brief Returns whether the option is set during parsing, including
   /// whether the option was added with a default value.
   bool OptionSet(const std::string& a_name) const;
 
   /// \brief Remove all option metadata used when initially setting up available
-  /// options. Any parsed options will  still be available through the
+  /// options. Any parsed options will still be available through the
   /// operator[].
   void ClearOptions(void);
 
@@ -168,8 +150,6 @@ class InputParser {
   DirectoryJSON parsed_input_m;
   DirectoryJSON default_values_m;
   DirectoryJSON option_description_m;
-  std::unordered_map<std::string, int> option_required_status_m;
-  std::vector<std::string> dependencies_m;
 };
 
 }  // namespace chyps

@@ -359,8 +359,7 @@ TEST(IO, PutGetMesh) {
   parser.DirectSet("serial_refine", 0);
   parser.DirectSet("parallel_refine", 0);
 
-  BoundaryConditionManager bc_manager(parser);
-  mesh.Initialize(bc_manager);
+  mesh.Initialize();
 
   IO file_io(*mpi_session, "HandleName");
   std::string write_file_name = "tests/unit/parallel/data/io_test";

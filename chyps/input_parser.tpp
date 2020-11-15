@@ -21,16 +21,15 @@ void InputParser::DirectSet(const std::string& a_name, const Type& a_value) {
 }
 
 template <class ValueType>
-void InputParser::AddOptionDefault(const std::string& a_name,
-                                   const std::string& a_description,
-                                   const ValueType& a_default_value) {
-  option_description_m[a_name] = a_description;
-  parsed_input_m[a_name] = a_default_value;
+void InputParser::AddOption(const std::string& a_name,
+                            const std::string& a_description,
+                            const ValueType& a_default_value) {
   DEBUG_ASSERT(
-      option_required_status_m.find(a_name) == option_required_status_m.end(),
-      global_assert{}, DebugLevel::CHEAP{},
+      !option_description_m.Contains(a_name), global_assert{},
+      DebugLevel::CHEAP{},
       "Option \"" + a_name + "\" already exists in InputParser object");
-  option_required_status_m[a_name] = -2;
+  option_description_m[a_name] = a_description;
+  default_values_m[a_name] = a_default_value;
 }
 
 }  // namespace chyps

@@ -18,18 +18,15 @@ namespace chyps {
 
 QuadraticPulse::QuadraticPulse(InputParser& a_parser)
     : ConfigurationInitializer(a_parser) {
-  parser_m.AddOptionDefault(
-      "SimulationInitializer/QuadraticPulse/pulse_amplitude",
-      "Amplitude of quadratic pulse (value at center)", 1.0);
-  parser_m.AddOptionDefault(
-      "SimulationInitializer/QuadraticPulse/approximation_terms",
-      "Number of terms to use in pulse approximation", 1);
-  parser_m.AddOptionNoDefault(
+  parser_m.AddOption("SimulationInitializer/QuadraticPulse/pulse_amplitude",
+                     "Amplitude of quadratic pulse (value at center)", 1.0);
+  parser_m.AddOption("SimulationInitializer/QuadraticPulse/approximation_terms",
+                     "Number of terms to use in pulse approximation", 1);
+  parser_m.AddOption(
       "SimulationInitializer/QuadraticPulse/boundary_configuration",
       "Configuration of homogeneous boundary conditions. Supplied by string of "
       "4 characters, D for Dirichlet and N for Neumann, correspoding to tag "
-      "locations, (e.g.,\"HHNN\")",
-      true);
+      "locations, (e.g.,\"HHNN\")");
 }
 
 void QuadraticPulse::Initialize(void) {}

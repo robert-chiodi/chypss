@@ -17,30 +17,35 @@
 #include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/simulation.hpp"
+#include "chyps/simulation_initializer.hpp"
 
 namespace {
 
 using namespace chyps;
 
 TEST(Checkpoint, ReproduceLongRunLowOrder) {
+  std::vector<std::string> init_input_string;
+  init_input_string.push_back("Executable_name");
+  init_input_string.push_back(
+      "tests/verification/data/checkpoint_loworder_test_input.json");
+  init_input_string.push_back("constant");
+  auto input_char = FakeCommandLineInput(init_input_string);
+  int argc = static_cast<int>(input_char.size());
+  char** argv = input_char.data();
+  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  DeleteCommandLineInput(input_char);
+
   // Full length run
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
   input_string.push_back(
       "tests/verification/data/checkpoint_loworder_test_input.json");
-  input_string.push_back("-tf");
-  input_string.push_back("0.3");
-  input_string.push_back("-od");
+  input_string.push_back("-Simulation/end_time");
+  input_string.push_back("0.01");
+  input_string.push_back("-Simulation/in_data");
+  input_string.push_back("tests/verification/data/checkpointLO_init");
+  input_string.push_back("-Simulation/out_data");
   input_string.push_back("tests/verification/data/checkpointLO_OutputFull");
-  auto input_char = FakeCommandLineInput(input_string);
-  int argc = static_cast<int>(input_char.size());
-  char** argv = input_char.data();
-  chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
-
-  MPI_Barrier(mpi_session->GetComm());
-  DeleteCommandLineInput(input_char);
-  input_string[3] = "0.15";
-  input_string[5] = "tests/verification/data/checkpointLO_OutputHalf";
   input_char = FakeCommandLineInput(input_string);
   argc = static_cast<int>(input_char.size());
   argv = input_char.data();
@@ -48,10 +53,18 @@ TEST(Checkpoint, ReproduceLongRunLowOrder) {
 
   MPI_Barrier(mpi_session->GetComm());
   DeleteCommandLineInput(input_char);
-  input_string[3] = "0.3";
-  input_string[5] = "tests/verification/data/checkpointLO_OutputRestartFull";
-  input_string.push_back("-id");
-  input_string.push_back("tests/verification/data/checkpointLO_OutputHalf");
+  input_string[3] = "0.005";
+  input_string[7] = "tests/verification/data/checkpointLO_OutputHalf";
+  input_char = FakeCommandLineInput(input_string);
+  argc = static_cast<int>(input_char.size());
+  argv = input_char.data();
+  chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
+
+  MPI_Barrier(mpi_session->GetComm());
+  DeleteCommandLineInput(input_char);
+  input_string[3] = "0.01";
+  input_string[5] = "tests/verification/data/checkpointLO_OutputHalf";
+  input_string[7] = "tests/verification/data/checkpointLO_OutputRestartFull";
   input_char = FakeCommandLineInput(input_string);
   argc = static_cast<int>(input_char.size());
   argv = input_char.data();
@@ -67,10 +80,10 @@ TEST(Checkpoint, ReproduceLongRunLowOrder) {
       "tests/verification/data/checkpointLO_OutputRestartFull");
 
   std::vector<double> full_temperature_data;
-  one_run_file.GetImmediateBlock("HeatSolver/Temperature",
+  one_run_file.GetImmediateBlock("HeatSolver/temperature",
                                  full_temperature_data);
   std::vector<double> restart_temperature_data;
-  multi_run_file.GetImmediateBlock("HeatSolver/Temperature",
+  multi_run_file.GetImmediateBlock("HeatSolver/temperature",
                                    restart_temperature_data);
 
   const double error = GlobalL2Diff_Normalized(
@@ -81,24 +94,28 @@ TEST(Checkpoint, ReproduceLongRunLowOrder) {
 }
 
 TEST(Checkpoint, ReproduceLongRunHigherOrder) {
+  std::vector<std::string> init_input_string;
+  init_input_string.push_back("Executable_name");
+  init_input_string.push_back(
+      "tests/verification/data/checkpoint_highorder_test_input.json");
+  init_input_string.push_back("constant");
+  auto input_char = FakeCommandLineInput(init_input_string);
+  int argc = static_cast<int>(input_char.size());
+  char** argv = input_char.data();
+  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  DeleteCommandLineInput(input_char);
+
   // Full length run
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
   input_string.push_back(
       "tests/verification/data/checkpoint_highorder_test_input.json");
-  input_string.push_back("-tf");
-  input_string.push_back("0.3");
-  input_string.push_back("-od");
+  input_string.push_back("-Simulation/end_time");
+  input_string.push_back("0.01");
+  input_string.push_back("-Simulation/in_data");
+  input_string.push_back("tests/verification/data/checkpointLO_init");
+  input_string.push_back("-Simulation/out_data");
   input_string.push_back("tests/verification/data/checkpointLO_OutputFull");
-  auto input_char = FakeCommandLineInput(input_string);
-  int argc = static_cast<int>(input_char.size());
-  char** argv = input_char.data();
-  chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
-
-  MPI_Barrier(mpi_session->GetComm());
-  DeleteCommandLineInput(input_char);
-  input_string[3] = "0.15";
-  input_string[5] = "tests/verification/data/checkpointLO_OutputHalf";
   input_char = FakeCommandLineInput(input_string);
   argc = static_cast<int>(input_char.size());
   argv = input_char.data();
@@ -106,10 +123,18 @@ TEST(Checkpoint, ReproduceLongRunHigherOrder) {
 
   MPI_Barrier(mpi_session->GetComm());
   DeleteCommandLineInput(input_char);
-  input_string[3] = "0.3";
-  input_string[5] = "tests/verification/data/checkpointLO_OutputRestartFull";
-  input_string.push_back("-id");
-  input_string.push_back("tests/verification/data/checkpointLO_OutputHalf");
+  input_string[3] = "0.005";
+  input_string[7] = "tests/verification/data/checkpointLO_OutputHalf";
+  input_char = FakeCommandLineInput(input_string);
+  argc = static_cast<int>(input_char.size());
+  argv = input_char.data();
+  chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
+
+  MPI_Barrier(mpi_session->GetComm());
+  DeleteCommandLineInput(input_char);
+  input_string[3] = "0.01";
+  input_string[5] = "tests/verification/data/checkpointLO_OutputHalf";
+  input_string[7] = "tests/verification/data/checkpointLO_OutputRestartFull";
   input_char = FakeCommandLineInput(input_string);
   argc = static_cast<int>(input_char.size());
   argv = input_char.data();
@@ -125,10 +150,10 @@ TEST(Checkpoint, ReproduceLongRunHigherOrder) {
       "tests/verification/data/checkpointLO_OutputRestartFull");
 
   std::vector<double> full_temperature_data;
-  one_run_file.GetImmediateBlock("HeatSolver/Temperature",
+  one_run_file.GetImmediateBlock("HeatSolver/temperature",
                                  full_temperature_data);
   std::vector<double> restart_temperature_data;
-  multi_run_file.GetImmediateBlock("HeatSolver/Temperature",
+  multi_run_file.GetImmediateBlock("HeatSolver/temperature",
                                    restart_temperature_data);
 
   const double error = GlobalL2Diff_Normalized(

@@ -17,95 +17,124 @@
 #include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/simulation.hpp"
+#include "chyps/simulation_initializer.hpp"
 
 namespace {
 
 using namespace chyps;
 
 TEST(Dirichlet, Left) {
+  std::vector<std::string> init_input_string;
+  init_input_string.push_back("Executable_name");
+  init_input_string.push_back(
+      "tests/verification/data/dirichlet_top_test_input.json");
+  init_input_string.push_back("constant");
+  auto input_char = FakeCommandLineInput(init_input_string);
+  int argc = static_cast<int>(input_char.size());
+  char** argv = input_char.data();
+  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  DeleteCommandLineInput(input_char);
+
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
   input_string.push_back(
       "tests/verification/data/dirichlet_left_test_input.json");
-  input_string.push_back("-tf");
-  input_string.push_back("0.1");
-  input_string.push_back("-od");
-  input_string.push_back("tests/verification/data/Dirichlet");
-  auto input_char = FakeCommandLineInput(input_string);
-  int argc = static_cast<int>(input_char.size());
-  char** argv = input_char.data();
+  input_char = FakeCommandLineInput(input_string);
+  argc = static_cast<int>(input_char.size());
+  argv = input_char.data();
   chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
 
   IO run_file(*mpi_session, "OneRun");
   run_file.SetRead("tests/verification/data/Dirichlet");
   std::vector<double> temperature_field;
-  run_file.GetImmediateBlock("HeatSolver/Temperature", temperature_field);
+  run_file.GetImmediateBlock("HeatSolver/temperature", temperature_field);
   const double global_max = GlobalMaxValue(temperature_field, *mpi_session);
   EXPECT_DOUBLE_EQ(global_max, 10.0);  // 10.0 is Dirichlet value from input
 }
 
 TEST(Dirichlet, Right) {
+  std::vector<std::string> init_input_string;
+  init_input_string.push_back("Executable_name");
+  init_input_string.push_back(
+      "tests/verification/data/dirichlet_top_test_input.json");
+  init_input_string.push_back("constant");
+  auto input_char = FakeCommandLineInput(init_input_string);
+  int argc = static_cast<int>(input_char.size());
+  char** argv = input_char.data();
+  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  DeleteCommandLineInput(input_char);
+
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
   input_string.push_back(
       "tests/verification/data/dirichlet_right_test_input.json");
-  input_string.push_back("-tf");
-  input_string.push_back("0.1");
-  input_string.push_back("-od");
-  input_string.push_back("tests/verification/data/Dirichlet");
-  auto input_char = FakeCommandLineInput(input_string);
-  int argc = static_cast<int>(input_char.size());
-  char** argv = input_char.data();
+  input_char = FakeCommandLineInput(input_string);
+  argc = static_cast<int>(input_char.size());
+  argv = input_char.data();
   chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
 
   IO run_file(*mpi_session, "OneRun");
   run_file.SetRead("tests/verification/data/Dirichlet");
   std::vector<double> temperature_field;
-  run_file.GetImmediateBlock("HeatSolver/Temperature", temperature_field);
+  run_file.GetImmediateBlock("HeatSolver/temperature", temperature_field);
   const double global_max = GlobalMaxValue(temperature_field, *mpi_session);
   EXPECT_DOUBLE_EQ(global_max, 5.0);  // 5.0 is Dirichlet value from input
 }
 
 TEST(Dirichlet, Bottom) {
+  std::vector<std::string> init_input_string;
+  init_input_string.push_back("Executable_name");
+  init_input_string.push_back(
+      "tests/verification/data/dirichlet_top_test_input.json");
+  init_input_string.push_back("constant");
+  auto input_char = FakeCommandLineInput(init_input_string);
+  int argc = static_cast<int>(input_char.size());
+  char** argv = input_char.data();
+  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  DeleteCommandLineInput(input_char);
+
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
   input_string.push_back(
       "tests/verification/data/dirichlet_bottom_test_input.json");
-  input_string.push_back("-tf");
-  input_string.push_back("0.1");
-  input_string.push_back("-od");
-  input_string.push_back("tests/verification/data/Dirichlet");
-  auto input_char = FakeCommandLineInput(input_string);
-  int argc = static_cast<int>(input_char.size());
-  char** argv = input_char.data();
+  input_char = FakeCommandLineInput(input_string);
+  argc = static_cast<int>(input_char.size());
+  argv = input_char.data();
   chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
 
   IO run_file(*mpi_session, "OneRun");
   run_file.SetRead("tests/verification/data/Dirichlet");
   std::vector<double> temperature_field;
-  run_file.GetImmediateBlock("HeatSolver/Temperature", temperature_field);
+  run_file.GetImmediateBlock("HeatSolver/temperature", temperature_field);
   const double global_max = GlobalMaxValue(temperature_field, *mpi_session);
   EXPECT_DOUBLE_EQ(global_max, 3.0);  // 3.0 is Dirichlet value from input
 }
 
 TEST(Dirichlet, Top) {
+  std::vector<std::string> init_input_string;
+  init_input_string.push_back("Executable_name");
+  init_input_string.push_back(
+      "tests/verification/data/dirichlet_top_test_input.json");
+  init_input_string.push_back("constant");
+  auto input_char = FakeCommandLineInput(init_input_string);
+  int argc = static_cast<int>(input_char.size());
+  char** argv = input_char.data();
+  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  DeleteCommandLineInput(input_char);
+
   std::vector<std::string> input_string;
   input_string.push_back("Executable_name");
   input_string.push_back(
       "tests/verification/data/dirichlet_top_test_input.json");
-  input_string.push_back("-tf");
-  input_string.push_back("0.1");
-  input_string.push_back("-od");
-  input_string.push_back("tests/verification/data/Dirichlet");
-  auto input_char = FakeCommandLineInput(input_string);
-  int argc = static_cast<int>(input_char.size());
-  char** argv = input_char.data();
+  input_char = FakeCommandLineInput(input_string);
+  argc = static_cast<int>(input_char.size());
+  argv = input_char.data();
   chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
 
   IO run_file(*mpi_session, "OneRun");
   run_file.SetRead("tests/verification/data/Dirichlet");
   std::vector<double> temperature_field;
-  run_file.GetImmediateBlock("HeatSolver/Temperature", temperature_field);
+  run_file.GetImmediateBlock("HeatSolver/temperature", temperature_field);
   const double global_max = GlobalMaxValue(temperature_field, *mpi_session);
   EXPECT_DOUBLE_EQ(global_max, 8.0);  // 8.0 is Dirichlet value from input
 }

@@ -23,60 +23,15 @@ namespace {
 
 using namespace chyps;
 
-TEST(CommonType, DefaultInvalid) {
-  CommonType ctype;
-  ASSERT_TRUE(ctype.GetType() == InputType::INVALID);
-}
-TEST(CommonType, BoolConstruct) {
-  CommonType ctype(false);
-  EXPECT_FALSE(ctype);
-  ctype = true;
-  EXPECT_TRUE(ctype);
-}
-TEST(CommonType, IntConstruct) {
-  CommonType ctype(43);
-  EXPECT_EQ(static_cast<int>(ctype), 43);
-  ctype = -10;
-  EXPECT_EQ(static_cast<int>(ctype), -10);
-}
-TEST(CommonType, DoubleConstruct) {
-  CommonType ctype(-38.4962);
-  EXPECT_DOUBLE_EQ(ctype, -38.4962);
-  ctype = 43.9682;
-  EXPECT_DOUBLE_EQ(ctype, 43.9682);
-}
-TEST(CommonType, ConstCharConstruct) {
-  CommonType ctype("BestOfTimes");
-  EXPECT_TRUE(StringEqual(ctype, "BestOfTimes"));
-  ctype = "WorstOfTimes";
-  EXPECT_TRUE(StringEqual(ctype, "WorstOfTimes"));
-}
-TEST(CommonType, StringConstruct) {
-  CommonType ctype(std::string("BestOfTimes"));
-  EXPECT_TRUE(StringEqual(ctype, "BestOfTimes"));
-  ctype = std::string("WorstOfTimes");
-  EXPECT_TRUE(StringEqual(ctype, "WorstOfTimes"));
-}
-TEST(CommonType, ChangeAfterConstruct) {
-  CommonType ctype;
-  EXPECT_TRUE(ctype.GetType() == InputType::INVALID);
-  ctype = 12;
-  EXPECT_EQ(static_cast<int>(ctype), 12);
-  ctype = 108.124694;
-  EXPECT_DOUBLE_EQ(ctype, 108.124694);
-  ctype = std::string("StillKickin");
-  EXPECT_TRUE(StringEqual(ctype, "StillKickin"));
-}
-
 TEST(InputParserCL, BoolDefault) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
+  inputs.emplace_back("input_name");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
-  parser.AddOption("test", "-t", "--test", "A test value for testing", false,
-                   OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", false);
   parser.ParseCL(argc, argv);
   ASSERT_FALSE(parser["test"].get<bool>());
   DeleteCommandLineInput(input_vec);
@@ -85,13 +40,13 @@ TEST(InputParserCL, BoolDefault) {
 TEST(InputParserCL, IntDefault) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
+  inputs.emplace_back("input_name");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   static constexpr int correct = {43};
-  parser.AddOption("test", "-t", "--test", "A test value for testing", correct,
-                   OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", correct);
   parser.ParseCL(argc, argv);
   int result = parser["test"].get<int>();
   ASSERT_EQ(result, correct);
@@ -101,13 +56,13 @@ TEST(InputParserCL, IntDefault) {
 TEST(InputParserCL, DoubleDefault) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
+  inputs.emplace_back("input_name");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   static constexpr double correct = {13.7892};
-  parser.AddOption("test", "-t", "--test", "A test value for testing", correct,
-                   OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", correct);
   parser.ParseCL(argc, argv);
   double result = parser["test"].get<double>();
   ASSERT_DOUBLE_EQ(result, correct);
@@ -117,13 +72,13 @@ TEST(InputParserCL, DoubleDefault) {
 TEST(InputParserCL, StringDefault) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
+  inputs.emplace_back("input_name");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   std::string correct = "A_Real_Test";
-  parser.AddOption("test", "-t", "--test", "A test value for testing", correct,
-                   OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", correct);
   parser.ParseCL(argc, argv);
   std::string result = parser["test"].get<std::string>();
   ASSERT_EQ(result, correct);
@@ -133,16 +88,17 @@ TEST(InputParserCL, StringDefault) {
 TEST(InputParserCL, BoolDefaultOverwrite) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("-t");
-  inputs.emplace_back("--no-second-test");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test");
+  inputs.emplace_back("true");
+  inputs.emplace_back("-test2");
+  inputs.emplace_back("false");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
-  parser.AddOption("test", "-t", "--test", "A test value for testing", false,
-                   OptionType::COMMAND_LINE);
-  parser.AddOption("test2", "-st", "--second-test", "A test value for testing",
-                   true, OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", false);
+  parser.AddOption("test2", "A test value for testing");
   parser.ParseCL(argc, argv);
   ASSERT_TRUE(parser["test"].get<bool>());
   ASSERT_FALSE(parser["test2"].get<bool>());
@@ -152,16 +108,16 @@ TEST(InputParserCL, BoolDefaultOverwrite) {
 TEST(InputParserCL, IntDefaultOverwrite) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("-t");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test");
   inputs.emplace_back("43");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   static constexpr int incorrect = {22};
   static constexpr int correct = {43};
-  parser.AddOption("test", "-t", "--test", "A test value for testing",
-                   incorrect, OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", incorrect);
   parser.ParseCL(argc, argv);
   int result = parser["test"].get<int>();
   ASSERT_EQ(result, correct);
@@ -171,16 +127,16 @@ TEST(InputParserCL, IntDefaultOverwrite) {
 TEST(InputParserCL, DoubleDefaultOverwrite) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("--test");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test");
   inputs.emplace_back("13.7892");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   static constexpr double incorrect = {962.00};
   static constexpr double correct = {13.7892};
-  parser.AddOption("test", "-t", "--test", "A test value for testing",
-                   incorrect, OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", incorrect);
   parser.ParseCL(argc, argv);
   double result = parser["test"].get<double>();
   ASSERT_DOUBLE_EQ(result, correct);
@@ -190,16 +146,16 @@ TEST(InputParserCL, DoubleDefaultOverwrite) {
 TEST(InputParserCL, StringDefaultOverwrite) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("--test");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test");
   inputs.emplace_back("A_Real_Test");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   std::string incorrect = "Faker";
   std::string correct = "A_Real_Test";
-  parser.AddOption("test", "-t", "--test", "A test value for testing",
-                   incorrect, OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing", incorrect);
   parser.ParseCL(argc, argv);
   std::string result = parser["test"].get<std::string>();
   ASSERT_EQ(result, correct);
@@ -209,13 +165,14 @@ TEST(InputParserCL, StringDefaultOverwrite) {
 TEST(InputParserCL, BoolRequired) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("-t");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test");
+  inputs.emplace_back("true");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
-  parser.AddOption<bool>("test", "-t", "--test", "A test value for testing",
-                         OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing");
   parser.ParseCL(argc, argv);
   ASSERT_TRUE(parser["test"].get<bool>());
   DeleteCommandLineInput(input_vec);
@@ -224,15 +181,15 @@ TEST(InputParserCL, BoolRequired) {
 TEST(InputParserCL, IntRequired) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("-t");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test");
   inputs.emplace_back("43");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   static constexpr int correct = {43};
-  parser.AddOption<int>("test", "-t", "--test", "A test value for testing",
-                        OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing");
   parser.ParseCL(argc, argv);
   int result = parser["test"].get<int>();
   ASSERT_EQ(result, correct);
@@ -242,15 +199,15 @@ TEST(InputParserCL, IntRequired) {
 TEST(InputParserCL, DoubleRequired) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("--test");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test");
   inputs.emplace_back("13.7892");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   static constexpr double correct = {13.7892};
-  parser.AddOption<double>("test", "-t", "--test", "A test value for testing",
-                           OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing");
   parser.ParseCL(argc, argv);
   double result = parser["test"].get<double>();
   ASSERT_DOUBLE_EQ(result, correct);
@@ -259,17 +216,16 @@ TEST(InputParserCL, DoubleRequired) {
 
 TEST(InputParserCL, StringRequired) {
   std::vector<std::string> inputs;
+  inputs.emplace_back("input_name");
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("--test");
+  inputs.emplace_back("-test");
   inputs.emplace_back("A_Real_Test");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   InputParser parser;
   std::string correct = "A_Real_Test";
-  parser.AddOption<std::string>("test", "-t", "--test",
-                                "A test value for testing",
-                                OptionType::COMMAND_LINE);
+  parser.AddOption("test", "A test value for testing");
   parser.ParseCL(argc, argv);
   std::string result = parser["test"].get<std::string>();
   ASSERT_EQ(result, correct);
@@ -279,40 +235,36 @@ TEST(InputParserCL, StringRequired) {
 TEST(InputParserCL, MultiOptions) {
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("--string_test");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-string_test");
   inputs.emplace_back("A_Real_Test");
-  inputs.emplace_back("--no-on-bool");
-  inputs.emplace_back("-d");
+  inputs.emplace_back("-false_bool");
+  inputs.emplace_back("false");
+  inputs.emplace_back("-double_test");
   inputs.emplace_back("-482.968");
-  inputs.emplace_back("--int-test");
+  inputs.emplace_back("-int_test");
   inputs.emplace_back("1042");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
 
   InputParser parser;
   // Bool, Default, overwritten
-  parser.AddOption("false_bool", "-b", "--on-bool", "A test value for testing",
-                   true, OptionType::COMMAND_LINE);
+  parser.AddOption("false_bool", "A test value for testing", true);
   // Int, Required
-  parser.AddOption<int>("int_test", "-i", "--int-test", "Test for int",
-                        OptionType::COMMAND_LINE);
+  parser.AddOption("int_test", "--int-test", "Test for int");
   // Double, Required
-  parser.AddOption<double>("double_test", "-d", "--double-test",
-                           "Test for double", OptionType::COMMAND_LINE);
+  parser.AddOption("double_test", "Test for double");
   // String, Default, overwritten
-  parser.AddOption("string_test", "-s", "--string_test", "Test for string",
-                   std::string("Faker"), OptionType::COMMAND_LINE);
+  parser.AddOption("string_test", "Test for string", std::string("Faker"));
 
   // Default bool, not overwritten
-  parser.AddOption("on_bool_def", "-v", "--on-bool-def",
-                   "A test value for testing (take default)", false,
-                   OptionType::COMMAND_LINE);
+  parser.AddOption("on_bool_def", "A test value for testing (take default)",
+                   false);
 
   // Default string, not overwritten
-  parser.AddOption("string test default", "-sd", "--string_test-def",
-                   "Test for string (take default)", std::string("Faker"),
-                   OptionType::COMMAND_LINE);
+  parser.AddOption("string test default", "Test for string (take default)",
+                   std::string("Faker"));
 
   parser.ParseCL(argc, argv);
 
@@ -329,13 +281,13 @@ TEST(InputParserCL, MultiOptions) {
 
 TEST(InputParserFILE, ParseFile) {
   InputParser parser;
-  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
-  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
-  parser.AddNoDefaultOption("test_double", "Testing reading of double.");
-  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
-  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
-  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
-  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_double", "Testing reading of double.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
 
   parser.ParseFromFile("tests/unit/serial/data/test_input.json");
   EXPECT_FALSE(parser["test_bool"].get<bool>());
@@ -359,65 +311,63 @@ TEST(InputParserFILE, ParseFile) {
 
 TEST(InputParser, CLOverwrite) {
   InputParser parser;
-  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
-  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
-  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
-  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
-  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
-  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
 
-  parser.AddOption<double>("test_double", "-t", "--test",
-                           "A test value for testing",
-                           OptionType::COMMAND_LINE);
+  parser.AddOption("test_double", "A test value for testing");
 
   parser.ParseFromFile("tests/unit/serial/data/test_input.json");
 
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("--test");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test_double");
   inputs.emplace_back("13.7892");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   parser.ParseCL(argc, argv);
   EXPECT_DOUBLE_EQ(parser["test_double"].get<double>(), 13.7892);
 }
 
 TEST(InputParser, OptionsToFile) {
   InputParser parser;
-  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
-  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
-  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
-  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
-  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
-  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
 
-  parser.AddOption<double>("test_double", "-t", "--test",
-                           "A test value for testing",
-                           OptionType::COMMAND_LINE);
+  parser.AddOption("test_double", "A test value for testing");
 
   parser.ParseFromFile("tests/unit/serial/data/test_input.json");
 
   std::vector<std::string> inputs;
   inputs.emplace_back("exe_name");
-  inputs.emplace_back("--test");
+  inputs.emplace_back("input_name");
+  inputs.emplace_back("-test_double");
   inputs.emplace_back("13.7892");
   auto input_vec = FakeCommandLineInput(inputs);
-  char** argv = input_vec.data();
-  int argc = input_vec.size();
+  char** argv = input_vec.data() + 2;
+  int argc = input_vec.size() - 2;
   parser.ParseCL(argc, argv);
 
   std::string write_file_name = "tests/unit/serial/parser_writing_test.json";
   parser.WriteToFile(write_file_name);
 
   InputParser read_parser;
-  read_parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
-  read_parser.AddNoDefaultOption("test_int", "Testing reading of int.");
-  read_parser.AddNoDefaultOption("test_double", "Testing reading of double.");
-  read_parser.AddNoDefaultOption("test_string1", "Test string without spaces");
-  read_parser.AddNoDefaultOption("test_string2", "Test string with spaces");
-  read_parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
-  read_parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
+  read_parser.AddOption("test_bool", "Testing reading of bool.");
+  read_parser.AddOption("test_int", "Testing reading of int.");
+  read_parser.AddOption("test_double", "Testing reading of double.");
+  read_parser.AddOption("test_string1", "Test string without spaces");
+  read_parser.AddOption("test_string2", "Test string with spaces");
+  read_parser.AddOption("test_double_vec", "Vector of doubles.");
+  read_parser.AddOption("test_int_vec", "Vector of ints.");
   read_parser.ParseFromFile(write_file_name);
 
   EXPECT_FALSE(parser["test_bool"].get<bool>());
@@ -441,13 +391,13 @@ TEST(InputParser, OptionsToFile) {
 }
 TEST(InputParser, RoundTripBSON) {
   InputParser parser;
-  parser.AddNoDefaultOption("test_bool", "Testing reading of bool.");
-  parser.AddNoDefaultOption("test_int", "Testing reading of int.");
-  parser.AddNoDefaultOption("test_double", "Testing reading of double.");
-  parser.AddNoDefaultOption("test_string1", "Test string without spaces");
-  parser.AddNoDefaultOption("test_string2", "Test string with spaces");
-  parser.AddNoDefaultOption("test_double_vec", "Vector of doubles.");
-  parser.AddNoDefaultOption("test_int_vec", "Vector of ints.");
+  parser.AddOption("test_bool", "Testing reading of bool.");
+  parser.AddOption("test_int", "Testing reading of int.");
+  parser.AddOption("test_double", "Testing reading of double.");
+  parser.AddOption("test_string1", "Test string without spaces");
+  parser.AddOption("test_string2", "Test string with spaces");
+  parser.AddOption("test_double_vec", "Vector of doubles.");
+  parser.AddOption("test_int_vec", "Vector of ints.");
 
   parser.ParseFromFile("tests/unit/serial/data/test_input.json");
 

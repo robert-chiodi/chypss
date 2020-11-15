@@ -31,12 +31,6 @@ Mesh::Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser,
 }
 
 void Mesh::Initialize(void) {
-  DEBUG_ASSERT(parser_m.AllOptionsSet("Mesh"), global_assert{},
-               DebugLevel::ALWAYS{},
-               "Not all options needed for Mesh supplied\n"
-               "Make sure that the InputParser has been parsed before "
-               "calling Initialize and that all required options are "
-               "specified or have a valid default value.");
   this->ReadAndRefineMesh();
   this->AllocateVariables();
 }
@@ -146,45 +140,45 @@ Mesh::~Mesh(void) {
 
 void Mesh::GatherOptions(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Adding options to look for in parser");
-  parser_m.AddOptionDefault("Mesh/mesh_file", "Mesh file to use.",
+  parser_m.AddOption("Mesh/mesh_file", "Mesh file to use.",
                             std::string("../data/star.mesh"));
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/serial_refine",
       "Number of times to refine the mesh uniformly in serial.", 2);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/parallel_refine",
       "Number of times to refine the mesh uniformly in parallel.", 1);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_nx",
       "If using generated mesh, number of elements in x direction.", -1);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_ny",
       "If using generated mesh, number of elements in y direction.", -1);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_nz",
       "If using generated mesh, number of elements in z direction.", -1);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_blx",
       "If using generated mesh, lower x dimension of the cuboid domain", -1.0);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_bly",
       "If using generated mesh, lower y dimension of the cuboid domain", -1.0);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_blz",
       "If using generated mesh, lower z dimension of the cuboid domain", -1.0);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_bux",
       "If using generated mesh, upper x dimension of the cuboid domain", 1.0);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_buy",
       "If using generated mesh, upper y dimension of the cuboid domain", 1.0);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/gen_buz",
       "If using generated mesh, upper z dimension of the cuboid domain", 1.0);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/rotation", "Degrees to rotate mesh in xy-plane by (along +z axis).",
       0.0);
-  parser_m.AddOptionDefault(
+  parser_m.AddOption(
       "Mesh/periodicity",
       "If using generated mesh (currently only 2D quad mesh), marks the "
       "boundaries to be periodic. Provided as string with axis names (e.g., "
