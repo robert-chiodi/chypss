@@ -17,7 +17,7 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 
 {
     "SimulationInitializer":{
-        "simulation_configuration": "cooled_rod",
+        "initializer": "cooled_rod",
 	"out_data": "tests/verification/data/CooledRod",
         "CooledRod":{
                         "approximation_terms": 1

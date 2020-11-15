@@ -10,7 +10,10 @@
 
 #include "chyps/simulation.hpp"
 
+#include <chrono>
 #include <cmath>
+#include <ctime>
+#include <fstream>
 #include <iostream>
 #include <utility>
 
@@ -19,6 +22,7 @@
 #include "chyps/boundary_condition.hpp"
 #include "chyps/boundary_condition_manager.hpp"
 #include "chyps/debug_assert.hpp"
+#include "chyps/git.hpp"
 #include "chyps/heat_solver.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/io.hpp"
@@ -63,7 +67,13 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
       "Name of file (or BP4 directory) to write that holds "
       "data to restart from. Do not include extension. Pass ignore if you "
       "do not wish to write files.",
-      std::string("CHyPSDataOut"));
+      "CHyPSDataOut");
+  input_parser.AddOptionDefault(
+      "Simulation/option_output_name",
+      "Name of file to write the options used for the simulation. Provides way "
+      "to rerun the same simulation. Should end in the extension .json",
+      "simulation_configuration.json");
+
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Added main parser options.");
 
   IO file_io(mpi_session, "FILEIO");
@@ -82,7 +92,18 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   }
   argc += -2;  // Skip executable and input file name
   input_parser.ParseCL(argc, argv + 2);
-  input_parser.WriteToFile("simulation_configuration.json");
+  if (mpi_session.IAmRoot()) {
+    std::ofstream options_used(
+        input_parser["Simulation/option_output_name"].get<std::string>());
+    options_used << "/*\n" << GetGitDescriptionString() << "\n*/\n";
+    const auto now = std::chrono::system_clock::now();
+    const auto time = std::chrono::system_clock::to_time_t(now);
+    options_used << "/*\n"
+                 << "Simulation start time:\n"
+                 << std::ctime(&time) << "*/\n";
+    options_used << input_parser.WriteToString();
+    options_used.close();
+  }
   DEBUG_ASSERT(input_parser.AllOptionsSet("Simulation"), global_assert{},
                DebugLevel::ALWAYS{},
                "Options required by  \"Simulation\" missing.");
@@ -94,13 +115,13 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
                DebugLevel::ALWAYS{}, "Cannot read and write from same file.");
   file_io.SetRead(in_data_name);
-
   if (out_data_name != "ignore") {
     DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
                  DebugLevel::ALWAYS{}, "Cannot read and write from same file.");
     file_io.SetWrite(out_data_name);
     file_io.RootWriteAttribute("InputFile", input_parser.WriteToString());
   }
+  file_io.RootWriteAttribute("GitInfo", GetGitDescriptionString());
 
   mesh.Initialize();
 

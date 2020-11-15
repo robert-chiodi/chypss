@@ -1,6 +1,6 @@
 {
     "SimulationInitializer":{
-        "simulation_configuration": "quadratic_pulse" ,
+        "initializer": "quadratic_pulse" ,
 	"out_data": "tests/verification/data/HomogeneousCCInit",
         "QuadraticPulse":{
                         "pulse_amplitude": 1.0,

@@ -30,6 +30,7 @@ IO::IO(const MPIParallel& a_mpi_session, const std::string a_io_name)
 
   this->SetEngineType();
   this->SetDefaultParameters();
+  this->RootAddVariable<std::string>("REAL_WORLD_TIME");
   this->RootAddVariable<int>("CYCLE");
   this->RootAddVariable<double>("TIME");
   this->RootAddVariable<double>("DT");
@@ -124,6 +125,10 @@ void IO::BeginWriteStep(const int a_cycle, const double a_time,
   DEBUG_ASSERT(write_engine_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   active_write_step_m = true;
   write_engine_m->BeginStep();
+  const auto now = std::chrono::system_clock::now();
+  const auto time = std::chrono::system_clock::to_time_t(now);
+  std::string real_world_time(std::ctime(&time));
+  this->RootPutDeferred("REAL_WORLD_TIME", &real_world_time);
   this->RootPutDeferred("CYCLE", &a_cycle);
   this->RootPutDeferred("TIME", &a_time);
   this->RootPutDeferred("DT", &a_dt);

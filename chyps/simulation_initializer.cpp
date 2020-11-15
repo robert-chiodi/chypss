@@ -24,17 +24,17 @@ namespace chyps {
 
 namespace chyps_details {
 ConfigurationInitializer* GetConfigurationInitializer(
-    const std::string& a_configuration_name, InputParser& a_parser) {
-  if (a_configuration_name == "constant") {
+    const std::string& a_initializer, InputParser& a_parser) {
+  if (a_initializer == "constant") {
     return new Constant(a_parser);
-  } else if (a_configuration_name == "cooled_rod") {
+  } else if (a_initializer == "cooled_rod") {
     return new CooledRod(a_parser);
 
-  } else if (a_configuration_name == "quadratic_pulse") {
+  } else if (a_initializer == "quadratic_pulse") {
     return new QuadraticPulse(a_parser);
   } else {
     DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
-                 "Unknown configuration type of : " + a_configuration_name);
+                 "Unknown configuration type of : " + a_initializer);
   }
   return nullptr;  // Should never reach
 }
@@ -135,11 +135,10 @@ SimulationInitializer::SimulationInitializer(int argc, char** argv,
 
   DEBUG_ASSERT(argc >= 3, global_assert{}, DebugLevel::ALWAYS{},
                "Command line options should be provided as [input_file_name] "
-               "[configuration_name] [...command line parser flags...]");
+               "[initializer_name] [...command line parser flags...]");
 
-  parser_m.AddOptionNoDefault(
-      "SimulationInitializer/simulation_configuration",
-      "Name of the simulation configuration to intialize.", true);
+  parser_m.AddOptionNoDefault("SimulationInitializer/initializer",
+                              "Name of initializer to use.", true);
   parser_m.AddOptionDefault(
       "SimulationInitializer/out_data",
       "Name of file (or BP4 directory) to write that holds "
@@ -147,7 +146,7 @@ SimulationInitializer::SimulationInitializer(int argc, char** argv,
       std::string("CHyPSInitData"));
 
   const std::string input_file_name = argv[1];
-  const std::string configuration_name = argv[2];
+  const std::string initializer = argv[2];
 
   // Should develop and construct a RequiredData class here that holds a mesh
   // and whatever ParGridFunctions need to be filled in by the configuration
@@ -156,7 +155,7 @@ SimulationInitializer::SimulationInitializer(int argc, char** argv,
   IO file_io(mpi_session_m, "FILEIO");
   RequiredData required_data(mpi_session_m, parser_m, file_io);
   configuration_initializer_m =
-      chyps_details::GetConfigurationInitializer(configuration_name, parser_m);
+      chyps_details::GetConfigurationInitializer(initializer, parser_m);
 
   if (input_file_name == "help") {
     if (a_mpi_session.IAmRoot()) {
@@ -167,6 +166,15 @@ SimulationInitializer::SimulationInitializer(int argc, char** argv,
   parser_m.ParseFromFile(input_file_name, a_mpi_session);
   argc += -3;  // Skip executable and input file name
   parser_m.ParseCL(argc, argv + 3);
+
+  DEBUG_ASSERT(
+      initializer ==
+          parser_m["SimulationInitializer/initializer"].get<std::string>(),
+      global_assert{}, DebugLevel::ALWAYS{},
+      "Initializer given on command line \"" + initializer +
+          "\" not the same as in input file \"" +
+          parser_m["SimulationInitializer/initializer"].get<std::string>() +
+          "\"");
 
   const std::string out_data_name =
       parser_m["SimulationInitializer/out_data"].get<std::string>();

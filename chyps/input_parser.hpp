@@ -166,8 +166,8 @@ class InputParser {
   static std::string BreakupString(const std::string& a_string);
 
   DirectoryJSON parsed_input_m;
+  DirectoryJSON default_values_m;
   DirectoryJSON option_description_m;
-  // -2=not required, -1=required, >=0 dependent
   std::unordered_map<std::string, int> option_required_status_m;
   std::vector<std::string> dependencies_m;
 };

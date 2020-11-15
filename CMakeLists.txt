@@ -11,6 +11,7 @@ project(CHyPS VERSION 0.1
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules"
 "${PROJECT_SOURCE_DIR}/cmake/Utils")
+
 find_package(MPI REQUIRED)
 find_package(HYPRE REQUIRED)
 find_package(MFEM REQUIRED)
@@ -30,6 +31,14 @@ set(DEBUG_ASSERT_SINGLE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/external/debug_asser
 
 
 set(CHYPS_SOURCE "./chyps")
+
+# Setup necessary files to embed git information
+set(PRE_CONFIGURE_FILE "${CHYPS_SOURCE}/git.cpp.in")
+set(POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/chyps/git.cpp")
+include(cmake/Utils/git_watcher.cmake)
+add_library(git STATIC ${POST_CONFIGURE_FILE})
+target_include_directories(git PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(git check_git)
 
 add_library(chyps STATIC)
 set_property(TARGET chyps PROPERTY CXX_STANDARD 11)
@@ -55,6 +64,7 @@ target_link_libraries(chyps PUBLIC Petsc::Petsc)
 target_link_libraries(chyps PUBLIC Spdlog::Spdlog)
 target_link_libraries(chyps PUBLIC adios2::cxx11_mpi)
 target_link_libraries(chyps PUBLIC ${LAPACK_LIBRARIES})
+target_link_libraries(chyps PUBLIC git)
 
 add_executable(chyps_heat)
 target_link_libraries(chyps_heat PRIVATE chyps)
