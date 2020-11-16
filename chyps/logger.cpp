@@ -14,6 +14,7 @@
 #include <string>
 
 #include "chyps/mpi_parallel.hpp"
+#include "chyps/string_manipulation.hpp"
 
 namespace chyps {
 
@@ -50,16 +51,10 @@ void StartLogger(const int a_rank, const int a_world_size,
       spdlog::set_level(spdlog::level::off);
     }
 
-    int world_digits = 0;
-    int ws = a_world_size;
-    do {
-      ++world_digits;
-      ws /= 10;
-    } while (ws / 10 > 0);
-
+    const int world_digits = std::to_string(a_world_size).size();
     std::string number = std::to_string(a_rank);
-    std::string id_suffix =
-        std::string(world_digits - number.length(), '0') + number;
+    std::string id_suffix = ZeroFill(static_cast<uint32_t>(a_rank),
+                                     static_cast<uint32_t>(world_digits));
     std::string log_name =
         std::string("log_") + id_suffix + std::string(".txt");
     try {

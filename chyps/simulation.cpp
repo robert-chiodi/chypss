@@ -28,6 +28,8 @@
 #include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/mesh.hpp"
+#include "chyps/monitor_file.hpp"
+#include "chyps/monitor_manager.hpp"
 #include "chyps/mpi_parallel.hpp"
 #include "chyps/precice_adapter.hpp"
 
@@ -76,6 +78,16 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
   IO file_io(mpi_session, "FILEIO");
   Mesh mesh(mpi_session, input_parser, &file_io);
   HeatSolver solver(input_parser, &file_io);
+
+  MonitorManager monitor_manager;
+  MonitorFile* monitor_file = nullptr;
+  if (mpi_session.IAmRoot()) {
+    monitor_file = monitor_manager.CreateMonitorFile(
+        "test_file.txt",
+        {"Test1", "SUPERLONGTest2THISNAMEISRIDICULOUS", "Test3"},
+        {FieldType::INT, FieldType::DOUBLE, FieldType::DOUBLE});
+    std::cout << "Returned" << std::endl;
+  }
 
   const std::string input_file_name = argv[1];
   if (input_file_name == "help") {
@@ -236,6 +248,12 @@ int main(int argc, char** argv, MPIParallel& mpi_session,
       file_io.BeginWriteStep(ti, time, dt);
       solver.WriteFields(ti, time);
       file_io.EndWriteStep();
+    }
+
+    if (mpi_session.IAmRoot()) {
+      std::cout << "Sim " << monitor_file << std::endl;
+      monitor_file->SetEntries({static_cast<double>(ti), time, dt});
+      monitor_manager.WriteStepToDisk(ti, time, dt);
     }
 
     if (use_precice && !precice->IsCouplingOngoing()) {

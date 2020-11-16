@@ -47,7 +47,7 @@ target_link_libraries(test_chyps_serial chyps gtest gmock)
 
 set_target_properties(test_chyps_serial
     PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 17
 )
 
 add_executable(test_chyps_parallel)
@@ -57,7 +57,7 @@ target_link_libraries(test_chyps_parallel chyps gtest gmock)
 
 set_target_properties(test_chyps_parallel
     PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 17
 )
 
 add_executable(test_chyps_verification)
@@ -67,7 +67,7 @@ target_link_libraries(test_chyps_verification chyps gtest gmock)
 
 set_target_properties(test_chyps_verification
     PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 17
 )
 
 

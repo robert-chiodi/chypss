@@ -33,21 +33,16 @@ int main(int argc, char** argv, MPIParallel& a_mpi_session) {
   // behave correctly.
   Mesh mesh(a_mpi_session, input_parser, nullptr);
 
-  input_parser.AddOption<int>(
-      "bc_tag", "-bt", "--boundary-condition-tag",
-      "Tag value for  boundary condition. Value for mesh on chyps_heat mesh.",
-      OptionType::COMMAND_LINE);
-  input_parser.AddOption<double>("bc_val", "-bv", "--boundary-condition-value",
-                                 "Value for boundary condition.",
-                                 OptionType::COMMAND_LINE);
+  input_parser.AddOption(
+      "bc_tag",
+      "Tag value for  boundary condition. Value for mesh on chyps_heat mesh.");
+  input_parser.AddOption("bc_val", "Value for boundary condition.");
 
-  input_parser.AddOption("precice_config", "-pc", "--preCICE-config",
+  input_parser.AddOption("precice_config",
                          "XML File holding the configuration for preCICE",
                          std::string("../data/precice-config.xml"));
-  input_parser.AddOption("end_time", "-tf", "--t-final",
-                         "Final time; start time is 0.", 0.5);
-  input_parser.AddOption("time_step", "-dt", "--time-step", "Time step.",
-                         1.0e-2);
+  input_parser.AddOption("end_time", "Final time; start time is 0.", 0.5);
+  input_parser.AddOption("time_step", "Time step.", 1.0e-2);
 
   input_parser.ParseCL(argc, argv);
   DEBUG_ASSERT(input_parser["mesh_file"].get<std::string>() == "generate",

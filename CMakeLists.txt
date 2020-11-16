@@ -41,7 +41,7 @@ target_include_directories(git PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 add_dependencies(git check_git)
 
 add_library(chyps STATIC)
-set_property(TARGET chyps PROPERTY CXX_STANDARD 11)
+set_property(TARGET chyps PROPERTY CXX_STANDARD 17)
 target_include_directories(chyps PUBLIC "./")
 target_include_directories(chyps PUBLIC "${NLOHMANN_JSON_SINGLE_HEADER}")
 target_include_directories(chyps PUBLIC "${DEBUG_ASSERT_SINGLE_HEADER}")
@@ -68,16 +68,16 @@ target_link_libraries(chyps PUBLIC git)
 
 add_executable(chyps_heat)
 target_link_libraries(chyps_heat PRIVATE chyps)
-set_property(TARGET chyps_heat PROPERTY CXX_STANDARD 11)
+set_property(TARGET chyps_heat PROPERTY CXX_STANDARD 17)
 
 add_executable(chyps_initializer)
 target_link_libraries(chyps_initializer PRIVATE chyps)
-set_property(TARGET chyps_initializer PROPERTY CXX_STANDARD 11)
+set_property(TARGET chyps_initializer PROPERTY CXX_STANDARD 17)
 
 
 add_executable(dummy_precice)
 target_link_libraries(dummy_precice PRIVATE chyps)
-set_property(TARGET dummy_precice PROPERTY CXX_STANDARD 11)
+set_property(TARGET dummy_precice PROPERTY CXX_STANDARD 17)
 
 add_subdirectory("${CHYPS_SOURCE}")
 
