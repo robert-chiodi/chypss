@@ -31,7 +31,7 @@ IO::IO(const MPIParallel& a_mpi_session, const std::string a_io_name)
   this->SetEngineType();
   this->SetDefaultParameters();
   this->RootAddVariable<std::string>("REAL_WORLD_TIME");
-  this->RootAddVariable<int>("CYCLE");
+  this->RootAddVariable<uint64_t>("CYCLE");
   this->RootAddVariable<double>("TIME");
   this->RootAddVariable<double>("DT");
 }
@@ -118,7 +118,7 @@ void IO::AddVariableForGridFunction(
   this->MarkAsPointVariable(a_variable_name, a_element_space.GetOrder(0));
 }
 
-void IO::BeginWriteStep(const int a_cycle, const double a_time,
+void IO::BeginWriteStep(const uint64_t a_cycle, const double a_time,
                         const double a_dt) {
   DEBUG_ASSERT(!this->OngoingWriteStep(), global_assert{}, DebugLevel::CHEAP{},
                "Already in middle of write step.");

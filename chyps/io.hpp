@@ -207,7 +207,7 @@ class IO {
   /// \brief Begin step inside the ADIOS2 file. This, along with EndStep, can be
   /// seen as Gates between which all calls to PutDeferred and GetDeferred are
   /// buffered. All calls will then be fulfilled during call to EndStep().
-  void BeginWriteStep(const int a_cycle, const double a_time,
+  void BeginWriteStep(const uint64_t a_cycle, const double a_time,
                       const double a_dt);
 
   /// \brief Returns if an IO step is currently ongoing (i.e., BeginStep has
