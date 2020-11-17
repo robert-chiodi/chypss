@@ -13,8 +13,6 @@
 #include <chrono>
 #include <cmath>
 #include <ctime>
-#include <fstream>
-#include <iostream>
 #include <utility>
 
 #include "chyps/debug_assert.hpp"
@@ -45,6 +43,98 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
   StartLogger(mpi_session_m, a_log_level);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Beginning simulation.");
 
+  this->GatherOptions();
+
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Added main parser options.");
+}
+
+void Simulation::Initialize(int argc, char** argv) {
+  this->ParseOptions(argc, argv);
+  this->SetupFileIO();
+  mesh_m.Initialize();
+  heat_solver_m.Initialize(mesh_m);
+  this->ActivatePrecice();
+  this->InitializeStepInfo();
+  this->InitializeRestrictions();
+  this->InitializeGoals();
+  this->InitializeOutputs();
+
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting simulation at time {}", time);
+  SPDLOG_LOGGER_INFO(MAIN_LOG,
+                     "Performing simulation to time {} with time steps of {}",
+                     goals_m.end_time, step_info_m.dt);
+  this->WriteInitialConditions();
+  this->WriteProgressHeaderToScreen();
+}
+
+void Simulation::RunToEnd(void) {
+  bool last_step = false;
+  while (!last_step) {
+    SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting time-iteration {} for time {:8.6E}",
+                       step_info_m.iteration, step_info_m.time);
+    // if (this->PreciceActive()) {
+    //   precice_m->ReadBlockScalarData("Temperature", temperature_bc);
+    // }
+
+    double dt_adj = heat_solver_m.AdjustTimeStep(step_info_m.dt);
+    dt_adj = std::min(restrictions_m.max_dt, dt_adj);
+
+    if (step_info_m.time + dt_adj > goals_m.end_time) {
+      dt_adj = goals_m.end_time - step_info_m.time;
+    }
+    if (std::fabs(step_info_m.time + dt_adj - goals_m.end_time) < 1.0e-14) {
+      last_step = true;
+      SPDLOG_LOGGER_INFO(MAIN_LOG, "Begun last step.");
+    }
+
+    step_info_m.dt = heat_solver_m.Advance(step_info_m.time, dt_adj);
+    step_info_m.time += step_info_m.dt;
+    ++step_info_m.iteration;
+
+    restrictions_m.max_dt = this->PreciceActive()
+                                ? precice_m->Advance(step_info_m.dt)
+                                : restrictions_m.max_dt;
+
+    if (mpi_session_m.IAmRoot()) {
+      this->WriteProgressToScreen();
+    }
+
+    if (step_info_m.iteration % output_m.visualization_steps == 0 ||
+        last_step) {
+      this->WriteIterationConditions(step_info_m);
+    }
+
+    if (this->PreciceActive() && !precice_m->IsCouplingOngoing()) {
+      SPDLOG_LOGGER_INFO(MAIN_LOG,
+                         "Precice coupling done at iteration {} and time {}",
+                         step_info_m.iteration, step_info_m.time);
+      break;
+    }
+  }
+
+  SPDLOG_LOGGER_INFO(MAIN_LOG,
+                     "Final simulation time of {:8.6E} reached. Finalizing "
+                     "simulation and cleaning up.",
+                     time);
+
+  if (this->PreciceActive()) {
+    precice_m->Finalize();
+  }
+}
+
+bool Simulation::PreciceActive(void) const { return precice_m != nullptr; }
+
+Simulation::~Simulation(void) {
+  delete precice_m;
+  precice_m = nullptr;
+  if (parser_m["Simulation/output_screen"] != "cout") {
+    fclose(output_m.output_screen);
+    delete output_m.output_screen;
+  }
+  output_m.output_screen = nullptr;
+}
+
+void Simulation::GatherOptions(void) {
   parser_m.AddOption("Simulation/use_precice",
                      "If preCICE will be used to couple to another solver.",
                      false);
@@ -60,10 +150,15 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
 
   parser_m.AddOption("Simulation/viz_steps", "Visualize every n-th timestep.",
                      5);
+  parser_m.AddOption("Simulation/output_screen",
+                     "Location to write output that would normally go to the "
+                     "screen. Supply \"cout\" to write to terminal.",
+                     "cout");
   parser_m.AddOption(
       "Simulation/in_data",
       "Name of file (or BP4 directory) holding "
-      "initial data. Do not include extension. Initial data can be generated "
+      "initial data. Do not include extension. Initial data can be "
+      "generated "
       "from a previous simulation check point or using the tool "
       "chyps_initializer.");
   parser_m.AddOption(
@@ -76,11 +171,9 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
       "Name of file to write the options used for the simulation. Provides way "
       "to rerun the same simulation. Should end in the extension .json",
       "simulation_configuration.json");
-
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Added main parser options.");
 }
 
-void Simulation::Initialize(int argc, char** argv) {
+void Simulation::ParseOptions(int argc, char** argv) {
   const std::string input_file_name = argv[1];
   if (input_file_name == "help") {
     if (mpi_session_m.IAmRoot()) {
@@ -106,7 +199,9 @@ void Simulation::Initialize(int argc, char** argv) {
     options_used.close();
   }
   parser_m.ClearOptions();
+}
 
+void Simulation::SetupFileIO(void) {
   const auto in_data_name = parser_m["Simulation/in_data"].get<std::string>();
   const auto out_data_name = parser_m["Simulation/out_data"].get<std::string>();
   DEBUG_ASSERT(in_data_name != out_data_name, global_assert{},
@@ -120,10 +215,9 @@ void Simulation::Initialize(int argc, char** argv) {
     file_io_m.RootWriteAttribute("InputFile", parser_m.WriteToString());
   }
   file_io_m.RootWriteAttribute("GitInfo", GetGitDescriptionString());
+}
 
-  mesh_m.Initialize();
-  heat_solver_m.Initialize(mesh_m);
-
+void Simulation::ActivatePrecice(void) {
   PreciceAdapter* precice_m =
       parser_m["Simulation/use_precice"].get<bool>()
           ? new PreciceAdapter(
@@ -173,10 +267,9 @@ void Simulation::Initialize(int argc, char** argv) {
   // //  condition.SetValues(2.5);
   // mesh_m.SetBoundaryCondition(3, condition);
   // mesh_m.CommitBoundaryConditions();
+}
 
-  // Clear options from parser. Can still parse but
-  // can not check all options supplied.
-
+void Simulation::InitializeStepInfo(void) {
   step_info_m.dt = parser_m["Simulation/time_step"].get<double>();
   if (file_io_m.IsReadModeActive()) {
     file_io_m.GetImmediateValue("CYCLE", &step_info_m.iteration);
@@ -187,19 +280,34 @@ void Simulation::Initialize(int argc, char** argv) {
       step_info_m.dt = std::min(step_info_m.dt, read_in_dt);
     }
   }
+}
+
+void Simulation::InitializeRestrictions(void) {
   restrictions_m.max_dt = step_info_m.dt;
   if (this->PreciceActive()) {
     restrictions_m.max_dt = precice_m->Initialize();
   }
+}
+
+void Simulation::InitializeGoals(void) {
   goals_m.end_time = parser_m["Simulation/end_time"].get<double>();
+}
+
+void Simulation::InitializeOutputs(void) {
+  const std::string& screen_name =
+      parser_m["Simulation/output_screen"].get<std::string>();
+  if (screen_name == "cout") {
+    output_m.output_screen = stdout;
+  } else if (screen_name == "off") {
+    output_m.output_screen = fopen("/dev/null", "w");
+  } else {
+    output_m.output_screen = fopen(screen_name.c_str(), "w");
+  }
+
   output_m.visualization_steps = parser_m["Simulation/viz_steps"].get<int>();
+}
 
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting simulation at time {}", time);
-  SPDLOG_LOGGER_INFO(MAIN_LOG,
-                     "Performing simulation to time {} with time steps of {}",
-                     goals_m.end_time, step_info_m.dt);
-
-  // Initial writing of data
+void Simulation::WriteInitialConditions(void) {
   file_io_m.BeginWriteStep(step_info_m.iteration, step_info_m.time,
                            step_info_m.dt);
   mesh_m.WriteMesh();
@@ -208,70 +316,20 @@ void Simulation::Initialize(int argc, char** argv) {
   file_io_m.WriteXMLSchema();
 }
 
-void Simulation::RunToEnd(void) {
-  bool last_step = false;
-  while (!last_step) {
-    SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting time-iteration {} for time {:8.6E}",
-                       step_info_m.iteration, step_info_m.time);
-    // if (this->PreciceActive()) {
-    //   precice_m->ReadBlockScalarData("Temperature", temperature_bc);
-    // }
-
-    double dt_adj = heat_solver_m.AdjustTimeStep(step_info_m.dt);
-    dt_adj = std::min(restrictions_m.max_dt, dt_adj);
-
-    if (step_info_m.time + dt_adj > goals_m.end_time) {
-      dt_adj = goals_m.end_time - step_info_m.time;
-    }
-    if (std::fabs(step_info_m.time + dt_adj - goals_m.end_time) < 1.0e-14) {
-      last_step = true;
-      SPDLOG_LOGGER_INFO(MAIN_LOG, "Begun last step.");
-    }
-
-    step_info_m.dt = heat_solver_m.Advance(step_info_m.time, dt_adj);
-    step_info_m.time += step_info_m.dt;
-    ++step_info_m.iteration;
-
-    restrictions_m.max_dt = this->PreciceActive()
-                                ? precice_m->Advance(step_info_m.dt)
-                                : restrictions_m.max_dt;
-
-    if (step_info_m.iteration % output_m.visualization_steps == 0 ||
-        last_step) {
-      if (mpi_session_m.IAmRoot()) {
-        std::cout << "step " << step_info_m.iteration
-                  << ", t = " << step_info_m.time << std::endl;
-      }
-
-      file_io_m.BeginWriteStep(step_info_m.iteration, step_info_m.time,
-                               step_info_m.dt);
-      heat_solver_m.WriteFields(step_info_m.iteration, step_info_m.time);
-      file_io_m.EndWriteStep();
-    }
-
-    if (this->PreciceActive() && !precice_m->IsCouplingOngoing()) {
-      SPDLOG_LOGGER_INFO(MAIN_LOG,
-                         "Precice coupling done at iteration {} and time {}",
-                         step_info_m.iteration, step_info_m.time);
-      break;
-    }
-  }
-
-  SPDLOG_LOGGER_INFO(MAIN_LOG,
-                     "Final simulation time of {:8.6E} reached. Finalizing "
-                     "simulation and cleaning up.",
-                     time);
-
-  if (this->PreciceActive()) {
-    precice_m->Finalize();
-  }
+void Simulation::WriteIterationConditions(const IterationInfo& a_iter) {
+  file_io_m.BeginWriteStep(a_iter.iteration, a_iter.time, a_iter.dt);
+  heat_solver_m.WriteFields(step_info_m.iteration, step_info_m.time);
+  file_io_m.EndWriteStep();
 }
 
-bool Simulation::PreciceActive(void) const { return precice_m != nullptr; }
+void Simulation::WriteProgressHeaderToScreen(void) {
+  fprintf(output_m.output_screen, "%-15s %-17s %-17s\n", "Iteration",
+          "Time [s]", "dt [s]");
+}
 
-Simulation::~Simulation(void) {
-  delete precice_m;
-  precice_m = nullptr;
+void Simulation::WriteProgressToScreen(void) {
+  fprintf(output_m.output_screen, "%-15d %-17.6E %-17.6E\n",
+          step_info_m.iteration, step_info_m.time, step_info_m.dt);
 }
 
 }  // namespace chyps

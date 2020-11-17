@@ -11,6 +11,10 @@
 #ifndef CHYPS_SIMULATION_HPP_
 #define CHYPS_SIMULATION_HPP_
 
+#include <stdio.h>
+#include <fstream>
+#include <iostream>
+
 #include "chyps/heat_solver.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/io.hpp"
@@ -38,6 +42,9 @@ struct SimulationRestrictions {
 };
 
 struct SimulationOutput {
+  SimulationOutput(void) : output_screen(nullptr), visualization_steps(-1) {}
+
+  FILE* output_screen;
   int visualization_steps;
 };
 
@@ -60,6 +67,19 @@ class Simulation {
   ~Simulation(void);
 
  private:
+  void GatherOptions(void);
+  void ParseOptions(int argc, char** argv);
+  void SetupFileIO(void);
+  void ActivatePrecice(void);
+  void InitializeStepInfo(void);
+  void InitializeRestrictions(void);
+  void InitializeGoals(void);
+  void InitializeOutputs(void);
+  void WriteInitialConditions(void);
+  void WriteIterationConditions(const IterationInfo& a_iter);
+  void WriteProgressHeaderToScreen(void);
+  void WriteProgressToScreen(void);
+
   MPIParallel& mpi_session_m;
   InputParser parser_m;
   IO file_io_m;
