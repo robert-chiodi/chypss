@@ -309,7 +309,7 @@ void Simulation::InitializeOutputs(void) {
   if (screen_name == "cout") {
     output_m.output_screen = stdout;
   } else if (screen_name == "off") {
-    output_m.output_screen = fopen("/dev/null", "w");
+    output_m.output_screen = nullptr;
   } else {
     output_m.output_screen = fopen(screen_name.c_str(), "w");
   }
@@ -333,13 +333,12 @@ void Simulation::WriteIterationConditions(const IterationInfo& a_iter) {
 }
 
 void Simulation::WriteProgressHeaderToScreen(void) {
-  fprintf(output_m.output_screen, "%-15s %-17s %-17s\n", "Iteration",
-          "Time [s]", "dt [s]");
+  output_m.printf("%-15s %-17s %-17s\n", "Iteration", "Time [s]", "dt [s]");
 }
 
 void Simulation::WriteProgressToScreen(void) {
-  fprintf(output_m.output_screen, "%-15lld %-17.6E %-17.6E\n",
-          step_info_m.iteration, step_info_m.time, step_info_m.dt);
+  output_m.printf("%-15lld %-17.6E %-17.6E\n", step_info_m.iteration,
+                  step_info_m.time, step_info_m.dt);
 }
 
 }  // namespace chyps

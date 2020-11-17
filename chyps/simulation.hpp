@@ -11,6 +11,7 @@
 #ifndef CHYPS_SIMULATION_HPP_
 #define CHYPS_SIMULATION_HPP_
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
@@ -44,6 +45,15 @@ struct SimulationRestrictions {
 
 struct SimulationOutput {
   SimulationOutput(void) : output_screen(nullptr), visualization_steps(-1) {}
+
+  void printf(const char* format, ...) {
+    if (output_screen != nullptr) {
+      va_list arglist;
+      va_start(arglist, format);
+      vfprintf(output_screen, format, arglist);
+      va_end(arglist);
+    }
+  }
 
   FILE* output_screen;
   int visualization_steps;
