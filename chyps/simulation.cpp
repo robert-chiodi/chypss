@@ -17,16 +17,8 @@
 #include <iostream>
 #include <utility>
 
-#include <mpi.h>
-
-#include "chyps/boundary_condition.hpp"
-#include "chyps/boundary_condition_manager.hpp"
 #include "chyps/debug_assert.hpp"
 #include "chyps/git.hpp"
-#include "chyps/logger.hpp"
-#include "chyps/monitor_file.hpp"
-#include "chyps/monitor_manager.hpp"
-#include "chyps/precice_adapter.hpp"
 
 namespace chyps {
 
