@@ -83,11 +83,16 @@ int ConvergenceRunner(const std::string& a_input_name,
                  global_assert{}, DebugLevel::CHEAP{});
     std::vector<uint32_t> nvert(1);
     run_file.GetImmediateBlock("NumOfVertices", {0}, {1}, nvert.data());
+    int send_temp = static_cast<int>(nvert[0]);
+    int recv_temp = 0;
+    MPI_Allreduce(&send_temp, &recv_temp, 1, MPI_INT, MPI_SUM,
+                  mpi_session->GetComm());
+    nvert[0] = static_cast<uint32_t>(recv_temp);
     DEBUG_ASSERT(nvert[0] == point_field.size() / 2, global_assert{},
                  DebugLevel::CHEAP{});
 
     std::vector<double> correct_solution(temperature_field.size());
-    for (std::size_t n = 0; n < nvert[0]; ++n) {
+    for (std::size_t n = 0; n < send_temp; ++n) {
       const double* position_2d = &(point_field[2 * n]);
       correct_solution[n] =
           a_analytical_solution_lambda(position_2d, final_time);
@@ -139,7 +144,7 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientTop) {
   std::string file_name =
       "tests/verification/data/"
       "homogeneous_constant_coefficient_linear_heat_hn_top.json";
-  static constexpr int number_of_refinements = 5;
+  static constexpr int number_of_refinements = 4;
 
   std::ifstream myfile(file_name.c_str());
   nlohmann::json input_file =
@@ -206,7 +211,7 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientBot) {
   std::string file_name =
       "tests/verification/data/"
       "homogeneous_constant_coefficient_linear_heat_hn_bot.json";
-  static constexpr int number_of_refinements = 5;
+  static constexpr int number_of_refinements = 4;
 
   std::ifstream myfile(file_name.c_str());
   nlohmann::json input_file =
@@ -273,7 +278,7 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientRight) {
   std::string file_name =
       "tests/verification/data/"
       "homogeneous_constant_coefficient_linear_heat_hn_right.json";
-  static constexpr int number_of_refinements = 5;
+  static constexpr int number_of_refinements = 4;
 
   std::ifstream myfile(file_name.c_str());
   nlohmann::json input_file =
@@ -341,7 +346,7 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientLeft) {
   std::string file_name =
       "tests/verification/data/"
       "homogeneous_constant_coefficient_linear_heat_hn_left.json";
-  static constexpr int number_of_refinements = 5;
+  static constexpr int number_of_refinements = 4;
 
   std::ifstream myfile(file_name.c_str());
   nlohmann::json input_file =
@@ -409,7 +414,7 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficient) {
   std::string file_name =
       "tests/verification/data/"
       "homogeneous_tensor_coefficient.json";
-  static constexpr int number_of_refinements = 5;
+  static constexpr int number_of_refinements = 4;
 
   std::ifstream myfile(file_name.c_str());
   nlohmann::json input_file =
@@ -472,7 +477,7 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficientRot45) {
   std::string file_name =
       "tests/verification/data/"
       "homogeneous_tensor_coefficient_rotated.json";
-  static constexpr int number_of_refinements = 5;
+  static constexpr int number_of_refinements = 4;
 
   std::ifstream myfile(file_name.c_str());
   nlohmann::json input_file =
@@ -535,7 +540,7 @@ TEST(LinearHeatEquation, CooledRod) {
   std::string file_name =
       "tests/verification/data/"
       "neumann_cooled_rod.json";
-  static constexpr int number_of_refinements = 3;
+  static constexpr int number_of_refinements = 2;
 
   std::ifstream myfile(file_name.c_str());
   nlohmann::json input_file =
