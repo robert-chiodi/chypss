@@ -353,12 +353,12 @@ TEST(IO, PutGetMesh) {
   IO file_in(*mpi_session, "ReadName");
   Mesh mesh(*mpi_session, parser, file_in);
 
-  parser.DirectSet("mesh_file", std::string("generate"));
-  parser.DirectSet("gen_nx", 10);
-  parser.DirectSet("gen_ny", 10);
-  parser.DirectSet("gen_nz", 10);
-  parser.DirectSet("serial_refine", 0);
-  parser.DirectSet("parallel_refine", 0);
+  parser.DirectSet("Mesh/mesh_file", std::string("generate"));
+  parser.DirectSet("Mesh/gen_nx", 10);
+  parser.DirectSet("Mesh/gen_ny", 10);
+  parser.DirectSet("Mesh/gen_nz", 10);
+  parser.DirectSet("Mesh/serial_refine", 0);
+  parser.DirectSet("Mesh/parallel_refine", 0);
 
   mesh.Initialize();
 
