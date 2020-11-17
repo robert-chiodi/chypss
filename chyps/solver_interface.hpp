@@ -36,7 +36,7 @@ class SolverInterface {
   /// variables that will be used by the solver. It will be called
   /// separately from advancement of the solution, and will only
   /// be called once.
-  virtual void Initialize(Mesh& a_mesh) = 0;
+  virtual void Initialize(void) = 0;
 
   /// \brief Return the a timestep <= a_proposed_dt that
   /// meets any requirements of the solver (e.g., for stability).

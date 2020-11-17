@@ -20,7 +20,7 @@
 namespace chyps {
 
 Mesh::Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser,
-           IO* a_file_io)
+           IO& a_file_io)
     : parser_m(a_parser),
       mpi_session_m(a_mpi_session),
       file_io_m(a_file_io),
@@ -141,10 +141,10 @@ Mesh::~Mesh(void) {
 void Mesh::GatherOptions(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Adding options to look for in parser");
   parser_m.AddOption("Mesh/mesh_file", "Mesh file to use.",
-                            std::string("../data/star.mesh"));
-  parser_m.AddOption(
-      "Mesh/serial_refine",
-      "Number of times to refine the mesh uniformly in serial.", 2);
+                     std::string("../data/star.mesh"));
+  parser_m.AddOption("Mesh/serial_refine",
+                     "Number of times to refine the mesh uniformly in serial.",
+                     2);
   parser_m.AddOption(
       "Mesh/parallel_refine",
       "Number of times to refine the mesh uniformly in parallel.", 1);
@@ -175,9 +175,9 @@ void Mesh::GatherOptions(void) {
   parser_m.AddOption(
       "Mesh/gen_buz",
       "If using generated mesh, upper z dimension of the cuboid domain", 1.0);
-  parser_m.AddOption(
-      "Mesh/rotation", "Degrees to rotate mesh in xy-plane by (along +z axis).",
-      0.0);
+  parser_m.AddOption("Mesh/rotation",
+                     "Degrees to rotate mesh in xy-plane by (along +z axis).",
+                     0.0);
   parser_m.AddOption(
       "Mesh/periodicity",
       "If using generated mesh (currently only 2D quad mesh), marks the "
@@ -605,7 +605,7 @@ std::pair<mfem::Mesh*, double*> Mesh::GenerateHexMesh(
 }
 
 bool Mesh::FileWritingEnabled(void) const {
-  return file_io_m != nullptr && file_io_m->IsWriteModeActive();
+  return file_io_m.IsWriteModeActive();
 }
 
 // Write now we will handle IO with independent (rank local) writes.
@@ -616,28 +616,28 @@ void Mesh::AddIOVariables(void) {
   if (!this->FileWritingEnabled()) {
     return;
   }
-  file_io_m->WriteAttribute("format", std::string("MFEM ADIOS2 BP v0.2"));
-  file_io_m->WriteAttribute("format/version", std::string("0.2"));
-  file_io_m->WriteAttribute("format/mfem_mesh", std::string("MFEM mesh v1.0"));
+  file_io_m.WriteAttribute("format", std::string("MFEM ADIOS2 BP v0.2"));
+  file_io_m.WriteAttribute("format/version", std::string("0.2"));
+  file_io_m.WriteAttribute("format/mfem_mesh", std::string("MFEM mesh v1.0"));
   std::vector<std::string> export_types{"Paraview: ADIOS2VTXReader",
                                         "VTK: vtkADIOS2VTXReader.h"};
-  file_io_m->WriteAttribute("format/viz_tools", export_types);
+  file_io_m.WriteAttribute("format/viz_tools", export_types);
 
-  file_io_m->RootAddVariable<uint32_t>("dimension");
-  file_io_m->AddVariable<uint32_t>("NumOfElements");
-  file_io_m->AddVariable<uint32_t>("NumOfVertices");
-  file_io_m->RootAddVariable<uint32_t>("types");
+  file_io_m.RootAddVariable<uint32_t>("dimension");
+  file_io_m.AddVariable<uint32_t>("NumOfElements");
+  file_io_m.AddVariable<uint32_t>("NumOfVertices");
+  file_io_m.RootAddVariable<uint32_t>("types");
   // Need to compute and include sizes for these.
   // Assumes same element type across all of mesh.
   std::size_t element_nvertices =
       static_cast<std::size_t>(parallel_mesh_m->GetElement(0)->GetNVertices());
-  file_io_m->AddVariable<uint64_t>(
+  file_io_m.AddVariable<uint64_t>(
       "connectivity",
       {this->GetLocalCount<MeshElement::ELEMENT>(), 1 + element_nvertices},
       true);
-  file_io_m->AddVariable<int32_t>(
+  file_io_m.AddVariable<int32_t>(
       "attribute", {this->GetLocalCount<MeshElement::ELEMENT>()}, true);
-  file_io_m->MarkAsElementVariable("attribute");
+  file_io_m.MarkAsElementVariable("attribute");
 
   // Will handle vertices in WriteMesh function.
 }
@@ -646,13 +646,13 @@ void Mesh::WriteMesh(void) {
   if (!this->FileWritingEnabled()) {
     return;
   }
-  DEBUG_ASSERT(file_io_m->IsWriteModeActive(), global_assert{},
+  DEBUG_ASSERT(file_io_m.IsWriteModeActive(), global_assert{},
                DebugLevel::CHEAP{},
                "IO must be in write mode for writing to fields.");
-  DEBUG_ASSERT(file_io_m->OngoingWriteStep(), global_assert{},
+  DEBUG_ASSERT(file_io_m.OngoingWriteStep(), global_assert{},
                DebugLevel::CHEAP{},
                "An ongoing IO step is required for writing.");
-  auto min_max_order = file_io_m->MinMaxVariableOrder();
+  auto min_max_order = file_io_m.MinMaxVariableOrder();
   // Handle only constant order mesh/simulation for now
   DEBUG_ASSERT(
       min_max_order[0] == min_max_order[1], global_assert{},
@@ -671,7 +671,7 @@ void Mesh::WriteMesh(void) {
   const auto ndofs = static_cast<std::size_t>(fes.GetNDofs());
   const auto dim = static_cast<std::size_t>(this->GetDimension());
   // True here will be invalid for AMR and H/P refinement.
-  file_io_m->AddVariable<double>("vertices", {ndofs, dim}, true);
+  file_io_m.AddVariable<double>("vertices", {ndofs, dim}, true);
   //*****************
 
   uint32_t dimension = static_cast<uint32_t>(this->GetDimension());
@@ -681,12 +681,12 @@ void Mesh::WriteMesh(void) {
   // static_cast<uint32_t>(this->GetLocalCount<MeshElement::VERTEX>());
   uint32_t vtk_type = static_cast<uint32_t>(this->GLVISToVTKType(
       static_cast<int>(parallel_mesh_m->GetElement(0)->GetGeometryType())));
-  file_io_m->RootPutDeferred("dimension", &dimension);
-  file_io_m->PutDeferred("NumOfElements", &number_of_elements);
-  file_io_m->PutDeferred("NumOfVertices", &number_of_vertices);
-  file_io_m->RootPutDeferred("types", &vtk_type);
-  auto connectivity_span = file_io_m->PutSpan<uint64_t>("connectivity");
-  auto attribute_span = file_io_m->PutSpan<int32_t>("attribute");
+  file_io_m.RootPutDeferred("dimension", &dimension);
+  file_io_m.PutDeferred("NumOfElements", &number_of_elements);
+  file_io_m.PutDeferred("NumOfVertices", &number_of_vertices);
+  file_io_m.RootPutDeferred("types", &vtk_type);
+  auto connectivity_span = file_io_m.PutSpan<uint64_t>("connectivity");
+  auto attribute_span = file_io_m.PutSpan<int32_t>("attribute");
 
   std::size_t span_position = 0;
   for (uint32_t n = 0; n < number_of_elements; ++n) {
@@ -706,8 +706,8 @@ void Mesh::WriteMesh(void) {
                global_assert{}, DebugLevel::CHEAP{},
                "Span given wrong size or not completely filled.");
 
-  file_io_m->PutDeferred("vertices", nodes.GetData());
-  file_io_m->PerformPuts();
+  file_io_m.PutDeferred("vertices", nodes.GetData());
+  file_io_m.PerformPuts();
 }
 
 // Note: Taken from adios2stream.cpp in MFEM, added

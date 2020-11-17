@@ -18,8 +18,6 @@
 
 #include <mpi.h>
 
-#include "chyps/boundary_condition.hpp"
-#include "chyps/boundary_condition_manager.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/mpi_parallel.hpp"
 
@@ -35,7 +33,7 @@ class Mesh {
   Mesh(void) = delete;
 
   /// \brief Initialize Mesh for parallel use and collect options in a_parser.
-  Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser, IO* a_file_io);
+  Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser, IO& a_file_io);
 
   /// \brief Construct mesh for use by flow solvers.
   void Initialize(void);
@@ -122,7 +120,7 @@ class Mesh {
 
   InputParser& parser_m;
   const MPIParallel& mpi_session_m;
-  IO* file_io_m;
+  IO& file_io_m;
   mfem::ParMesh* parallel_mesh_m;
   std::size_t element_offset_m;
 };

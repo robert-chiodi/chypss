@@ -24,6 +24,7 @@
 #include "chyps/precice_adapter.hpp"
 
 namespace chyps {
+
 int main(int argc, char** argv, MPIParallel& mpi_session,
          const SpdlogLevel a_log_level = SpdlogLevel::INFO);
 
@@ -64,6 +65,12 @@ class Simulation {
 
   bool PreciceActive(void) const;
 
+  Mesh& GetMesh(void);
+  const Mesh& GetMesh(void) const;
+  IO& GetIO(void);
+  const IO& GetIO(void) const;
+  const MPIParallel& GetMPI(void) const;
+
   ~Simulation(void);
 
  private:
@@ -91,6 +98,7 @@ class Simulation {
   SimulationGoals goals_m;
   SimulationOutput output_m;
 };
+
 }  // namespace chyps
 
 #endif  // CHYPS_SIMULATION_HPP_

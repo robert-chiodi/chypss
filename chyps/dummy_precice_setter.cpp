@@ -16,6 +16,7 @@
 
 #include "chyps/boundary_condition_manager.hpp"
 #include "chyps/input_parser.hpp"
+#include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/mesh.hpp"
 #include "chyps/mpi_parallel.hpp"
@@ -31,7 +32,8 @@ int main(int argc, char** argv, MPIParallel& a_mpi_session) {
   // Related to mesh generation and use with chyps_heat executable.
   // Should be given same command line options as chyps_heat to
   // behave correctly.
-  Mesh mesh(a_mpi_session, input_parser, nullptr);
+  IO file_io(a_mpi_session, "preCICE_IO");
+  Mesh mesh(a_mpi_session, input_parser, file_io);
 
   input_parser.AddOption(
       "bc_tag",

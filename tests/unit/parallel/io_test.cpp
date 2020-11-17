@@ -350,7 +350,8 @@ TEST(IO, ImmediatePutGet) {
 
 TEST(IO, PutGetMesh) {
   InputParser parser;
-  Mesh mesh(*mpi_session, parser, nullptr);
+  IO file_in(*mpi_session, "ReadName");
+  Mesh mesh(*mpi_session, parser, file_in);
 
   parser.DirectSet("mesh_file", std::string("generate"));
   parser.DirectSet("gen_nx", 10);
@@ -372,7 +373,6 @@ TEST(IO, PutGetMesh) {
   file_io.EndWriteStep();
   file_io.CloseWriteEngine();
 
-  IO file_in(*mpi_session, "ReadName");
   file_in.SetRead(write_file_name);
   std::vector<int> read_data(mesh.GetLocalCount<MeshElement::ELEMENT>());
   file_in.BeginReadStep();

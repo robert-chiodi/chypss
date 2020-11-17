@@ -14,13 +14,13 @@
 
 #include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
+#include "chyps/simulation.hpp"
 
 namespace chyps {
 
-HeatSolver::HeatSolver(InputParser& a_parser, IO* a_file_io)
+HeatSolver::HeatSolver(InputParser& a_parser, Simulation& a_simulation)
     : parser_m(a_parser),
-      file_io_m(a_file_io),
-      mesh_m(nullptr),
+      sim_m(a_simulation),
       boundary_conditions_m(),
       ode_solver_m(nullptr),
       element_collection_m(nullptr),
@@ -43,11 +43,10 @@ void HeatSolver::CreateBoundaryConditionManagers(void) {
                                "HeatSolver/BoundaryConditions/temperature")));
 }
 
-void HeatSolver::Initialize(Mesh& a_mesh) {
+void HeatSolver::Initialize(void) {
   // Construct mesh, allocate and construct operators, and perform all setup for
   // time advancement
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Initializing HeatSolver class.");
-  mesh_m = &a_mesh;
   this->InitializeBoundaryConditions();
   this->AllocateVariablesAndOperators();
   this->SetODESolver();
@@ -82,16 +81,16 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
   }
 
   if (this->FileWritingEnabled()) {
-    DEBUG_ASSERT(file_io_m->IsWriteModeActive(), global_assert{},
+    DEBUG_ASSERT(sim_m.GetIO().IsWriteModeActive(), global_assert{},
                  DebugLevel::CHEAP{},
                  "IO must be in write mode for writing to fields.");
-    DEBUG_ASSERT(file_io_m->OngoingWriteStep(), global_assert{},
+    DEBUG_ASSERT(sim_m.GetIO().OngoingWriteStep(), global_assert{},
                  DebugLevel::CHEAP{},
                  "An ongoing IO step is required for writing.");
     mfem::ParGridFunction temperature_gf(element_space_m);
     temperature_gf.SetFromTrueDofs(temperature_m);
-    file_io_m->PutDeferred("HeatSolver/temperature", temperature_gf);
-    file_io_m->PerformPuts();
+    sim_m.GetIO().PutDeferred("HeatSolver/temperature", temperature_gf);
+    sim_m.GetIO().PerformPuts();
   }
 }
 
@@ -192,18 +191,18 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating H1 collection with {} order elements",
                      parser_m["HeatSolver/order"].get<int>());
   element_collection_m = new mfem::H1_FECollection(
-      parser_m["HeatSolver/order"].get<int>(), mesh_m->GetDimension());
+      parser_m["HeatSolver/order"].get<int>(), sim_m.GetMesh().GetDimension());
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Generating element space from H1 collection");
-  element_space_m = new mfem::ParFiniteElementSpace(&(mesh_m->GetMfemMesh()),
-                                                    element_collection_m);
+  element_space_m = new mfem::ParFiniteElementSpace(
+      &sim_m.GetMesh().GetMfemMesh(), element_collection_m);
 
   coarse_element_collection_m =
-      new mfem::H1_FECollection(1, mesh_m->GetDimension());
+      new mfem::H1_FECollection(1, sim_m.GetMesh().GetDimension());
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Generating element space from H1 collection");
   coarse_element_space_m = new mfem::ParFiniteElementSpace(
-      &(mesh_m->GetMfemMesh()), coarse_element_collection_m);
+      &sim_m.GetMesh().GetMfemMesh(), coarse_element_collection_m);
 
   // Allocates temperature and sets initial values.
   this->SetInitialConditions();
@@ -211,7 +210,7 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   const std::vector<double> tensor_kappa =
       parser_m["HeatSolver/kappa"].get<std::vector<double>>();
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating new conduction operator with kappa.");
-  operator_m = new ConductionOperator(*mesh_m, boundary_conditions_m,
+  operator_m = new ConductionOperator(sim_m.GetMesh(), boundary_conditions_m,
                                       *coarse_element_space_m, *element_space_m,
                                       temperature_m, tensor_kappa);
 }
@@ -220,15 +219,15 @@ void HeatSolver::RegisterFieldsForIO(void) {
   if (parser_m["Simulation/use_visit"].get<bool>()) {
     SPDLOG_LOGGER_INFO(MAIN_LOG, "Registering fields for export via VisIt");
     visit_collection_m = new MfemVisItCollection(
-        mesh_m->GetMPIComm(), "HeatSolver", mesh_m->GetMfemMesh());
+        sim_m.GetMPI().GetComm(), "HeatSolver", sim_m.GetMesh().GetMfemMesh());
     visit_collection_m->RegisterField("temperature", element_space_m);
     SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
   }
 
   // Below is ADIOS2 io calls. Will replace VisIt once working.
   if (this->FileWritingEnabled()) {
-    file_io_m->AddVariableForGridFunction("HeatSolver/temperature",
-                                          *element_space_m, true);
+    sim_m.GetIO().AddVariableForGridFunction("HeatSolver/temperature",
+                                             *element_space_m, true);
   }
 }
 
@@ -237,7 +236,7 @@ void HeatSolver::SetInitialConditions(void) {
   DEBUG_ASSERT(this->RestartFileActive(), global_assert{}, DebugLevel::CHEAP{},
                "Cannot read from restart file.");
   temperature_grid_function = 0.0;
-  file_io_m->GetImmediateBlock(
+  sim_m.GetIO().GetImmediateBlock(
       "HeatSolver/temperature", {0},
       {static_cast<std::size_t>(temperature_grid_function.Size())},
       temperature_grid_function.GetData());
@@ -267,16 +266,16 @@ HeatSolver::~HeatSolver(void) {
 
 void HeatSolver::InitializeBoundaryConditions(void) {
   for (auto& manager : boundary_conditions_m) {
-    manager.second.Initialize(*mesh_m);
+    manager.second.Initialize(sim_m.GetMesh());
   }
 }
 
 bool HeatSolver::FileWritingEnabled(void) const {
-  return file_io_m != nullptr && file_io_m->IsWriteModeActive();
+  return sim_m.GetIO().IsWriteModeActive();
 }
 
 bool HeatSolver::RestartFileActive(void) const {
-  return file_io_m != nullptr && file_io_m->IsReadModeActive();
+  return sim_m.GetIO().IsReadModeActive();
 }
 
 }  // namespace chyps

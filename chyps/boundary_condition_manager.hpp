@@ -15,11 +15,9 @@
 
 #include "chyps/boundary_condition.hpp"
 #include "chyps/input_parser.hpp"
+#include "chyps/mesh.hpp"
 
 namespace chyps {
-
-// Forward declare Mesh to prevent cyclical reference
-class Mesh;
 
 class BoundaryConditionManager {
  public:

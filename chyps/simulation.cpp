@@ -33,8 +33,8 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
     : mpi_session_m(a_mpi_session),
       parser_m(),
       file_io_m(mpi_session_m, "FILEIO"),
-      mesh_m(mpi_session_m, parser_m, &file_io_m),
-      heat_solver_m(parser_m, &file_io_m),
+      mesh_m(mpi_session_m, parser_m, file_io_m),
+      heat_solver_m(parser_m, *this),
       precice_m(nullptr),
       step_info_m(0.0, 0.0, 0.0),
       restrictions_m(),
@@ -51,8 +51,9 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
 void Simulation::Initialize(int argc, char** argv) {
   this->ParseOptions(argc, argv);
   this->SetupFileIO();
+  // Note, order is important here. Mesh must be initialized first.
   mesh_m.Initialize();
-  heat_solver_m.Initialize(mesh_m);
+  heat_solver_m.Initialize();
   this->ActivatePrecice();
   this->InitializeStepInfo();
   this->InitializeRestrictions();
@@ -123,6 +124,15 @@ void Simulation::RunToEnd(void) {
 }
 
 bool Simulation::PreciceActive(void) const { return precice_m != nullptr; }
+
+Mesh& Simulation::GetMesh(void) { return mesh_m; }
+
+const Mesh& Simulation::GetMesh(void) const { return mesh_m; }
+
+IO& Simulation::GetIO(void) { return file_io_m; }
+const IO& Simulation::GetIO(void) const { return file_io_m; }
+
+const MPIParallel& Simulation::GetMPI(void) const { return mpi_session_m; }
 
 Simulation::~Simulation(void) {
   delete precice_m;
@@ -218,7 +228,7 @@ void Simulation::SetupFileIO(void) {
 }
 
 void Simulation::ActivatePrecice(void) {
-  PreciceAdapter* precice_m =
+  precice_m =
       parser_m["Simulation/use_precice"].get<bool>()
           ? new PreciceAdapter(
                 "HeatSolver", "HeatSolverMesh",
@@ -328,7 +338,7 @@ void Simulation::WriteProgressHeaderToScreen(void) {
 }
 
 void Simulation::WriteProgressToScreen(void) {
-  fprintf(output_m.output_screen, "%-15d %-17.6E %-17.6E\n",
+  fprintf(output_m.output_screen, "%-15lld %-17.6E %-17.6E\n",
           step_info_m.iteration, step_info_m.time, step_info_m.dt);
 }
 

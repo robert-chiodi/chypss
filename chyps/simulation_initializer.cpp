@@ -44,7 +44,7 @@ RequiredData::RequiredData(const MPIParallel& a_mpi_session,
                            InputParser& a_parser, IO& a_file_io)
     : parser_m(a_parser),
       file_io_m(a_file_io),
-      mesh_m(a_mpi_session, parser_m, &file_io_m),
+      mesh_m(a_mpi_session, parser_m, file_io_m),
       finite_element_collection_m(nullptr),
       finite_element_space_m(nullptr) {}
 

@@ -28,6 +28,9 @@
 
 namespace chyps {
 
+// Forward declaration
+class Simulation;
+
 /// \class HeatSolver heat_solver.hpp chyps/heat_solver.hpp
 /// \brief Executes and controls solution of the heat equation.
 ///
@@ -39,11 +42,11 @@ class HeatSolver : public SolverInterface {
 
   /// \brief Initialize HeatSolver and collect all options passed to
   /// parser.
-  HeatSolver(InputParser& a_parser, IO* a_file_io);
+  HeatSolver(InputParser& a_parser, Simulation& a_simulation);
 
   /// \brief Initialize solver, including the construction of operators and MFEM
   /// objects.
-  virtual void Initialize(Mesh& a_mesh) override final;
+  virtual void Initialize(void) override final;
 
   /// \brief Compute time step the solver would like to take. Will be either
   /// a_proposed_dt or smaller.
@@ -89,8 +92,7 @@ class HeatSolver : public SolverInterface {
   bool RestartFileActive(void) const;
 
   InputParser& parser_m;
-  IO* file_io_m;
-  Mesh* mesh_m;
+  Simulation& sim_m;
   std::unordered_map<std::string, BoundaryConditionManager>
       boundary_conditions_m;
   mfem::ODESolver* ode_solver_m;
