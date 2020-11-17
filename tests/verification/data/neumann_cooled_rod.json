@@ -30,7 +30,8 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 		    "time_step": 0.001,
 		    "use_adios2": false,
 		    "use_visit": false,
-		    "viz_steps": 100000
+		    "viz_steps": 100000,
+                    "output_screen": "off"
 		 },
     "HeatSolver":{
 		    "kappa": [1.0, 0.0, 0.0, 1.0],
@@ -62,7 +63,7 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 	    "gen_bux": 1.0,
 	    "gen_buy": 0.01,
 	    "gen_buz": 1.0,
-	    "gen_nx": 8,
+	    "gen_nx": 16,
 	    "gen_ny": 1,
 	    "gen_nz": -1,
 	    "mesh_file": "generate",

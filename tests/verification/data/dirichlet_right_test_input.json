@@ -12,7 +12,8 @@
 		    "end_time": 0.01,
 		    "time_step": 0.001,
 		    "use_visit": false,
-		    "viz_steps": 10000000
+		    "viz_steps": 10000000,
+                    "output_screen": "off"
 		 },
     "HeatSolver":{
 		    "kappa": [1.0, 0.0, 0.0, 1.0],
