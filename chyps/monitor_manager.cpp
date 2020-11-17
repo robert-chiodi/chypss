@@ -53,14 +53,12 @@ MonitorFile* MonitorManager::CreateMonitorFile(
                                               a_header, std::move(a_format))});
   DEBUG_ASSERT(insert_location.second, global_assert{}, DebugLevel::CHEAP{},
                "Monitor file with name \"" + a_name + "\" already added.");
-  std::cout << "Going to return " << std::endl;
   return &(insert_location.first->second);
 }
 
 void MonitorManager::WriteStepToDisk(const int a_iter, const double a_time,
                                      const double a_dt) {
   for (auto& elem : file_list_m) {
-    std::cout << elem.first << " " << &elem.second << std::endl;
     elem.second.WriteLineToDisk(a_iter, a_time, a_dt);
     elem.second.ClearLine();
   }

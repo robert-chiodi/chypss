@@ -41,9 +41,7 @@ MonitorFile::MonitorFile(const std::string& a_name,
   DEBUG_ASSERT(
       a_header.size() == format_m.size(), global_assert{}, DebugLevel::CHEAP{},
       "Supplied header vector and format vector are of different length.");
-  std::cout << "Going to initialize " << std::endl;
   this->InitializeMonitorFile(a_name, a_header);
-  std::cout << "Initialized " << std::endl;
 }
 
 MonitorFile::MonitorFile(MonitorFile&& a_other)
@@ -131,7 +129,6 @@ void MonitorFile::ClearLine(void) { updated_m = false; }
 void MonitorFile::FlushToDisk(void) { fflush(monitor_file_m); }
 
 MonitorFile::~MonitorFile(void) {
-  std::cout << "Should not see " << (monitor_file_m == nullptr) << std::endl;
   fclose(monitor_file_m);
   monitor_file_m = nullptr;
 }
