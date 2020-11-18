@@ -21,10 +21,14 @@
 #include "chyps/mesh.hpp"
 
 namespace chyps {
+
+// Forward declare Simulation
+class Simulation;
+
 class ConductionOperator : public ConductionOperatorBase {
  public:
   ConductionOperator(
-      const InputParser& a_parser, Mesh& a_mesh,
+      const InputParser& a_parser, Simulation& a_sim,
       const std::unordered_map<std::string, BoundaryConditionManager>&
           a_boundary_conditions,
       mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
@@ -52,7 +56,7 @@ class ConductionOperator : public ConductionOperatorBase {
  protected:
   mfem::ParFiniteElementSpace& fespace_linear_m;
 
-  Mesh& mesh_m;
+  Simulation& sim_m;
   const std::unordered_map<std::string, BoundaryConditionManager>&
       boundary_conditions_m;
   mfem::ParBilinearForm* M;

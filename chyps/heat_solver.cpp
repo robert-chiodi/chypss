@@ -207,9 +207,9 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   this->SetInitialConditions();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating new conduction operator.");
-  operator_m = new ConductionOperator(
-      parser_m, sim_m.GetMesh(), boundary_conditions_m, *coarse_element_space_m,
-      *element_space_m, temperature_m);
+  operator_m = new ConductionOperator(parser_m, sim_m, boundary_conditions_m,
+                                      *coarse_element_space_m, *element_space_m,
+                                      temperature_m);
 }
 
 void HeatSolver::RegisterFieldsForIO(void) {

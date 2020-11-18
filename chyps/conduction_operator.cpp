@@ -14,18 +14,19 @@
 
 #include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
+#include "chyps/simulation.hpp"
 
 namespace chyps {
 
 ConductionOperator::ConductionOperator(
-    const InputParser& a_parser, Mesh& a_mesh,
+    const InputParser& a_parser, Simulation& a_sim,
     const std::unordered_map<std::string, BoundaryConditionManager>&
         a_boundary_conditions,
     mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
     mfem::Vector& u)
     : ConductionOperatorBase(f),
       fespace_linear_m(f_linear),
-      mesh_m(a_mesh),
+      sim_m(a_sim),
       boundary_conditions_m(a_boundary_conditions),
       M(nullptr),
       K(nullptr),
@@ -38,8 +39,9 @@ ConductionOperator::ConductionOperator(
       T_prec(nullptr),
       tensor_kappa_m(),
       z(height),  // Note, height inherited from mfem::TimeDependentOperator
-      neumann_coefficient_m(a_mesh.GetNumberOfBoundaryTagValues(), nullptr),
-      boundary_marker_m(a_mesh.GetNumberOfBoundaryTagValues()),
+      neumann_coefficient_m(sim_m.GetMesh().GetNumberOfBoundaryTagValues(),
+                            nullptr),
+      boundary_marker_m(sim_m.GetMesh().GetNumberOfBoundaryTagValues()),
       tensor_thermal_coeff_m(nullptr),
       dt_tensor_thermal_coeff_m(nullptr),
       inhomogeneous_neumann_active_m(false),
@@ -49,12 +51,14 @@ ConductionOperator::ConductionOperator(
   tensor_kappa_m = a_parser["HeatSolver/ConductionOperator/kappa"]
                        .get<std::vector<double>>();
   DEBUG_ASSERT(
-      tensor_kappa_m.size() == static_cast<std::size_t>(mesh_m.GetDimension() *
-                                                        mesh_m.GetDimension()),
+      tensor_kappa_m.size() ==
+          static_cast<std::size_t>(sim_m.GetMesh().GetDimension() *
+                                   sim_m.GetMesh().GetDimension()),
       global_assert{}, DebugLevel::CHEAP{},
       "Thermal coefficient tensor (kappa) of incorrect size. Provide as a "
       "column-major array of size MESH_DIM*MESH_DIM= " +
-          std::to_string(mesh_m.GetDimension() * mesh_m.GetDimension()));
+          std::to_string(sim_m.GetMesh().GetDimension() *
+                         sim_m.GetMesh().GetDimension()));
 
   tensor_basis = mfem::UsesTensorBasis(fespace);
   use_partial_assembly =
@@ -286,8 +290,9 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
 void ConductionOperator::SetParameters(const mfem::Vector& u) {
   // Since thermal coefficient is not time varying (for now)
   if (K == nullptr) {
-    mfem::DenseMatrix full_value(tensor_kappa_m.data(), mesh_m.GetDimension(),
-                                 mesh_m.GetDimension());
+    mfem::DenseMatrix full_value(tensor_kappa_m.data(),
+                                 sim_m.GetMesh().GetDimension(),
+                                 sim_m.GetMesh().GetDimension());
 
     // Make assert that this (full_value) is positive definite
     DEBUG_ASSERT(full_value.Det() > 0.0, global_assert{}, DebugLevel::CHEAP{},
