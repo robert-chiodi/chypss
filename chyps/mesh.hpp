@@ -25,6 +25,7 @@ namespace chyps {
 
 // Forward declare IO to prevent cyclical reference
 class IO;
+class Simulation;
 
 enum class MeshElement { ELEMENT = 0, VERTEX };
 
@@ -34,6 +35,8 @@ class Mesh {
 
   /// \brief Initialize Mesh for parallel use and collect options in a_parser.
   Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser, IO& a_file_io);
+
+  Mesh(InputParser& a_parser, Simulation& a_simulation);
 
   /// \brief Construct mesh for use by flow solvers.
   void Initialize(void);
@@ -80,6 +83,8 @@ class Mesh {
   ~Mesh(void);
 
  private:
+  bool TiedToSimulation(void) const;
+
   void GatherOptions(void);
   void AddIOVariables(void);
   void ReadAndRefineMesh(void);
@@ -119,6 +124,7 @@ class Mesh {
   uint32_t GLVISToVTKType(const int glvisType) const noexcept;
 
   InputParser& parser_m;
+  Simulation* sim_m;
   const MPIParallel& mpi_session_m;
   IO& file_io_m;
   mfem::ParMesh* parallel_mesh_m;

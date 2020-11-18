@@ -16,14 +16,27 @@
 #include "chyps/debug_assert.hpp"
 #include "chyps/io.hpp"
 #include "chyps/logger.hpp"
+#include "chyps/simulation.hpp"
 
 namespace chyps {
 
 Mesh::Mesh(const MPIParallel& a_mpi_session, InputParser& a_parser,
            IO& a_file_io)
     : parser_m(a_parser),
+      sim_m(nullptr),
       mpi_session_m(a_mpi_session),
       file_io_m(a_file_io),
+      parallel_mesh_m(nullptr),
+      element_offset_m(0) {
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing mesh object");
+  this->GatherOptions();
+}
+
+Mesh::Mesh(InputParser& a_parser, Simulation& a_simulation)
+    : parser_m(a_parser),
+      sim_m(&a_simulation),
+      mpi_session_m(sim_m->GetMPI()),
+      file_io_m(sim_m->GetIO()),
       parallel_mesh_m(nullptr),
       element_offset_m(0) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing mesh object");
@@ -137,6 +150,8 @@ Mesh::~Mesh(void) {
   parallel_mesh_m = nullptr;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Mesh successfully destructed.");
 }
+
+bool Mesh::TiedToSimulation(void) const { return sim_m != nullptr; }
 
 void Mesh::GatherOptions(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Adding options to look for in parser");
