@@ -84,27 +84,26 @@ int ConvergenceRunner(const std::string& a_input_name,
     std::vector<uint32_t> nvert(1);
     run_file.GetImmediateBlock("NumOfVertices", {0}, {1}, nvert.data());
     int send_temp = static_cast<int>(nvert[0]);
-    int recv_temp = 0;
-    MPI_Allreduce(&send_temp, &recv_temp, 1, MPI_INT, MPI_SUM,
+    int total_nodes = 0;
+    MPI_Allreduce(&send_temp, &total_nodes, 1, MPI_INT, MPI_SUM,
                   mpi_session->GetComm());
-    nvert[0] = static_cast<uint32_t>(recv_temp);
     DEBUG_ASSERT(nvert[0] == point_field.size() / 2, global_assert{},
                  DebugLevel::CHEAP{});
 
     std::vector<double> correct_solution(temperature_field.size());
-    for (std::size_t n = 0; n < send_temp; ++n) {
+    for (std::size_t n = 0; n < nvert[0]; ++n) {
       const double* position_2d = &(point_field[2 * n]);
       correct_solution[n] =
           a_analytical_solution_lambda(position_2d, final_time);
     }
 
-    const double global_l1 = GlobalL1Diff_Normalized(
-        temperature_field, correct_solution, *mpi_session);
-    const double global_l2 = GlobalL2Diff_Normalized(
-        temperature_field, correct_solution, *mpi_session);
+    const double global_l1 =
+        GlobalL1Diff(temperature_field, correct_solution, *mpi_session);
+    const double global_l2 =
+        GlobalL2Diff(temperature_field, correct_solution, *mpi_session);
     const double global_linf =
         GlobalLinfDiff(temperature_field, correct_solution, *mpi_session);
-    error_metrics[r][0] = static_cast<double>(nvert[0]);
+    error_metrics[r][0] = static_cast<double>(total_nodes);
     error_metrics[r][1] = global_l1;
     error_metrics[r][2] = global_l2;
     error_metrics[r][3] = global_linf;
