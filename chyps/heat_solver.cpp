@@ -104,12 +104,11 @@ void HeatSolver::GatherOptions(void) {
       "ODE solver: 1 - Backward Euler, 2 - SDIRK2, 3 - SDIRK3,\n\t"
       "\t   11 - Forward Euler, 12 - RK2, 13 - RK3 SSP, 14 - RK4.",
       3);
-  parser_m.AddOption(
-      "HeatSolver/kappa",
-      "Array of thermal coefficients representing tensor in column major "
-      "ordering. Should be MESH_DIM*MESH_DIM in size.");
   // TODO Add a flag and way to specify which variables we wish to export to
   // VisIt.
+
+  // Add options for conduction operator.
+  ConductionOperator::GatherOptions(parser_m);
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Add all options to parser.");
 }
@@ -207,12 +206,10 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   // Allocates temperature and sets initial values.
   this->SetInitialConditions();
 
-  const std::vector<double> tensor_kappa =
-      parser_m["HeatSolver/kappa"].get<std::vector<double>>();
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating new conduction operator with kappa.");
-  operator_m = new ConductionOperator(sim_m.GetMesh(), boundary_conditions_m,
-                                      *coarse_element_space_m, *element_space_m,
-                                      temperature_m, tensor_kappa);
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating new conduction operator.");
+  operator_m = new ConductionOperator(
+      parser_m, sim_m.GetMesh(), boundary_conditions_m, *coarse_element_space_m,
+      *element_space_m, temperature_m);
 }
 
 void HeatSolver::RegisterFieldsForIO(void) {

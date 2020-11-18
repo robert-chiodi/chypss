@@ -34,7 +34,9 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
                     "output_screen": "off"
 		 },
     "HeatSolver":{
-		    "kappa": [1.0, 0.0, 0.0, 1.0],
+		    "ConductionOperator":{
+		    "kappa": [1.0, 0.0, 0.0, 1.0]
+	            },
 		    "order": 2,
 		    "time_advancement": 3,
 		    "BoundaryConditions":{

@@ -17,17 +17,18 @@
 
 #include "chyps/boundary_condition_manager.hpp"
 #include "chyps/conduction_operator_base.hpp"
+#include "chyps/input_parser.hpp"
 #include "chyps/mesh.hpp"
 
 namespace chyps {
 class ConductionOperator : public ConductionOperatorBase {
  public:
   ConductionOperator(
-      Mesh& a_mesh,
+      const InputParser& a_parser, Mesh& a_mesh,
       const std::unordered_map<std::string, BoundaryConditionManager>&
           a_boundary_conditions,
       mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-      mfem::Vector& u, const std::vector<double>& a_tensor_kappa);
+      mfem::Vector& u);
 
   virtual void Mult(const mfem::Vector& u,
                     mfem::Vector& du_dt) const override final;
@@ -45,6 +46,8 @@ class ConductionOperator : public ConductionOperatorBase {
   virtual void UpdateBoundaryConditions(mfem::Vector& u) override final;
 
   virtual ~ConductionOperator(void) override final;
+
+  static void GatherOptions(InputParser& a_parser);
 
  protected:
   mfem::ParFiniteElementSpace& fespace_linear_m;

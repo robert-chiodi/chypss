@@ -22,6 +22,7 @@ namespace chyps {
 
 int main(int argc, char** argv, MPIParallel& mpi_session,
          const SpdlogLevel a_log_level) {
+  StartLogger(mpi_session, a_log_level);
   Simulation simulation(mpi_session, a_log_level);
   simulation.Initialize(argc, argv);
   simulation.RunToEnd();
@@ -40,6 +41,8 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
       restrictions_m(),
       goals_m(),
       output_m() {
+  // Log needs to have been started before this so that logging in
+  // constructors above do not segfault.
   StartLogger(mpi_session_m, a_log_level);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Beginning simulation.");
 
@@ -60,7 +63,8 @@ void Simulation::Initialize(int argc, char** argv) {
   this->InitializeGoals();
   this->InitializeOutputs();
 
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting simulation at time {}", time);
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting simulation at time {}",
+                     step_info_m.time);
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Performing simulation to time {} with time steps of {}",
                      goals_m.end_time, step_info_m.dt);
@@ -116,7 +120,7 @@ void Simulation::RunToEnd(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Final simulation time of {:8.6E} reached. Finalizing "
                      "simulation and cleaning up.",
-                     time);
+                     step_info_m.time);
 
   if (this->PreciceActive()) {
     precice_m->Finalize();

@@ -123,13 +123,13 @@ int ConvergenceRunner(const std::string& a_input_name,
       } else {
         const double l1_conv =
             log(error_metrics[r - 1][1] / error_metrics[r][1] /
-                (error_metrics[r - 1][0] / error_metrics[r][0]));
+                (std::sqrt(error_metrics[r - 1][0] / error_metrics[r][0])));
         const double l2_conv =
             log(error_metrics[r - 1][2] / error_metrics[r][2] /
-                (error_metrics[r - 1][0] / error_metrics[r][0]));
+                (std::sqrt(error_metrics[r - 1][0] / error_metrics[r][0])));
         const double linf_conv =
             log(error_metrics[r - 1][3] / error_metrics[r][3] /
-                (error_metrics[r - 1][0] / error_metrics[r][0]));
+                (std::sqrt(error_metrics[r - 1][0] / error_metrics[r][0])));
         printf("%16d %16.8E %16.8f %16.8E %16.8f %16.8E %16.8f\n",
                static_cast<int>(error_metrics[r][0]), error_metrics[r][1],
                l1_conv, error_metrics[r][2], l2_conv, error_metrics[r][3],
@@ -165,7 +165,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientTop) {
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
+          .get<std::vector<double>>();
   const double coefficient = tensor_kappa[0];
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
@@ -232,7 +233,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientBot) {
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
+          .get<std::vector<double>>();
   const double coefficient = tensor_kappa[0];
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
@@ -299,7 +301,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientRight) {
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
+          .get<std::vector<double>>();
   const double coefficient = tensor_kappa[0];
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
@@ -367,7 +370,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientLeft) {
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
+          .get<std::vector<double>>();
   const double coefficient = tensor_kappa[0];
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
@@ -435,7 +439,8 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficient) {
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
+          .get<std::vector<double>>();
   const double coefficient_x = tensor_kappa[0];
   const double coefficient_y = tensor_kappa[3];
 
@@ -498,7 +503,8 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficientRot45) {
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
+          .get<std::vector<double>>();
   const double coefficient_x = 0.5;
   const double coefficient_y = 0.5;
 
@@ -552,7 +558,8 @@ TEST(LinearHeatEquation, CooledRod) {
                DebugLevel::ALWAYS{}, "Test requires domain length of 1.0");
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["kappa"].get<std::vector<double>>();
+      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
+          .get<std::vector<double>>();
   const double coefficient = tensor_kappa[0];
   DEBUG_ASSERT(std::fabs(coefficient - 1.0) < 1.0e-15, global_assert{},
                DebugLevel::ALWAYS{},

@@ -20,7 +20,9 @@
 		 },
     "HeatSolver":{
 		    "alpha": 0.0,
-		    "kappa": [0.5, 0.0, 0.0, 0.5],
+		    "ConductionOperator":{
+		    "kappa": [0.5, 0.0, 0.0, 0.5]
+	            },
 		    "order": 2,
 		    "time_advancement": 3,
 		    "BoundaryConditions":{

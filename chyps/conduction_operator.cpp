@@ -18,25 +18,25 @@
 namespace chyps {
 
 ConductionOperator::ConductionOperator(
-    Mesh& a_mesh,
+    const InputParser& a_parser, Mesh& a_mesh,
     const std::unordered_map<std::string, BoundaryConditionManager>&
         a_boundary_conditions,
     mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-    mfem::Vector& u, const std::vector<double>& a_tensor_kappa)
+    mfem::Vector& u)
     : ConductionOperatorBase(f),
       fespace_linear_m(f_linear),
       mesh_m(a_mesh),
       boundary_conditions_m(a_boundary_conditions),
-      M(NULL),
-      K(NULL),
-      T(NULL),
+      M(nullptr),
+      K(nullptr),
+      T(nullptr),
       neumann_m(nullptr),
       current_dt(0.0),
       M_solver(f.GetComm()),
       M_prec(nullptr),
       T_solver(f.GetComm()),
       T_prec(nullptr),
-      tensor_kappa_m(a_tensor_kappa),
+      tensor_kappa_m(),
       z(height),  // Note, height inherited from mfem::TimeDependentOperator
       neumann_coefficient_m(a_mesh.GetNumberOfBoundaryTagValues(), nullptr),
       boundary_marker_m(a_mesh.GetNumberOfBoundaryTagValues()),
@@ -45,6 +45,9 @@ ConductionOperator::ConductionOperator(
       inhomogeneous_neumann_active_m(false),
       tensor_basis(false),
       use_partial_assembly(false) {
+  // Set values from parser;
+  tensor_kappa_m = a_parser["HeatSolver/ConductionOperator/kappa"]
+                       .get<std::vector<double>>();
   DEBUG_ASSERT(
       tensor_kappa_m.size() == static_cast<std::size_t>(mesh_m.GetDimension() *
                                                         mesh_m.GetDimension()),
@@ -54,19 +57,28 @@ ConductionOperator::ConductionOperator(
           std::to_string(mesh_m.GetDimension() * mesh_m.GetDimension()));
 
   tensor_basis = mfem::UsesTensorBasis(fespace);
-  use_partial_assembly = tensor_basis;
+  use_partial_assembly =
+      tensor_basis &&
+      a_parser["HeatSolver/ConductionOperator/use_partial_assembly"]
+          .get<bool>();
 
-  const double rel_tol = 1.0e-8;
+  const double rel_tol =
+      a_parser["HeatSolver/ConductionOperator/solver_rel_tol"].get<double>();
+  const double abs_tol =
+      a_parser["HeatSolver/ConductionOperator/solver_abs_tol"].get<double>();
+  const double max_iter =
+      a_parser["HeatSolver/ConductionOperator/solver_max_iter"].get<int>();
+
   M_solver.iterative_mode = false;
   M_solver.SetRelTol(rel_tol);
-  M_solver.SetAbsTol(0.0);
-  M_solver.SetMaxIter(100);
+  M_solver.SetAbsTol(abs_tol);
+  M_solver.SetMaxIter(max_iter);
   M_solver.SetPrintLevel(-1);
 
   T_solver.iterative_mode = false;
   T_solver.SetRelTol(rel_tol);
-  T_solver.SetAbsTol(0.0);
-  T_solver.SetMaxIter(100);
+  T_solver.SetAbsTol(abs_tol);
+  T_solver.SetMaxIter(max_iter);
   T_solver.SetPrintLevel(-1);
 
   // Preset boundary arrays
@@ -430,6 +442,29 @@ ConductionOperator::~ConductionOperator(void) {
   delete neumann_m;
   delete tensor_thermal_coeff_m;
   delete dt_tensor_thermal_coeff_m;
+}
+
+void ConductionOperator::GatherOptions(InputParser& a_parser) {
+  a_parser.AddOption(
+      "HeatSolver/ConductionOperator/kappa",
+      "Array of thermal coefficients representing tensor in column major "
+      "ordering. Should be MESH_DIM*MESH_DIM in size.");
+  a_parser.AddOption(
+      "HeatSolver/ConductionOperator/use_partial_assembly",
+      "If \"true\", use partial assembly for MFEM bilinear "
+      "forms. If false, use default LEGACYFULL assembly. NOTE: partial "
+      "assembly can only be used on QUAD or HEX element meshes. If this mesh "
+      "is not, LEGACYFULL will be reverted too.",
+      false);
+  a_parser.AddOption("HeatSolver/ConductionOperator/solver_rel_tol",
+                     "Relative tolerance for iterative solves of X=A^{-1} B",
+                     1.0e-8);
+  a_parser.AddOption("HeatSolver/ConductionOperator/solver_abs_tol",
+                     "Absolute tolerance for iterative solves of X=A^{-1} B",
+                     0.0);
+  a_parser.AddOption(
+      "HeatSolver/ConductionOperator/solver_max_iter",
+      "Maximum allowed iterations for iterative solves of X=A^{-1} B", 100);
 }
 
 void ConductionOperator::SetTrueDofsFromVertexData(
