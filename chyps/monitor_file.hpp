@@ -68,14 +68,14 @@ class MonitorFile {
   void SetEntry(const std::size_t a_index, const double a_value);
 
   /// \brief Write the stored data for this iteration to disk.
-  void WriteLineToDisk(const int a_iter, const double a_time,
+  void WriteLineToFile(const int a_iter, const double a_time,
                        const double a_dt);
 
   /// \brief Clear the stored data in data_m to be updated again.
   void ClearLine(void);
 
   /// \brief Flush the file associated with this MonitorFile object.
-  void FlushToDisk(void);
+  void Flush(void);
 
   /// \brief Close the file that is open.
   ~MonitorFile(void);

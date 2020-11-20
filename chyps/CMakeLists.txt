@@ -35,6 +35,8 @@ target_sources(chyps PRIVATE monitor_manager.hpp)
 target_sources(chyps PRIVATE monitor_manager.cpp)
 target_sources(chyps PRIVATE monitor_file.hpp)
 target_sources(chyps PRIVATE monitor_file.cpp)
+target_sources(chyps PRIVATE timer_manager.hpp)
+target_sources(chyps PRIVATE timer_manager.cpp)
 target_sources(chyps PRIVATE debug_assert.hpp)
 target_sources(chyps PRIVATE string_manipulation.hpp)
 

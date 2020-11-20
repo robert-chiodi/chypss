@@ -56,15 +56,15 @@ MonitorFile* MonitorManager::CreateMonitorFile(
   return &(insert_location.first->second);
 }
 
-void MonitorManager::WriteStepToDisk(const int a_iter, const double a_time,
-                                     const double a_dt) {
+void MonitorManager::WriteStepToFiles(const int a_iter, const double a_time,
+                                      const double a_dt) {
   for (auto& elem : file_list_m) {
-    elem.second.WriteLineToDisk(a_iter, a_time, a_dt);
+    elem.second.WriteLineToFile(a_iter, a_time, a_dt);
     elem.second.ClearLine();
   }
   if (a_iter % IO_FLUSH_FREQUENCY == 0) {
     for (auto& elem : file_list_m) {
-      elem.second.FlushToDisk();
+      elem.second.Flush();
     }
   }
 }

@@ -9,7 +9,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #ifndef CHYPS_MONITOR_MANAGER_HPP_
-#define CHYPS_MONITOR_MANANGER_HPP_
+#define CHYPS_MONITOR_MANAGER_HPP_
 
 #include <string>
 #include <unordered_map>
@@ -66,9 +66,9 @@ class MonitorManager {
                                  std::vector<FieldType>&& a_format);
 
   /// \brief Write the current MonitorFile::line_m stored in each
-  /// MonitorFile to disk. The
-  void WriteStepToDisk(const int a_iter, const double a_time,
-                       const double a_dt);
+  /// MonitorFile to disk.
+  void WriteStepToFiles(const int a_iter, const double a_time,
+                        const double a_dt);
 
   ///\brief Default destructor. Will call destructor for all MonitorFile
   /// objects.

@@ -34,6 +34,8 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
     : mpi_session_m(a_mpi_session),
       parser_m(),
       file_io_m(mpi_session_m, "FILEIO"),
+      monitor_manager_m(),
+      timer_manager_m(&mpi_session_m),
       mesh_m(parser_m, *this),
       heat_solver_m(parser_m, *this),
       precice_m(nullptr),
@@ -42,16 +44,19 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
       goals_m(),
       output_m() {
   // Log needs to have been started before this so that logging in
-  // constructors above do not segfault.
+  // constructors above do not segfault. This will reset
+  // log level to a_log_level though.
   StartLogger(mpi_session_m, a_log_level);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Beginning simulation.");
 
   this->GatherOptions();
-
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Added main parser options.");
+
+  this->GetTimerManager().AddTimer("Total");
 }
 
 void Simulation::Initialize(int argc, char** argv) {
+  this->GetTimerManager().StartTimer("Total");
   this->ParseOptions(argc, argv);
   this->SetupFileIO();
   // Note, order is important here. Mesh must be initialized first.
@@ -69,12 +74,24 @@ void Simulation::Initialize(int argc, char** argv) {
                      "Performing simulation to time {} with time steps of {}",
                      goals_m.end_time, step_info_m.dt);
   this->WriteInitialConditions();
-  this->WriteProgressHeaderToScreen();
+  this->GetTimerManager().StopTimer("Total");
+  this->GetTimerManager().CreateMonitorFile("timing",
+                                            this->GetMonitorManager());
+  this->GetTimerManager().PushTimesToMonitor();
+  if (mpi_session_m.IAmRoot()) {
+    this->WriteProgressHeaderToScreen();
+    this->WriteProgressToScreen();
+    this->GetMonitorManager().WriteStepToFiles(
+        step_info_m.iteration, step_info_m.time, step_info_m.dt);
+  }
 }
 
 void Simulation::RunToEnd(void) {
   bool last_step = false;
   while (!last_step) {
+    this->GetTimerManager().ResetAllTimers();  // Reset all timers to 0
+    this->GetTimerManager().StartTimer("Total");
+
     SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting time-iteration {} for time {:8.6E}",
                        step_info_m.iteration, step_info_m.time);
     // if (this->PreciceActive()) {
@@ -100,13 +117,20 @@ void Simulation::RunToEnd(void) {
                                 ? precice_m->Advance(step_info_m.dt)
                                 : restrictions_m.max_dt;
 
-    if (mpi_session_m.IAmRoot()) {
-      this->WriteProgressToScreen();
-    }
-
+    // Write out visualization files and checkpoints
     if (step_info_m.iteration % output_m.visualization_steps == 0 ||
         last_step) {
       this->WriteIterationConditions(step_info_m);
+    }
+
+    this->GetTimerManager().StopTimer("Total");
+    this->GetTimerManager().PushTimesToMonitor();
+
+    // Write out progress to screen and monitor files.
+    if (mpi_session_m.IAmRoot()) {
+      this->WriteProgressToScreen();
+      this->GetMonitorManager().WriteStepToFiles(
+          step_info_m.iteration, step_info_m.time, step_info_m.dt);
     }
 
     if (this->PreciceActive() && !precice_m->IsCouplingOngoing()) {
@@ -137,6 +161,19 @@ IO& Simulation::GetIO(void) { return file_io_m; }
 const IO& Simulation::GetIO(void) const { return file_io_m; }
 
 const MPIParallel& Simulation::GetMPI(void) const { return mpi_session_m; }
+
+MonitorManager& Simulation::GetMonitorManager(void) {
+  return monitor_manager_m;
+}
+
+const MonitorManager& Simulation::GetMonitorManager(void) const {
+  return monitor_manager_m;
+}
+
+TimerManager& Simulation::GetTimerManager(void) { return timer_manager_m; }
+const TimerManager& Simulation::GetTimerManager(void) const {
+  return timer_manager_m;
+}
 
 Simulation::~Simulation(void) {
   delete precice_m;

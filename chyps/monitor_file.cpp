@@ -96,10 +96,10 @@ void MonitorFile::SetEntry(const std::size_t a_index, const double a_value) {
   updated_m = true;
 }
 
-void MonitorFile::WriteLineToDisk(const int a_iter, const double a_time,
+void MonitorFile::WriteLineToFile(const int a_iter, const double a_time,
                                   const double a_dt) {
   DEBUG_ASSERT(updated_m, global_assert{}, DebugLevel::CHEAP{},
-               "No new data has been set since the last writing to disk.");
+               "No new data has been set since the last writing to file.");
   DEBUG_ASSERT(monitor_file_m != nullptr, global_assert{}, DebugLevel::CHEAP{});
   fprintf(monitor_file_m, "%-*d", MIN_WIDTH, a_iter);
   fprintf(monitor_file_m, "%-*.14E", MIN_WIDTH, a_time);
@@ -126,7 +126,7 @@ void MonitorFile::WriteLineToDisk(const int a_iter, const double a_time,
 
 void MonitorFile::ClearLine(void) { updated_m = false; }
 
-void MonitorFile::FlushToDisk(void) { fflush(monitor_file_m); }
+void MonitorFile::Flush(void) { fflush(monitor_file_m); }
 
 MonitorFile::~MonitorFile(void) {
   fclose(monitor_file_m);

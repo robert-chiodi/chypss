@@ -21,8 +21,10 @@
 #include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/mesh.hpp"
+#include "chyps/monitor_manager.hpp"
 #include "chyps/mpi_parallel.hpp"
 #include "chyps/precice_adapter.hpp"
+#include "chyps/timer_manager.hpp"
 
 namespace chyps {
 
@@ -80,6 +82,10 @@ class Simulation {
   IO& GetIO(void);
   const IO& GetIO(void) const;
   const MPIParallel& GetMPI(void) const;
+  MonitorManager& GetMonitorManager(void);
+  const MonitorManager& GetMonitorManager(void) const;
+  TimerManager& GetTimerManager(void);
+  const TimerManager& GetTimerManager(void) const;
 
   ~Simulation(void);
 
@@ -100,6 +106,8 @@ class Simulation {
   MPIParallel& mpi_session_m;
   InputParser parser_m;
   IO file_io_m;
+  MonitorManager monitor_manager_m;
+  TimerManager timer_manager_m;
   Mesh mesh_m;
   HeatSolver heat_solver_m;
   PreciceAdapter* precice_m;
