@@ -15,7 +15,12 @@
 namespace chyps {
 
 TimerManager::TimerTracker::TimerTracker(void)
-    : active_m(false), time_m(), cummulative_time_m(0.0) {}
+    : active_m(false),
+      time_m(),
+      cumulative_time_location_m(static_cast<std::size_t>(-1)) {}
+
+TimerManager::TimerTracker::TimerTracker(const std::size_t a_location)
+    : active_m(false), time_m(), cumulative_time_location_m(a_location) {}
 
 void TimerManager::TimerTracker::Start(void) {
   DEBUG_ASSERT(!this->Active(), global_assert{}, DebugLevel::CHEAP{},
@@ -23,27 +28,30 @@ void TimerManager::TimerTracker::Start(void) {
   active_m = true;
   time_m = std::chrono::system_clock::now();
 }
-void TimerManager::TimerTracker::Stop(void) {
+double TimerManager::TimerTracker::Stop(void) {
   DEBUG_ASSERT(this->Active(), global_assert{}, DebugLevel::CHEAP{},
                "Trying to stop timer that has not been started.");
   const std::chrono::duration<double> duration =
       std::chrono::system_clock::now() - time_m;
-  cummulative_time_m += duration.count();
   active_m = false;
+  return duration.count();
 }
-void TimerManager::TimerTracker::Reset(void) { cummulative_time_m = 0.0; }
 
 bool TimerManager::TimerTracker::Active(void) const { return active_m; }
 
-double TimerManager::TimerTracker::GetTime(void) const {
-  return cummulative_time_m;
+std::size_t TimerManager::TimerTracker::GetTimeLocation(void) const {
+  return cumulative_time_location_m;
+}
+
+void TimerManager::TimerTracker::SetTimeLocation(const std::size_t a_location) {
+  cumulative_time_location_m = a_location;
 }
 
 TimerManager::TimerManager(const MPIParallel* a_mpi_session)
     : mpi_session_m(a_mpi_session),
       timer_collection_m(),
-      monitor_file_m(nullptr),
-      total_exists_m(-1) {}
+      cumulative_time_m(),
+      monitor_file_m(nullptr) {}
 
 void TimerManager::AddTimer(const std::string& a_name) {
   DEBUG_ASSERT(!this->TimerExists(a_name), global_assert{}, DebugLevel::CHEAP{},
@@ -51,7 +59,25 @@ void TimerManager::AddTimer(const std::string& a_name) {
   DEBUG_ASSERT(
       this->CanStillModify(), global_assert{}, DebugLevel::CHEAP{},
       "Timers cannot be added after a call to this->CreateMonitorFile(...)");
-  timer_collection_m.emplace(a_name, TimerTracker());
+
+  cumulative_time_m.push_back(0.0);
+  if (a_name == "Total" || a_name == "total") {
+    std::string alternative_name = a_name == "Total" ? "total" : "Total";
+    DEBUG_ASSERT(
+        !this->TimerExists(alternative_name), global_assert{},
+        DebugLevel::CHEAP{},
+        "A timer named \"Total\" and \"total\" cannot exist at the same time.");
+
+    // Make total the first entry, so increment all others.
+    for (auto& elem : timer_collection_m) {
+      elem.second.SetTimeLocation(elem.second.GetTimeLocation() + 1);
+    }
+    timer_collection_m.emplace(a_name, TimerTracker(0));
+  } else {
+    timer_collection_m.emplace(
+        a_name,
+        TimerTracker(static_cast<std::size_t>(cumulative_time_m.size() - 1)));
+  }
 }
 void TimerManager::StartTimer(const std::string& a_name) {
   DEBUG_ASSERT(this->TimerExists(a_name), global_assert{}, DebugLevel::CHEAP{},
@@ -65,17 +91,21 @@ void TimerManager::StopTimer(const std::string& a_name) {
   DEBUG_ASSERT(
       this->TimerActive(a_name), global_assert{}, DebugLevel::CHEAP{},
       "Tried to stop timer \"" + a_name + "\" that has not been started.");
-  timer_collection_m[a_name].Stop();
+  auto& timer = timer_collection_m[a_name];
+  DEBUG_ASSERT(timer.GetTimeLocation() < cumulative_time_m.size(),
+               global_assert{}, DebugLevel::CHEAP{});
+  cumulative_time_m[timer.GetTimeLocation()] += timer.Stop();
 }
 void TimerManager::ResetTimer(const std::string& a_name) {
   DEBUG_ASSERT(this->TimerExists(a_name), global_assert{}, DebugLevel::CHEAP{},
                "Tried to reset timer \"" + a_name + "\" that does not exist.");
-  timer_collection_m[a_name].Reset();
+  DEBUG_ASSERT(
+      timer_collection_m[a_name].GetTimeLocation() < cumulative_time_m.size(),
+      global_assert{}, DebugLevel::CHEAP{});
+  cumulative_time_m[timer_collection_m[a_name].GetTimeLocation()] = 0.0;
 }
 void TimerManager::ResetAllTimers(void) {
-  for (auto& elem : timer_collection_m) {
-    elem.second.Reset();
-  }
+  std::fill(cumulative_time_m.begin(), cumulative_time_m.end(), 0.0);
 }
 
 std::size_t TimerManager::TimerActive(void) const {
@@ -95,7 +125,10 @@ double TimerManager::GetTime(const std::string& a_name) const {
   DEBUG_ASSERT(this->TimerExists(a_name), global_assert{}, DebugLevel::CHEAP{},
                "Attempted to get time spent in timer \"" + a_name +
                    "\" but timer does not exist.");
-  return timer_collection_m.at(a_name).GetTime();
+  DEBUG_ASSERT(timer_collection_m.at(a_name).GetTimeLocation() <
+                   cumulative_time_m.size(),
+               global_assert{}, DebugLevel::CHEAP{});
+  return cumulative_time_m[timer_collection_m.at(a_name).GetTimeLocation()];
 }
 
 void TimerManager::CreateMonitorFile(const std::string& a_file_name,
@@ -106,56 +139,31 @@ void TimerManager::CreateMonitorFile(const std::string& a_file_name,
 
   if (!this->IsParallelTimer() || mpi_session_m->IAmRoot()) {
     std::vector<std::string> header(timer_collection_m.size());
-    std::size_t ind = 0;
     for (const auto& elem : timer_collection_m) {
-      if (elem.first == "Total" || elem.first == "total") {
-        total_exists_m = static_cast<int>(ind);
-      }
-      header[ind++] = elem.first;
+      DEBUG_ASSERT(elem.second.GetTimeLocation() < header.size(),
+                   global_assert{}, DebugLevel::CHEAP{});
+      header[elem.second.GetTimeLocation()] = elem.first;
     }
-
-    // Moving Total to the front
-    if (total_exists_m > 0) {
-      const std::string total_name = header[total_exists_m];
-      for (int n = 1; n <= total_exists_m; ++n) {
-        header[n] = header[n - 1];
-      }
-      header[0] = total_name;
-    }
-
     monitor_file_m = a_monitor_manager.CreateMonitorFile(
         a_file_name, header,
         std::vector<FieldType>(header.size(), FieldType::DOUBLE));
   }
 }
 void TimerManager::PushTimesToMonitor(void) {
-  std::vector<double> times(timer_collection_m.size());
-  std::size_t ind = 0;
-  for (const auto& elem : timer_collection_m) {
-    times[ind++] = elem.second.GetTime();
-  }
-
   if (this->IsParallelTimer()) {
     if (mpi_session_m->IAmNotRoot()) {
-      MPI_Reduce(times.data(), nullptr, static_cast<int>(times.size()),
-                 MPI_DOUBLE, MPI_MAX, 0, mpi_session_m->GetComm());
+      MPI_Reduce(cumulative_time_m.data(), nullptr,
+                 static_cast<int>(cumulative_time_m.size()), MPI_DOUBLE,
+                 MPI_MAX, 0, mpi_session_m->GetComm());
     } else {
       DEBUG_ASSERT(monitor_file_m != nullptr, global_assert{},
                    DebugLevel::CHEAP{},
                    "TimerManager object is not associated with a monitor file. "
                    "Need to call this->CreateMonitorFile(...) first.");
-      std::vector<double> global_times(times.size());
-      MPI_Reduce(times.data(), global_times.data(),
-                 static_cast<int>(times.size()), MPI_DOUBLE, MPI_MAX, 0,
-                 mpi_session_m->GetComm());
-
-      if (total_exists_m > 0) {
-        const double total_time = global_times[total_exists_m];
-        for (int n = 1; n <= total_exists_m; ++n) {
-          global_times[n] = global_times[n - 1];
-        }
-        global_times[0] = total_time;
-      }
+      std::vector<double> global_times(cumulative_time_m.size());
+      MPI_Reduce(cumulative_time_m.data(), global_times.data(),
+                 static_cast<int>(cumulative_time_m.size()), MPI_DOUBLE,
+                 MPI_MAX, 0, mpi_session_m->GetComm());
       monitor_file_m->SetEntries(global_times);
     }
   } else {
@@ -163,14 +171,7 @@ void TimerManager::PushTimesToMonitor(void) {
                  DebugLevel::CHEAP{},
                  "TimerManager object is not associated with a monitor file. "
                  "Need to call this->CreateMonitorFile(...) first.");
-    if (total_exists_m >= 0) {
-      const double total_time = times[total_exists_m];
-      for (int n = 1; n >= total_exists_m; ++n) {
-        times[n] = times[n - 1];
-      }
-      times[0] = total_time;
-    }
-    monitor_file_m->SetEntries(times);
+    monitor_file_m->SetEntries(cumulative_time_m);
   }
 }
 

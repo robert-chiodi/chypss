@@ -32,20 +32,26 @@ namespace chyps {
 /// additional timers can be created for this TimerManagerObject.
 /// If a timer with name "total" or "Total" exists, it will
 /// be moved to the first timer in the monitor.
+///
+/// NOTE: If using TimerManager in parallel (with a supplied MPIParallel object
+/// during construction), all ranks must add the same timers. The reported time
+/// will be the maximum time for that timer across all ranks.
 class TimerManager {
-  struct TimerTracker {
+  class TimerTracker {
+   public:
     TimerTracker(void);
+    TimerTracker(const std::size_t a_location);
 
     void Start(void);
-    void Stop(void);
-    void Reset(void);
+    double Stop(void);  // Returns time in seconds since start
     bool Active(void) const;
-    double GetTime(void) const;
+    std::size_t GetTimeLocation(void) const;
+    void SetTimeLocation(const std::size_t a_location);
 
    private:
     bool active_m;
     std::chrono::time_point<std::chrono::system_clock> time_m;
-    double cummulative_time_m;
+    std::size_t cumulative_time_location_m;
   };
 
  public:
@@ -119,8 +125,8 @@ class TimerManager {
 
   const MPIParallel* mpi_session_m;
   std::unordered_map<std::string, TimerTracker> timer_collection_m;
+  std::vector<double> cumulative_time_m;
   MonitorFile* monitor_file_m;
-  int total_exists_m;
 };
 
 }  // namespace chyps
