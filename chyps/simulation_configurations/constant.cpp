@@ -16,32 +16,26 @@
 
 namespace chyps {
 
-Constant::Constant(InputParser& a_parser) : ConfigurationInitializer(a_parser) {
-  parser_m.AddOption("SimulationInitializer/Constant/value",
-                     "Value to set at all node locations");
+namespace constant {
+
+void AddParserOptions(InputParser& a_parser) {
+  a_parser.AddOption("SimulationInitializer/Initializers/constant/value",
+                     "Sets the value of alll nodes to the supplied value.");
 }
 
-void Constant::Initialize(void) {}
+void InitializeData(const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser,
+                    mfem::ParFiniteElementSpace& a_finite_element_space,
+                    mfem::Vector& a_data) {
+  mfem::ParGridFunction grid_function(&a_finite_element_space);
 
-void Constant::FillRequiredData(RequiredData& a_data) {
-  auto finite_element_collection = new mfem::H1_FECollection(
-      parser_m["HeatSolver/order"].get<int>(), a_data.GetMesh().GetDimension());
-  auto finite_element_space = new mfem::ParFiniteElementSpace(
-      &(a_data.GetMesh().GetMfemMesh()), finite_element_collection);
-  a_data.SetFiniteElementCollection(finite_element_collection);
-  a_data.SetFiniteElementSpace(finite_element_space);
-
-  auto temperature_field = new mfem::ParGridFunction(finite_element_space);
-
-  const auto value =
-      parser_m["SimulationInitializer/Constant/value"].get<double>();
+  const auto value = a_json_object["value"].get<double>();
   auto value_setter = [=](const mfem::Vector& position) { return value; };
 
-  mfem::FunctionCoefficient temperature_setter(value_setter);
-  temperature_field->ProjectCoefficient(temperature_setter);
-  a_data.AddGridFunction("HeatSolver/temperature", temperature_field);
+  mfem::FunctionCoefficient value_setter_function(value_setter);
+  grid_function.ProjectCoefficient(value_setter_function);
+  grid_function.GetTrueDofs(a_data);
 }
-
-Constant::~Constant(void) {}
+}  // namespace constant
 
 }  // namespace chyps

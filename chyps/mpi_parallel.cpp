@@ -31,7 +31,9 @@ int MPIParallel::MyRank(void) const { return my_rank_m; }
 
 int MPIParallel::NumberOfRanks(void) const { return number_of_ranks_m; }
 
-bool MPIParallel::IAmRoot(void) const { return my_rank_m == 0; }
+bool MPIParallel::IAmRoot(void) const {
+  return my_rank_m == this->GetRootRank();
+}
 
 bool MPIParallel::IAmNotRoot(void) const { return !this->IAmRoot(); }
 

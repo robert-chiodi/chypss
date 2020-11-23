@@ -26,16 +26,29 @@ namespace chyps {
 /// This class stores a collection of MonitorFiles and will
 /// drive their writing to disk and cleaning between iterations.
 /// The storage of data itself should be handled by individual classes.
+///
+/// NOTE: If left uninitialized (by not calling the mehtod
+/// MonitorManager::Initialize()), the monitor manager can be considered in an
+/// off state. In this state,  `nullptr` will be handed back from the method
+/// CreateMonitorFile(...). Ensure that anything that attempts to write to the
+/// file checks for this by either checking for nullptr or checking if the
+/// monitor manager is off.
 class MonitorManager {
   static constexpr int IO_FLUSH_FREQUENCY = 20;
 
  public:
-  /// \brief Constructor that will determine the directory to use.
-  ///
-  /// The directory name will be monitor, HOWEVER, if a monitor directory
-  /// already exists, an integer will be appended to keep this directory
-  /// unique and avoid overwriting the previous directory and its files.
+  /// \brief Constructor.
   MonitorManager(void);
+
+  /// \brief Creates the directory for monitor files and turns the
+  /// MonitorManager to the `on` state. If not called, MonitorManager will be
+  /// considered off and return `nullptr` from calls to CreateMonitorFile().
+  ///
+  /// The directory name will be `a_directory_name`_000, HOWEVER, if this
+  /// directory already exists, an integer will be appended to keep this
+  /// directory unique and avoid overwriting the previous directory and its
+  /// files.
+  void Initialize(const std::string& a_directory_name);
 
   /// \brief Create a MonitorFile with the given name, header, and format field.
   ///
@@ -70,6 +83,9 @@ class MonitorManager {
   void WriteStepToFiles(const int a_iter, const double a_time,
                         const double a_dt);
 
+  /// \brief Returns whether MonitorFileManager is on (has been initialized).
+  bool IsOn(void) const;
+
   ///\brief Default destructor. Will call destructor for all MonitorFile
   /// objects.
   ~MonitorManager(void) = default;
@@ -77,6 +93,7 @@ class MonitorManager {
  private:
   std::string directory_base_m;
   std::unordered_map<std::string, MonitorFile> file_list_m;
+  bool on_m;
 };
 
 }  // namespace chyps

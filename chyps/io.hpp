@@ -75,6 +75,18 @@ class IO {
       const mfem::ParFiniteElementSpace& a_element_space,
       const bool a_dimensions_static);
 
+  /// \brief Add mfem::Vector of True Dofs variable for later export (through
+  /// PutDeferred or PutImmediate). Underlying data assumed to be of type
+  /// double. The data is also marked as a point variable using the
+  /// MarkAsPointVariableMethod. It is assumed the GridFunction is on a constant
+  /// element-order mesh.
+  ///
+  /// NOTE: Currently only implemented as all ranks write to their own section.
+  void AddVariableForTrueDofs(
+      const std::string a_variable_name,
+      const mfem::ParFiniteElementSpace& a_element_space,
+      const bool a_dimensions_static);
+
   /// \brief Add variable for later export (through PutDeferred or
   /// PutImmediate). The global shape, local start of the data, and local count
   /// of the data must be specified. The boolean a_dimensions_static indicate
@@ -258,14 +270,18 @@ class IO {
   ExistenceLocation DoesAttributeExist(const std::string& a_variable_name,
                                        const std::string& a_name);
 
-  /// \brief Taking an mfem::ParGridFunction, provide the underlying pointer for
-  /// writing. The underlying type is assumed to be double.
+  /// \brief Taking an mfem::Vector, provide the underlying pointer
+  /// for writing. The underlying type is assumed to be double.
   ///
-  /// The variable of type T and name a_variable_name must have been previously
-  /// added through a call to AddVariable. Note: DO NOT modify data contained in
+  /// The variable with name a_variable_name must have been previously
+  /// added through a call to AddVariable. Furthermore, the mfem::Vector
+  /// must be of the correct length, depending on whether it was
+  /// added as a TrueDof field or a ParGridFunction.
+  ///
+  /// Note: DO NOT modify data contained in
   /// a_data or the validity of the pointer until after the call to EndStep.
   void PutDeferred(const std::string& a_variable_name,
-                   const mfem::ParGridFunction& a_grid_function);
+                   const mfem::Vector& a_vector);
 
   /// \brief Deferred Put of data for I/O. Will hold reference to data
   /// given to it between BeginStep and EndStep and write during EndStep.

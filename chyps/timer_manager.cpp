@@ -51,7 +51,8 @@ TimerManager::TimerManager(const MPIParallel* a_mpi_session)
     : mpi_session_m(a_mpi_session),
       timer_collection_m(),
       cumulative_time_m(),
-      monitor_file_m(nullptr) {}
+      monitor_file_m(nullptr),
+      monitor_file_off_m(true) {}
 
 void TimerManager::AddTimer(const std::string& a_name) {
   DEBUG_ASSERT(!this->TimerExists(a_name), global_assert{}, DebugLevel::CHEAP{},
@@ -137,6 +138,22 @@ void TimerManager::CreateMonitorFile(const std::string& a_file_name,
                "TimerManager object already associated with a monitor file "
                "from a monitor manager.");
 
+  if (this->IsParallelTimer()) {
+    if (mpi_session_m->IAmRoot()) {
+      monitor_file_off_m = a_monitor_manager.IsOn() ? false : true;
+    }
+    int bool_as_int = monitor_file_off_m ? 1 : 0;
+    MPI_Bcast(&bool_as_int, 1, MPI_INT, mpi_session_m->GetRootRank(),
+              mpi_session_m->GetComm());
+    monitor_file_off_m = bool_as_int == 1;
+  } else {
+    monitor_file_off_m = a_monitor_manager.IsOn() ? false : true;
+  }
+
+  if (this->MonitorFileOff()) {
+    return;
+  }
+
   if (!this->IsParallelTimer() || mpi_session_m->IAmRoot()) {
     std::vector<std::string> header(timer_collection_m.size());
     for (const auto& elem : timer_collection_m) {
@@ -150,11 +167,17 @@ void TimerManager::CreateMonitorFile(const std::string& a_file_name,
   }
 }
 void TimerManager::PushTimesToMonitor(void) {
+  if (this->MonitorFileOff()) {
+    // MonitorManager off.
+    return;
+  }
+
   if (this->IsParallelTimer()) {
     if (mpi_session_m->IAmNotRoot()) {
       MPI_Reduce(cumulative_time_m.data(), nullptr,
                  static_cast<int>(cumulative_time_m.size()), MPI_DOUBLE,
-                 MPI_MAX, 0, mpi_session_m->GetComm());
+                 MPI_MAX, mpi_session_m->GetRootRank(),
+                 mpi_session_m->GetComm());
     } else {
       DEBUG_ASSERT(monitor_file_m != nullptr, global_assert{},
                    DebugLevel::CHEAP{},
@@ -163,7 +186,8 @@ void TimerManager::PushTimesToMonitor(void) {
       std::vector<double> global_times(cumulative_time_m.size());
       MPI_Reduce(cumulative_time_m.data(), global_times.data(),
                  static_cast<int>(cumulative_time_m.size()), MPI_DOUBLE,
-                 MPI_MAX, 0, mpi_session_m->GetComm());
+                 MPI_MAX, mpi_session_m->GetRootRank(),
+                 mpi_session_m->GetComm());
       monitor_file_m->SetEntries(global_times);
     }
   } else {
@@ -186,5 +210,7 @@ bool TimerManager::CanStillModify(void) const {
 bool TimerManager::IsParallelTimer(void) const {
   return mpi_session_m != nullptr;
 }
+
+bool TimerManager::MonitorFileOff(void) const { return monitor_file_off_m; }
 
 }  // namespace chyps

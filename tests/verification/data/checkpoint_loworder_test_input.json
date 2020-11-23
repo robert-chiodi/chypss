@@ -1,16 +1,35 @@
 {
     "SimulationInitializer":{
-        "initializer": "constant",
 	"out_data": "tests/verification/data/checkpointLO_init",
-        "Constant":{
-                        "value": 10.0
+	"FieldInitialization":{
+		"HeatSolver/temperature":{
+			"Initializer": "constant",
+			"Arguments":{
+				"value": 10.0
+
+			}
+		},
+		"HeatSolver/rho":{
+			"Initializer" : "constant",
+			"Arguments": {
+				"value":1.0
+			}
+		},
+                "HeatSolver/cp":{
+                        "Initializer" : "constant",
+                        "Arguments": {
+                                "value":1.0
                         }
+                }
+	}
+
                  },
     "Simulation":{
 		    "time_step": 0.001,
 		    "use_visit": false,
 		    "viz_steps": 10000000,
-		    "output_screen": "off"
+		    "output_screen": "off",
+		    "write_to_monitor": false
 		 },
     "HeatSolver":{
 		    "ConductionOperator":{

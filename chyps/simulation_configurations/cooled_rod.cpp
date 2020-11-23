@@ -16,28 +16,23 @@
 
 namespace chyps {
 
-CooledRod::CooledRod(InputParser& a_parser)
-    : ConfigurationInitializer(a_parser) {
-  parser_m.AddOption(
-      "SimulationInitializer/CooledRod/approximation_terms",
+namespace cooled_rod {
+
+void AddParserOptions(InputParser& a_parser) {
+  a_parser.AddOption(
+      "SimulationInitializer/Initializers/cooled_rod/"
+      "approximation_terms",
       "Number of terms to use in CooledRod solution approximation", 1);
 }
 
-void CooledRod::Initialize(void) {}
-
-void CooledRod::FillRequiredData(RequiredData& a_data) {
-  auto finite_element_collection = new mfem::H1_FECollection(
-      parser_m["HeatSolver/order"].get<int>(), a_data.GetMesh().GetDimension());
-  auto finite_element_space = new mfem::ParFiniteElementSpace(
-      &(a_data.GetMesh().GetMfemMesh()), finite_element_collection);
-  a_data.SetFiniteElementCollection(finite_element_collection);
-  a_data.SetFiniteElementSpace(finite_element_space);
-
-  auto temperature_field = new mfem::ParGridFunction(finite_element_space);
+void InitializeData(const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser,
+                    mfem::ParFiniteElementSpace& a_finite_element_space,
+                    mfem::Vector& a_data) {
+  mfem::ParGridFunction grid_function(&a_finite_element_space);
 
   const auto approximation_terms =
-      parser_m["SimulationInitializer/CooledRod/approximation_terms"]
-          .get<double>();
+      a_json_object["approximation_terms"].get<std::size_t>();
   auto value_setter = [=](const mfem::Vector& position) {
     // This is the analytical solution for an initial
     // condition of 25 and Neumann on left/Dirichelt on right.
@@ -50,11 +45,10 @@ void CooledRod::FillRequiredData(RequiredData& a_data) {
     return result + 24.0 + position[0];
   };
 
-  mfem::FunctionCoefficient temperature_setter(value_setter);
-  temperature_field->ProjectCoefficient(temperature_setter);
-  a_data.AddGridFunction("HeatSolver/temperature", temperature_field);
+  mfem::FunctionCoefficient value_setter_function(value_setter);
+  grid_function.ProjectCoefficient(value_setter_function);
+  grid_function.GetTrueDofs(a_data);
 }
-
-CooledRod::~CooledRod(void) {}
+}  // namespace cooled_rod
 
 }  // namespace chyps

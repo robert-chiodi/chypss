@@ -50,6 +50,7 @@ class MPIParallel {
   bool IAmRoot(void) const;
   bool IAmNotRoot(void) const;
   const MPI_Comm& GetComm(void) const;
+  static constexpr int GetRootRank(void) { return 0; }
 
   ~MPIParallel(void);
 

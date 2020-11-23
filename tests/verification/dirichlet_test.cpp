@@ -28,7 +28,6 @@ TEST(Dirichlet, Left) {
   init_input_string.push_back("Executable_name");
   init_input_string.push_back(
       "tests/verification/data/dirichlet_top_test_input.json");
-  init_input_string.push_back("constant");
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
@@ -57,7 +56,6 @@ TEST(Dirichlet, Right) {
   init_input_string.push_back("Executable_name");
   init_input_string.push_back(
       "tests/verification/data/dirichlet_top_test_input.json");
-  init_input_string.push_back("constant");
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
@@ -86,7 +84,6 @@ TEST(Dirichlet, Bottom) {
   init_input_string.push_back("Executable_name");
   init_input_string.push_back(
       "tests/verification/data/dirichlet_top_test_input.json");
-  init_input_string.push_back("constant");
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
@@ -115,7 +112,6 @@ TEST(Dirichlet, Top) {
   init_input_string.push_back("Executable_name");
   init_input_string.push_back(
       "tests/verification/data/dirichlet_top_test_input.json");
-  init_input_string.push_back("constant");
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();

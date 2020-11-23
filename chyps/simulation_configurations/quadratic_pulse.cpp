@@ -16,55 +16,57 @@
 
 namespace chyps {
 
-QuadraticPulse::QuadraticPulse(InputParser& a_parser)
-    : ConfigurationInitializer(a_parser) {
-  parser_m.AddOption("SimulationInitializer/QuadraticPulse/pulse_amplitude",
-                     "Amplitude of quadratic pulse (value at center)", 1.0);
-  parser_m.AddOption("SimulationInitializer/QuadraticPulse/approximation_terms",
-                     "Number of terms to use in pulse approximation", 1);
-  parser_m.AddOption(
-      "SimulationInitializer/QuadraticPulse/boundary_configuration",
+namespace quadratic_pulse {
+
+static std::function<double(const mfem::Vector&)> SelectInitialConditions(
+    const nlohmann::json& a_json_object, const InputParser& a_full_parser);
+
+void AddParserOptions(InputParser& a_parser) {
+  a_parser.AddOption(
+      "SimulationInitializer/Initializers/quadratic_pulse/"
+      "pulse_amplitude",
+      "Amplitude of quadratic pulse (value at center)", 1.0);
+  a_parser.AddOption(
+      "SimulationInitializer/Initializers/quadratic_pulse/"
+      "approximation_terms",
+      "Number of terms to use in pulse approximation", 1);
+  a_parser.AddOption(
+      "SimulationInitializer/Initializers/quadratic_pulse/"
+      "boundary_configuration",
       "Configuration of homogeneous boundary conditions. Supplied by string of "
       "4 characters, D for Dirichlet and N for Neumann, correspoding to tag "
       "locations, (e.g.,\"HHNN\")");
 }
 
-void QuadraticPulse::Initialize(void) {}
+void InitializeData(const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser,
+                    mfem::ParFiniteElementSpace& a_finite_element_space,
+                    mfem::Vector& a_data) {
+  mfem::ParGridFunction grid_function(&a_finite_element_space);
 
-void QuadraticPulse::FillRequiredData(RequiredData& a_data) {
-  auto finite_element_collection = new mfem::H1_FECollection(
-      parser_m["HeatSolver/order"].get<int>(), a_data.GetMesh().GetDimension());
-  auto finite_element_space = new mfem::ParFiniteElementSpace(
-      &(a_data.GetMesh().GetMfemMesh()), finite_element_collection);
-  a_data.SetFiniteElementCollection(finite_element_collection);
-  a_data.SetFiniteElementSpace(finite_element_space);
+  std::function<double(const mfem::Vector&)> value_setter =
+      SelectInitialConditions(a_json_object, a_full_parser);
 
-  auto temperature_field = new mfem::ParGridFunction(finite_element_space);
-  std::function<double(const mfem::Vector&)> initializing_function =
-      this->SelectInitialConditions();
-  mfem::FunctionCoefficient temperature_setter(initializing_function);
-  temperature_field->ProjectCoefficient(temperature_setter);
-  a_data.AddGridFunction("HeatSolver/temperature", temperature_field);
+  mfem::FunctionCoefficient value_setter_function(value_setter);
+  grid_function.ProjectCoefficient(value_setter_function);
+  grid_function.GetTrueDofs(a_data);
 }
 
-QuadraticPulse::~QuadraticPulse(void) {}
-
-std::function<double(const mfem::Vector&)>
-QuadraticPulse::SelectInitialConditions(void) const {
-  const std::string bc_config =
-      parser_m["SimulationInitializer/QuadraticPulse/boundary_configuration"];
-  const double domain_length = parser_m["Mesh/gen_bux"].get<double>() -
-                               parser_m["Mesh/gen_blx"].get<double>();
-  const double domain_height = parser_m["Mesh/gen_buy"].get<double>() -
-                               parser_m["Mesh/gen_bly"].get<double>();
-  const double amplitude =
-      parser_m["SimulationInitializer/QuadraticPulse/pulse_amplitude"]
-          .get<double>();
+std::function<double(const mfem::Vector&)> SelectInitialConditions(
+    const nlohmann::json& a_json_object, const InputParser& a_full_parser) {
+  const auto bc_config =
+      a_json_object["boundary_configuration"].get<std::string>();
+  const double amplitude = a_json_object["pulse_amplitude"].get<double>();
   const std::size_t approximation_terms =
-      parser_m["SimulationInitializer/QuadraticPulse/approximation_terms"]
-          .get<std::size_t>();
-  const double rotation = parser_m["Mesh/rotation"].get<double>();
+      a_json_object["approximation_terms"].get<std::size_t>();
+
+  const double domain_length = a_full_parser["Mesh/gen_bux"].get<double>() -
+                               a_full_parser["Mesh/gen_blx"].get<double>();
+  const double domain_height = a_full_parser["Mesh/gen_buy"].get<double>() -
+                               a_full_parser["Mesh/gen_bly"].get<double>();
+  const double rotation = a_full_parser["Mesh/rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
+
   if (bc_config == "DDDN") {
     return [=](const mfem::Vector& position) {
       std::array<double, 2> rp;
@@ -219,5 +221,7 @@ QuadraticPulse::SelectInitialConditions(void) const {
   }
   return [](const mfem::Vector& position) { return 0.0; };
 }
+
+}  // namespace quadratic_pulse
 
 }  // namespace chyps

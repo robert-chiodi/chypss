@@ -164,9 +164,11 @@ bool InputParser::ParseFromFile(const std::string& a_file_name,
     v_bson = this->ToBSON();
     size = v_bson.size();
   }
-  MPI_Bcast(&size, 1, my_MPI_SIZE_T, 0, a_mpi_session.GetComm());
+  MPI_Bcast(&size, 1, my_MPI_SIZE_T, a_mpi_session.GetRootRank(),
+            a_mpi_session.GetComm());
   v_bson.resize(size);  // Will do nothing for rank 0
-  MPI_Bcast(v_bson.data(), size, MPI_BYTE, 0, a_mpi_session.GetComm());
+  MPI_Bcast(v_bson.data(), size, MPI_BYTE, a_mpi_session.GetRootRank(),
+            a_mpi_session.GetComm());
   if (a_mpi_session.IAmNotRoot()) {
     this->SetFromBSON(v_bson);
   }

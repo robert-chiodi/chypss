@@ -13,21 +13,19 @@
 
 #include <functional>
 
-#include "chyps/simulation_configurations/configuration_initializer_interface.hpp"
+#include <mfem/mfem.hpp>
+
+#include "chyps/input_parser.hpp"
 
 namespace chyps {
 
-class Constant : public ConfigurationInitializer {
- public:
-  Constant(InputParser& a_parser);
-
-  virtual void Initialize(void) override final;
-  virtual void FillRequiredData(RequiredData& a_data) override final;
-
-  virtual ~Constant(void) override final;
-
- private:
-};
+namespace constant {
+void AddParserOptions(InputParser& a_parser);
+void InitializeData(const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser,
+                    mfem::ParFiniteElementSpace& a_finite_element_space,
+                    mfem::Vector& a_data);
+}  // namespace constant
 
 }  // namespace chyps
 

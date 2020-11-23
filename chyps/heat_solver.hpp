@@ -102,6 +102,8 @@ class HeatSolver : public SolverInterface {
   mfem::ParFiniteElementSpace* coarse_element_space_m;
   ConductionOperator* operator_m;
   mfem::Vector temperature_m;
+  mfem::Vector rho_m;
+  mfem::Vector cp_m;
   MfemVisItCollection* visit_collection_m;
 };
 

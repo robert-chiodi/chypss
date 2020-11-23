@@ -13,21 +13,20 @@
 
 #include <functional>
 
-#include "chyps/simulation_configurations/configuration_initializer_interface.hpp"
+#include <mfem/mfem.hpp>
+
+#include "chyps/input_parser.hpp"
 
 namespace chyps {
 
-class CooledRod : public ConfigurationInitializer {
- public:
-  CooledRod(InputParser& a_parser);
+namespace cooled_rod {
 
-  virtual void Initialize(void) override final;
-  virtual void FillRequiredData(RequiredData& a_data) override final;
-
-  virtual ~CooledRod(void) override final;
-
- private:
-};
+void AddParserOptions(InputParser& a_parser);
+void InitializeData(const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser,
+                    mfem::ParFiniteElementSpace& a_finite_element_space,
+                    mfem::Vector& a_data);
+}  // namespace cooled_rod
 
 }  // namespace chyps
 

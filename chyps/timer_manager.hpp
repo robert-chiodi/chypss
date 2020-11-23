@@ -122,11 +122,13 @@ class TimerManager {
  private:
   bool TimerExists(const std::string& a_name) const;
   bool CanStillModify(void) const;
+  bool MonitorFileOff(void) const;
 
   const MPIParallel* mpi_session_m;
   std::unordered_map<std::string, TimerTracker> timer_collection_m;
   std::vector<double> cumulative_time_m;
   MonitorFile* monitor_file_m;
+  bool monitor_file_off_m;
 };
 
 }  // namespace chyps

@@ -17,11 +17,28 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 
 {
     "SimulationInitializer":{
-        "initializer": "cooled_rod",
 	"out_data": "tests/verification/data/CooledRod",
-        "CooledRod":{
-                        "approximation_terms": 1
+"FieldInitialization":{
+		"HeatSolver/temperature":{
+			"Initializer": "cooled_rod",
+			"Arguments":{
+				"approximation_terms": 1
+
+			}
+		},
+		"HeatSolver/rho":{
+			"Initializer" : "constant",
+			"Arguments": {
+				"value":1.0
+			}
+		},
+                "HeatSolver/cp":{
+                        "Initializer" : "constant",
+                        "Arguments": {
+                                "value":1.0
                         }
+                }
+	}
                  },
     "Simulation":{
 		    "in_data":"tests/verification/data/CooledRod",
@@ -30,7 +47,7 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 		    "time_step": 0.001,
 		    "use_adios2": false,
 		    "use_visit": false,
-		    "viz_steps": 100000,
+		    "viz_steps": 1,
                     "output_screen": "off"
 		 },
     "HeatSolver":{

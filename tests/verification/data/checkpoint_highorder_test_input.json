@@ -1,21 +1,40 @@
 {
     "SimulationInitializer":{
-        "initializer": "constant",
 	"out_data": "tests/verification/data/checkpointLO_init",
-        "Constant":{
-                        "value": 10.0
+	"FieldInitialization":{
+		"HeatSolver/temperature":{
+			"Initializer": "constant",
+			"Arguments":{
+				"value": 10.0
+
+			}
+		},
+		"HeatSolver/rho":{
+			"Initializer" : "constant",
+			"Arguments": {
+				"value":1.0
+			}
+		},
+                "HeatSolver/cp":{
+                        "Initializer" : "constant",
+                        "Arguments": {
+                                "value":1.0
                         }
+                }
+	}
+
                  },
     "Simulation":{
 		    "time_step": 0.001,
 		    "use_visit": false,
 		    "viz_steps": 10000000,
-		    "output_screen": "off"
+		    "output_screen": "off",
+		    "write_to_monitor": false
 		 },
     "HeatSolver":{
 		    "ConductionOperator":{
 		    "kappa": [1.0, 0.0, 0.0, 1.0]
-	            },
+		    },
 		    "order": 4,
 		    "time_advancement": 3,
 		    "BoundaryConditions":{
@@ -33,7 +52,7 @@
 	    "gen_bux": 1.0,
 	    "gen_buy": 0.01,
 	    "gen_buz": 1.0,
-	    "gen_nx": 16,
+	    "gen_nx": 32,
 	    "gen_ny": 1,
 	    "gen_nz": -1,
 	    "mesh_file": "generate",

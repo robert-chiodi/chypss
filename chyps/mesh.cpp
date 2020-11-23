@@ -669,31 +669,33 @@ void Mesh::WriteMesh(void) {
                "An ongoing IO step is required for writing.");
   auto min_max_order = file_io_m.MinMaxVariableOrder();
   // Handle only constant order mesh/simulation for now
-  DEBUG_ASSERT(
-      min_max_order[0] == min_max_order[1], global_assert{},
-      DebugLevel::CHEAP{},
-      "Currenrtly only constant order mesh/simulations are supported.");
+  DEBUG_ASSERT(min_max_order[0] == min_max_order[1], global_assert{},
+               DebugLevel::CHEAP{},
+               "Currently only constant order mesh/simulations are supported.");
   mfem::H1_FECollection fec(min_max_order[0], this->GetDimension());
   mfem::ParFiniteElementSpace fes(parallel_mesh_m, &fec, this->GetDimension(),
                                   mfem::Ordering::byVDIM);
   mfem::ParGridFunction nodes(&fes);
   parallel_mesh_m->GetNodes(nodes);
+  mfem::Vector truedof_nodes;
+  nodes.GetTrueDofs(truedof_nodes);
 
   //*****************
   // This part inherently assumes mesh will only be written once.
   this->AddIOVariables();
   // Handle vertices
-  const auto ndofs = static_cast<std::size_t>(fes.GetNDofs());
-  const auto dim = static_cast<std::size_t>(this->GetDimension());
+  const std::size_t dim = static_cast<std::size_t>(fes.GetVDim());
+  const std::size_t true_dofs =
+      static_cast<std::size_t>(fes.GetTrueVSize()) / dim;
+
   // True here will be invalid for AMR and H/P refinement.
-  file_io_m.AddVariable<double>("vertices", {ndofs, dim}, true);
+  file_io_m.AddVariable<double>("vertices", {true_dofs, dim}, true);
   //*****************
 
-  uint32_t dimension = static_cast<uint32_t>(this->GetDimension());
+  uint32_t dimension = static_cast<uint32_t>(dim);
   uint32_t number_of_elements =
       static_cast<uint32_t>(this->GetLocalCount<MeshElement::ELEMENT>());
-  uint32_t number_of_vertices = static_cast<uint32_t>(fes.GetNDofs());
-  // static_cast<uint32_t>(this->GetLocalCount<MeshElement::VERTEX>());
+  uint32_t number_of_vertices = static_cast<uint32_t>(true_dofs);
   uint32_t vtk_type = static_cast<uint32_t>(this->GLVISToVTKType(
       static_cast<int>(parallel_mesh_m->GetElement(0)->GetGeometryType())));
   file_io_m.RootPutDeferred("dimension", &dimension);
@@ -721,7 +723,7 @@ void Mesh::WriteMesh(void) {
                global_assert{}, DebugLevel::CHEAP{},
                "Span given wrong size or not completely filled.");
 
-  file_io_m.PutDeferred("vertices", nodes.GetData());
+  file_io_m.PutDeferred("vertices", truedof_nodes.GetData());
   file_io_m.PerformPuts();
 }
 

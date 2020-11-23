@@ -23,7 +23,7 @@ ConductionOperator::ConductionOperator(
     const std::unordered_map<std::string, BoundaryConditionManager>&
         a_boundary_conditions,
     mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-    mfem::Vector& u)
+    mfem::Vector& a_temperature, mfem::Vector& a_rho, mfem::Vector& a_cp)
     : ConductionOperatorBase(f),
       fespace_linear_m(f_linear),
       sim_m(a_sim),
@@ -130,7 +130,7 @@ ConductionOperator::ConductionOperator(
     switch (condition.GetBCType()) {
       case BoundaryConditionType::HOMOGENEOUS_DIRICHLET: {
         ess_tdof_list.Append(tdof_list);
-        u.SetSubVector(tdof_list, 0.0);
+        a_temperature.SetSubVector(tdof_list, 0.0);
         break;
       }
       case BoundaryConditionType::DIRICHLET: {
@@ -144,11 +144,11 @@ ConductionOperator::ConductionOperator(
           temperature_gf.GetTrueDofs(boundary_temp);
           for (int i = 0; i < tdof_list.Size(); ++i) {
             const int j = tdof_list[i];
-            u(j) = boundary_temp(j);
+            a_temperature(j) = boundary_temp(j);
           }
         } else {
           const auto& values = condition.GetValues();
-          u.SetSubVector(tdof_list, *values.Data());
+          a_temperature.SetSubVector(tdof_list, *values.Data());
         }
         break;
       }
@@ -187,13 +187,24 @@ ConductionOperator::ConductionOperator(
   SPDLOG_LOGGER_INFO(
       MAIN_LOG, "Forming system matrices with updated essential True DOF list.",
       number_of_boundary_conditions);
+
   M = new mfem::ParBilinearForm(&fespace);
   if (use_partial_assembly) {
     M->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
   } else {
     M->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
   }
-  M->AddDomainIntegrator(new mfem::MassIntegrator());
+
+  mfem::ParGridFunction rho_gf(&fespace);
+  rho_gf.SetFromTrueDofs(a_rho);
+  mfem::GridFunctionCoefficient rho_gfc(&rho_gf);
+
+  mfem::ParGridFunction cp_gf(&fespace);
+  cp_gf.SetFromTrueDofs(a_cp);
+  mfem::GridFunctionCoefficient cp_gfc(&cp_gf);
+
+  mfem::ProductCoefficient mass_integrator_multiplier(cp_gfc, rho_gfc);
+  M->AddDomainIntegrator(new mfem::MassIntegrator(mass_integrator_multiplier));
   M->Assemble();  // keep sparsity pattern of M and K the same
   M->FormSystemMatrix(ess_tdof_list, M_op);
 

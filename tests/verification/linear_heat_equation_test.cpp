@@ -32,16 +32,8 @@ using namespace chyps;
 
 template <class SolutionFunctor>
 int ConvergenceRunner(const std::string& a_input_name,
-                      const std::string& a_configuration,
                       const SolutionFunctor& a_analytical_solution_lambda,
                       const int a_number_of_refines) {
-  std::vector<std::string> init_input_string;
-  init_input_string.push_back("Executable_name");
-  init_input_string.push_back(a_input_name);
-  init_input_string.push_back(a_configuration);
-  init_input_string.push_back("-Mesh/parallel_refine");
-  init_input_string.push_back("0");
-
   std::vector<std::string> chyps_input_string;
   chyps_input_string.push_back("Executable_name");
   chyps_input_string.push_back(a_input_name);
@@ -60,17 +52,13 @@ int ConvergenceRunner(const std::string& a_input_name,
   std::vector<std::array<double, 4>> error_metrics(a_number_of_refines + 1);
   for (int r = 0; r <= a_number_of_refines; ++r) {
     // Create file with initial conditions
-    init_input_string[4] = std::to_string(r);
-    auto init_input_char = FakeCommandLineInput(init_input_string);
-    int argc = static_cast<int>(init_input_char.size());
-    char** argv = init_input_char.data();
+    chyps_input_string[3] = std::to_string(r);
+    auto chyps_input_char = FakeCommandLineInput(chyps_input_string);
+    int argc = static_cast<int>(chyps_input_char.size());
+    char** argv = chyps_input_char.data();
     chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
 
     // Perform simulation
-    chyps_input_string[3] = std::to_string(r);
-    auto chyps_input_char = FakeCommandLineInput(chyps_input_string);
-    argc = static_cast<int>(chyps_input_char.size());
-    argv = chyps_input_char.data();
     chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
 
     IO run_file(*mpi_session, "Run");
@@ -108,7 +96,6 @@ int ConvergenceRunner(const std::string& a_input_name,
     error_metrics[r][2] = global_l2;
     error_metrics[r][3] = global_linf;
 
-    DeleteCommandLineInput(init_input_char);
     DeleteCommandLineInput(chyps_input_char);
   }
 
@@ -154,15 +141,17 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientTop) {
                                input_file["Mesh"]["gen_blx"].get<double>();
   const double domain_height = input_file["Mesh"]["gen_buy"].get<double>() -
                                input_file["Mesh"]["gen_bly"].get<double>();
-  const double amplitude =
-      input_file["SimulationInitializer"]["QuadraticPulse"]["pulse_amplitude"]
-          .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["QuadraticPulse"]
-                ["approximation_terms"]
-                    .get<std::size_t>();
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
+
+  const double amplitude =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
+                    .get<double>();
+  const std::size_t approximation_terms =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
+                    .get<std::size_t>();
 
   const std::vector<double> tensor_kappa =
       input_file["HeatSolver"]["ConductionOperator"]["kappa"]
@@ -202,8 +191,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientTop) {
     return result;
   };
 
-  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
-                                      solution_lambda, number_of_refinements);
+  int test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -222,15 +211,17 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientBot) {
                                input_file["Mesh"]["gen_blx"].get<double>();
   const double domain_height = input_file["Mesh"]["gen_buy"].get<double>() -
                                input_file["Mesh"]["gen_bly"].get<double>();
-  const double amplitude =
-      input_file["SimulationInitializer"]["QuadraticPulse"]["pulse_amplitude"]
-          .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["QuadraticPulse"]
-                ["approximation_terms"]
-                    .get<std::size_t>();
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
+
+  const double amplitude =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
+                    .get<double>();
+  const std::size_t approximation_terms =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
+                    .get<std::size_t>();
 
   const std::vector<double> tensor_kappa =
       input_file["HeatSolver"]["ConductionOperator"]["kappa"]
@@ -270,8 +261,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientBot) {
     return result;
   };
 
-  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
-                                      solution_lambda, number_of_refinements);
+  int test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -290,15 +281,17 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientRight) {
                                input_file["Mesh"]["gen_blx"].get<double>();
   const double domain_height = input_file["Mesh"]["gen_buy"].get<double>() -
                                input_file["Mesh"]["gen_bly"].get<double>();
-  const double amplitude =
-      input_file["SimulationInitializer"]["QuadraticPulse"]["pulse_amplitude"]
-          .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["QuadraticPulse"]
-                ["approximation_terms"]
-                    .get<std::size_t>();
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
+
+  const double amplitude =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
+                    .get<double>();
+  const std::size_t approximation_terms =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
+                    .get<std::size_t>();
 
   const std::vector<double> tensor_kappa =
       input_file["HeatSolver"]["ConductionOperator"]["kappa"]
@@ -339,8 +332,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientRight) {
     return result;
   };
 
-  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
-                                      solution_lambda, number_of_refinements);
+  int test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -359,15 +352,17 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientLeft) {
                                input_file["Mesh"]["gen_blx"].get<double>();
   const double domain_height = input_file["Mesh"]["gen_buy"].get<double>() -
                                input_file["Mesh"]["gen_bly"].get<double>();
-  const double amplitude =
-      input_file["SimulationInitializer"]["QuadraticPulse"]["pulse_amplitude"]
-          .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["QuadraticPulse"]
-                ["approximation_terms"]
-                    .get<std::size_t>();
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
+
+  const double amplitude =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
+                    .get<double>();
+  const std::size_t approximation_terms =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
+                    .get<std::size_t>();
 
   const std::vector<double> tensor_kappa =
       input_file["HeatSolver"]["ConductionOperator"]["kappa"]
@@ -408,8 +403,8 @@ TEST(LinearHeatEquation, HomogeneousAndConstantCoefficientLeft) {
     return result;
   };
 
-  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
-                                      solution_lambda, number_of_refinements);
+  int test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -428,15 +423,17 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficient) {
                                input_file["Mesh"]["gen_blx"].get<double>();
   const double domain_height = input_file["Mesh"]["gen_buy"].get<double>() -
                                input_file["Mesh"]["gen_bly"].get<double>();
-  const double amplitude =
-      input_file["SimulationInitializer"]["QuadraticPulse"]["pulse_amplitude"]
-          .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["QuadraticPulse"]
-                ["approximation_terms"]
-                    .get<std::size_t>();
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
+
+  const double amplitude =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
+                    .get<double>();
+  const std::size_t approximation_terms =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
+                    .get<std::size_t>();
 
   const std::vector<double> tensor_kappa =
       input_file["HeatSolver"]["ConductionOperator"]["kappa"]
@@ -472,72 +469,8 @@ TEST(LinearHeatEquation, HomogeneousAndTensorCoefficient) {
     return result;
   };
 
-  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
-                                      solution_lambda, number_of_refinements);
-  EXPECT_EQ(test_result, 1);
-}
-
-TEST(LinearHeatEquation, HomogeneousAndTensorCoefficientRot45) {
-  std::string file_name =
-      "tests/verification/data/"
-      "homogeneous_tensor_coefficient_rotated.json";
-  static constexpr int number_of_refinements = 4;
-
-  std::ifstream myfile(file_name.c_str());
-  nlohmann::json input_file =
-      nlohmann::json::parse(myfile, nullptr, true, true);
-  myfile.close();
-
-  const double domain_length = input_file["Mesh"]["gen_bux"].get<double>() -
-                               input_file["Mesh"]["gen_blx"].get<double>();
-  const double domain_height = input_file["Mesh"]["gen_buy"].get<double>() -
-                               input_file["Mesh"]["gen_bly"].get<double>();
-  const double amplitude =
-      input_file["SimulationInitializer"]["QuadraticPulse"]["pulse_amplitude"]
-          .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["QuadraticPulse"]
-                ["approximation_terms"]
-                    .get<std::size_t>();
-  const double rotation = input_file["Mesh"]["rotation"].get<double>();
-  const double mesh_rotation_rad = rotation * M_PI / 180.0;
-
-  const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["ConductionOperator"]["kappa"]
-          .get<std::vector<double>>();
-  const double coefficient_x = 0.5;
-  const double coefficient_y = 0.5;
-
-  auto solution_lambda = [=](const double* a_position, const double a_time) {
-    std::array<double, 2> rp;
-    rp[0] = std::cos(-mesh_rotation_rad) * a_position[0] -
-            std::sin(-mesh_rotation_rad) * a_position[1];
-    rp[1] = std::sin(-mesh_rotation_rad) * a_position[0] +
-            std::cos(-mesh_rotation_rad) * a_position[1];
-    double result = 0.0;
-    for (std::size_t m = 1; m <= approximation_terms; ++m) {
-      for (std::size_t n = 1; n <= approximation_terms; ++n) {
-        const double dm = static_cast<double>(m);
-        const double dn = static_cast<double>(n);
-        const double ic_factor =
-            -(((1.0 + std::pow(-1.0, m)) * (-1.0 + std::pow(-1.0, dn)) *
-               amplitude * std::pow(domain_height, 2) *
-               (-8.0 * std::pow(domain_length, 2) +
-                (-4.0 + std::pow(domain_length, 2)) * std::pow(dn, 2) *
-                    std::pow(M_PI, 2))) /
-              (std::pow(dm, 2) * std::pow(dn, 3) * std::pow(M_PI, 5)));
-        result += ic_factor * std::sin(dn * M_PI * rp[0] / domain_length) *
-                  std::cos(dm * M_PI * rp[1] / domain_height) *
-                  std::exp(-M_PI * M_PI * a_time *
-                           (coefficient_x * std::pow(dn / domain_length, 2) +
-                            coefficient_y * std::pow(dm / domain_height, 2)));
-      }
-    }
-    return result;
-  };
-
-  int test_result = ConvergenceRunner(file_name, "quadratic_pulse",
-                                      solution_lambda, number_of_refinements);
+  int test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 
@@ -565,8 +498,9 @@ TEST(LinearHeatEquation, CooledRod) {
                DebugLevel::ALWAYS{},
                "Test requires thermal coefficient of 1.0");
   const int approximation_terms =
-      input_file["SimulationInitializer"]["CooledRod"]["approximation_terms"]
-          .get<int>();
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
+                    .get<int>();
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
     double result = 0.0;
@@ -579,8 +513,8 @@ TEST(LinearHeatEquation, CooledRod) {
     return result + 24.0 + a_position[0];
   };
 
-  int test_result = ConvergenceRunner(file_name, "cooled_rod", solution_lambda,
-                                      number_of_refinements);
+  int test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
   EXPECT_EQ(test_result, 1);
 }
 

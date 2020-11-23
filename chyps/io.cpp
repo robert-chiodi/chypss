@@ -92,6 +92,7 @@ void IO::AddVariableForGridFunction(
     const bool a_dimensions_static) {
   const std::size_t ndofs =
       static_cast<std::size_t>(a_element_space.GetNDofs());
+  std::string node_ordering;
   if (a_element_space.GetVDim() == 1) {
     write_m.DefineVariable<double>(a_variable_name, {}, {}, {ndofs},
                                    a_dimensions_static);
@@ -99,19 +100,65 @@ void IO::AddVariableForGridFunction(
     const std::size_t components =
         static_cast<std::size_t>(a_element_space.GetVDim());
     if (a_element_space.GetOrdering() == mfem::Ordering::byNODES) {
+      node_ordering = "nodes";
       write_m.DefineVariable<double>(a_variable_name, {}, {},
                                      {components, ndofs}, a_dimensions_static);
     } else if (a_element_space.GetOrdering() == mfem::Ordering::byVDIM) {
+      node_ordering = "vdim";
       write_m.DefineVariable<double>(a_variable_name, {}, {},
                                      {ndofs, components}, a_dimensions_static);
     } else {
       DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
-                   "Unkown node ordering for GridFunction when adding to IO");
+                   "Unkown node ordering for Element Space when adding to IO");
     }
   }
   this->WriteAttributeForVariable(
       a_variable_name, "FiniteElementSpace",
       std::string(a_element_space.FEColl()->Name()));
+  this->WriteAttributeForVariable(a_variable_name, "DataOrdering",
+                                  node_ordering);
+  // Assumes constant order elements below
+  this->WriteAttributeForVariable(a_variable_name, "FiniteElementOrder",
+                                  a_element_space.GetOrder(0));
+  this->MarkAsPointVariable(a_variable_name, a_element_space.GetOrder(0));
+}
+
+// Note: This routine is for all ranks writing their own section. Need to work
+// on how to handle the all ranks to one section approach.
+void IO::AddVariableForTrueDofs(
+    const std::string a_variable_name,
+    const mfem::ParFiniteElementSpace& a_element_space,
+    const bool a_dimensions_static) {
+  const std::size_t components =
+      static_cast<std::size_t>(a_element_space.GetVDim());
+  const std::size_t true_dofs =
+      static_cast<std::size_t>(a_element_space.GetTrueVSize()) / components;
+
+  std::string node_ordering;
+  if (components == 1) {
+    write_m.DefineVariable<double>(a_variable_name, {}, {}, {true_dofs},
+                                   a_dimensions_static);
+  } else {
+    if (a_element_space.GetOrdering() == mfem::Ordering::byNODES) {
+      node_ordering = "nodes";
+      write_m.DefineVariable<double>(a_variable_name, {}, {},
+                                     {components, true_dofs},
+                                     a_dimensions_static);
+    } else if (a_element_space.GetOrdering() == mfem::Ordering::byVDIM) {
+      node_ordering = "vdim";
+      write_m.DefineVariable<double>(a_variable_name, {}, {},
+                                     {true_dofs, components},
+                                     a_dimensions_static);
+    } else {
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Unkown node ordering for Element Space when adding to IO");
+    }
+  }
+  this->WriteAttributeForVariable(
+      a_variable_name, "FiniteElementSpace",
+      std::string(a_element_space.FEColl()->Name()));
+  this->WriteAttributeForVariable(a_variable_name, "DataOrdering",
+                                  node_ordering);
   // Assumes constant order elements below
   this->WriteAttributeForVariable(a_variable_name, "FiniteElementOrder",
                                   a_element_space.GetOrder(0));
@@ -189,12 +236,12 @@ void IO::CloseReadEngine(void) {
 }
 
 void IO::PutDeferred(const std::string& a_variable_name,
-                     const mfem::ParGridFunction& a_grid_function) {
+                     const mfem::Vector& a_vector) {
   DEBUG_ASSERT(this->IsWriteModeActive(), global_assert{}, DebugLevel::CHEAP{},
                "IO must be in write mode for writing to fields.");
   DEBUG_ASSERT(this->OngoingWriteStep(), global_assert{}, DebugLevel::CHEAP{},
                "An ongoing IO step is required for writing.");
-  this->Put(a_variable_name, a_grid_function.GetData(), adios2::Mode::Deferred);
+  this->Put(a_variable_name, a_vector.GetData(), adios2::Mode::Deferred);
 }
 
 void IO::PerformPuts(void) {

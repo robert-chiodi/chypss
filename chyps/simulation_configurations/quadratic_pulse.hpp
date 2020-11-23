@@ -13,23 +13,19 @@
 
 #include <functional>
 
-#include "chyps/simulation_configurations/configuration_initializer_interface.hpp"
+#include <mfem/mfem.hpp>
+
+#include "chyps/input_parser.hpp"
 
 namespace chyps {
+namespace quadratic_pulse {
 
-class QuadraticPulse : public ConfigurationInitializer {
- public:
-  QuadraticPulse(InputParser& a_parser);
-
-  virtual void Initialize(void) override final;
-  virtual void FillRequiredData(RequiredData& a_data) override final;
-
-  virtual ~QuadraticPulse(void) override final;
-
- private:
-  std::function<double(const mfem::Vector&)> SelectInitialConditions(
-      void) const;
-};
+void AddParserOptions(InputParser& a_parser);
+void InitializeData(const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser,
+                    mfem::ParFiniteElementSpace& a_finite_element_space,
+                    mfem::Vector& a_data);
+}  // namespace quadratic_pulse
 
 }  // namespace chyps
 

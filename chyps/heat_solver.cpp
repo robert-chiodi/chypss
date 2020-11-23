@@ -29,6 +29,8 @@ HeatSolver::HeatSolver(InputParser& a_parser, Simulation& a_simulation)
       coarse_element_space_m(nullptr),
       operator_m(nullptr),
       temperature_m(),
+      rho_m(),
+      cp_m(),
       visit_collection_m(nullptr) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing HeatSolver object.");
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Gathering options of HeatSolver class.");
@@ -77,6 +79,8 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
 void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
   if (parser_m["Simulation/use_visit"].get<bool>()) {
     visit_collection_m->UpdateField("temperature", temperature_m);
+    visit_collection_m->UpdateField("rho", rho_m);
+    visit_collection_m->UpdateField("cp", cp_m);
     visit_collection_m->WriteOutFields(a_cycle, a_time);
   }
 
@@ -87,9 +91,9 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
     DEBUG_ASSERT(sim_m.GetIO().OngoingWriteStep(), global_assert{},
                  DebugLevel::CHEAP{},
                  "An ongoing IO step is required for writing.");
-    mfem::ParGridFunction temperature_gf(element_space_m);
-    temperature_gf.SetFromTrueDofs(temperature_m);
-    sim_m.GetIO().PutDeferred("HeatSolver/temperature", temperature_gf);
+    sim_m.GetIO().PutDeferred("HeatSolver/temperature", temperature_m);
+    sim_m.GetIO().PutDeferred("HeatSolver/rho", rho_m);
+    sim_m.GetIO().PutDeferred("HeatSolver/cp", cp_m);
     sim_m.GetIO().PerformPuts();
   }
 }
@@ -209,7 +213,7 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating new conduction operator.");
   operator_m = new ConductionOperator(parser_m, sim_m, boundary_conditions_m,
                                       *coarse_element_space_m, *element_space_m,
-                                      temperature_m);
+                                      temperature_m, rho_m, cp_m);
 }
 
 void HeatSolver::RegisterFieldsForIO(void) {
@@ -218,27 +222,45 @@ void HeatSolver::RegisterFieldsForIO(void) {
     visit_collection_m = new MfemVisItCollection(
         sim_m.GetMPI().GetComm(), "HeatSolver", sim_m.GetMesh().GetMfemMesh());
     visit_collection_m->RegisterField("temperature", element_space_m);
+    visit_collection_m->RegisterField("rho", element_space_m);
+    visit_collection_m->RegisterField("cp", element_space_m);
     SPDLOG_LOGGER_INFO(MAIN_LOG, "All fields registered for export");
   }
 
   // Below is ADIOS2 io calls. Will replace VisIt once working.
   if (this->FileWritingEnabled()) {
-    sim_m.GetIO().AddVariableForGridFunction("HeatSolver/temperature",
-                                             *element_space_m, true);
+    sim_m.GetIO().AddVariableForTrueDofs("HeatSolver/temperature",
+                                         *element_space_m, true);
+    sim_m.GetIO().AddVariableForTrueDofs("HeatSolver/rho", *element_space_m,
+                                         true);
+    sim_m.GetIO().AddVariableForTrueDofs("HeatSolver/cp", *element_space_m,
+                                         true);
   }
 }
 
 void HeatSolver::SetInitialConditions(void) {
-  mfem::ParGridFunction temperature_grid_function(element_space_m);
   DEBUG_ASSERT(this->RestartFileActive(), global_assert{}, DebugLevel::CHEAP{},
                "Cannot read from restart file.");
-  temperature_grid_function = 0.0;
-  sim_m.GetIO().GetImmediateBlock(
-      "HeatSolver/temperature", {0},
-      {static_cast<std::size_t>(temperature_grid_function.Size())},
-      temperature_grid_function.GetData());
-  temperature_grid_function.GetTrueDofs(temperature_m);
-  SPDLOG_LOGGER_INFO(MAIN_LOG, "temperature field allocated and set");
+  DEBUG_ASSERT(element_space_m->GetVDim() == 1, global_assert{},
+               DebugLevel::CHEAP{},
+               "Finite element space should be for a scalar component.");
+  const int truedof_size = element_space_m->GetTrueVSize();
+
+  temperature_m.SetSize(truedof_size);
+  sim_m.GetIO().GetImmediateBlock("HeatSolver/temperature", {0},
+                                  {static_cast<std::size_t>(truedof_size)},
+                                  temperature_m.GetData());
+
+  rho_m.SetSize(truedof_size);
+  sim_m.GetIO().GetImmediateBlock("HeatSolver/rho", {0},
+                                  {static_cast<std::size_t>(truedof_size)},
+                                  rho_m.GetData());
+
+  cp_m.SetSize(truedof_size);
+  sim_m.GetIO().GetImmediateBlock("HeatSolver/cp", {0},
+                                  {static_cast<std::size_t>(truedof_size)},
+                                  cp_m.GetData());
+  SPDLOG_LOGGER_INFO(MAIN_LOG, "Heat solver fields allocated and set");
 }
 
 HeatSolver::~HeatSolver(void) {

@@ -18,13 +18,18 @@
 
 namespace chyps {
 
-MonitorManager::MonitorManager(void) {
+MonitorManager::MonitorManager(void)
+    : directory_base_m(), file_list_m(), on_m(false) {}
+
+void MonitorManager::Initialize(const std::string& a_directory_name) {
+  on_m = true;
+
   static constexpr uint32_t max_directory_attempt = 1000;
 
   std::filesystem::path dir_path;
   uint32_t n = 0;
   for (n = 0; n < max_directory_attempt; ++n) {
-    directory_base_m = "./monitor_" + ZeroFill(n, 3);
+    directory_base_m = "./" + a_directory_name + "_" + ZeroFill(n, 3);
     dir_path = std::filesystem::path(directory_base_m);
     if (!std::filesystem::is_directory(dir_path)) {
       break;
@@ -34,26 +39,33 @@ MonitorManager::MonitorManager(void) {
                "Cannot create monitor directory. More than " +
                    std::to_string(max_directory_attempt) +
                    " directories in existence.");
-
   std::filesystem::create_directory(dir_path);
 }
 
 MonitorFile* MonitorManager::CreateMonitorFile(
     const std::string& a_name, const std::vector<std::string>& a_header,
     const std::vector<FieldType>& a_format) {
-  auto format_copy = a_format;
-  return CreateMonitorFile(a_name, a_header, std::move(format_copy));
+  if (this->IsOn()) {
+    auto format_copy = a_format;
+    return CreateMonitorFile(a_name, a_header, std::move(format_copy));
+  } else {
+    return nullptr;
+  }
 }
 
 MonitorFile* MonitorManager::CreateMonitorFile(
     const std::string& a_name, const std::vector<std::string>& a_header,
     std::vector<FieldType>&& a_format) {
-  auto insert_location =
-      file_list_m.insert({a_name, MonitorFile(directory_base_m + '/' + a_name,
-                                              a_header, std::move(a_format))});
-  DEBUG_ASSERT(insert_location.second, global_assert{}, DebugLevel::CHEAP{},
-               "Monitor file with name \"" + a_name + "\" already added.");
-  return &(insert_location.first->second);
+  if (this->IsOn()) {
+    auto insert_location = file_list_m.insert(
+        {a_name, MonitorFile(directory_base_m + '/' + a_name, a_header,
+                             std::move(a_format))});
+    DEBUG_ASSERT(insert_location.second, global_assert{}, DebugLevel::CHEAP{},
+                 "Monitor file with name \"" + a_name + "\" already added.");
+    return &(insert_location.first->second);
+  } else {
+    return nullptr;
+  }
 }
 
 void MonitorManager::WriteStepToFiles(const int a_iter, const double a_time,
@@ -68,5 +80,7 @@ void MonitorManager::WriteStepToFiles(const int a_iter, const double a_time,
     }
   }
 }
+
+bool MonitorManager::IsOn(void) const { return on_m; }
 
 }  // namespace chyps

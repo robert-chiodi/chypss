@@ -32,7 +32,7 @@ class ConductionOperator : public ConductionOperatorBase {
       const std::unordered_map<std::string, BoundaryConditionManager>&
           a_boundary_conditions,
       mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-      mfem::Vector& u);
+      mfem::Vector& a_temperature, mfem::Vector& a_rho, mfem::Vector& a_cp);
 
   virtual void Mult(const mfem::Vector& u,
                     mfem::Vector& du_dt) const override final;

@@ -58,6 +58,9 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
 void Simulation::Initialize(int argc, char** argv) {
   this->GetTimerManager().StartTimer("Total");
   this->ParseOptions(argc, argv);
+  if (parser_m["Simulation/write_to_monitor"].get<bool>()) {
+    this->GetMonitorManager().Initialize("monitor");
+  }
   this->SetupFileIO();
   // Note, order is important here. Mesh must be initialized first.
   mesh_m.Initialize();
@@ -205,6 +208,11 @@ void Simulation::GatherOptions(void) {
                      "Location to write output that would normally go to the "
                      "screen. Supply \"cout\" to write to terminal.",
                      "cout");
+  parser_m.AddOption(
+      "Simulation/write_to_monitor",
+      "Determines whether MonitorManager object will be initialized "
+      "and monitor files written to.",
+      true);
   parser_m.AddOption(
       "Simulation/in_data",
       "Name of file (or BP4 directory) holding "
