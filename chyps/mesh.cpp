@@ -17,6 +17,7 @@
 #include "chyps/io.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/simulation.hpp"
+#include "chyps/string_manipulation.hpp"
 
 namespace chyps {
 
@@ -46,6 +47,7 @@ Mesh::Mesh(InputParser& a_parser, Simulation& a_simulation)
 void Mesh::Initialize(void) {
   this->ReadAndRefineMesh();
   this->AllocateVariables();
+  this->CreateAndRegisterPreciceMeshes();
 }
 
 const MPI_Comm& Mesh::GetMPIComm(void) const { return mpi_session_m.GetComm(); }
@@ -96,51 +98,56 @@ int Mesh::GetNumberOfBoundaryTagValues(void) const {
              : 0;
 }
 
-std::pair<std::vector<double>, std::vector<int>> Mesh::GetBoundaryVertices(
-    const int a_tag) const {
-  SPDLOG_LOGGER_INFO(
-      MAIN_LOG,
-      "Building boundary vertex position list for boundaries tagged with {}",
-      a_tag);
-  const int dimension = this->GetDimension();
+std::pair<const std::vector<double>*, const std::vector<int>*>
+Mesh::GetBoundaryVertices(const int a_tag) const {
+  auto& boundary_vertices = boundary_vertices_m[a_tag - 1].first;
+  auto& boundary_indices = boundary_vertices_m[a_tag - 1].second;
+  if (boundary_vertices.size() == 0) {
+    // Must construct and store the two vectors.
 
-  mfem::Array<int> element_vertices;
-  std::set<int> unique_border_vertices;
-  const int number_of_border_elements = parallel_mesh_m->GetNBE();
-  for (int n = 0; n < number_of_border_elements; ++n) {
-    const mfem::Element* element = parallel_mesh_m->GetBdrElement(n);
-    if (element->GetAttribute() == a_tag) {
-      element->GetVertices(element_vertices);
-      for (int v = 0; v < element_vertices.Size(); ++v) {
-        unique_border_vertices.insert(element_vertices[v]);
+    SPDLOG_LOGGER_INFO(
+        MAIN_LOG,
+        "Building boundary vertex position list for boundaries tagged with {}",
+        a_tag);
+    const int dimension = this->GetDimension();
+
+    mfem::Array<int> element_vertices;
+    std::set<int> unique_border_vertices;
+    const int number_of_border_elements = parallel_mesh_m->GetNBE();
+    for (int n = 0; n < number_of_border_elements; ++n) {
+      const mfem::Element* element = parallel_mesh_m->GetBdrElement(n);
+      if (element->GetAttribute() == a_tag) {
+        element->GetVertices(element_vertices);
+        for (int v = 0; v < element_vertices.Size(); ++v) {
+          unique_border_vertices.insert(element_vertices[v]);
+        }
       }
     }
-  }
 
-  const std::size_t number_of_vertices = unique_border_vertices.size();
-  SPDLOG_LOGGER_INFO(MAIN_LOG,
-                     "{} unique boundary vertices found in mesh with tag {}",
-                     number_of_vertices, a_tag);
+    const std::size_t number_of_vertices = unique_border_vertices.size();
+    SPDLOG_LOGGER_INFO(MAIN_LOG,
+                       "{} unique boundary vertices found in mesh with tag {}",
+                       number_of_vertices, a_tag);
 
-  std::vector<double> boundary_vertices(number_of_vertices *
-                                        static_cast<std::size_t>(dimension));
-  std::vector<int> boundary_vertex_indices(number_of_vertices);
-  std::size_t nvertex = 0;
-  for (const auto& elem : unique_border_vertices) {
-    boundary_vertex_indices[nvertex] = elem;
-    const double* vertex = parallel_mesh_m->GetVertex(elem);
-    for (int d = 0; d < dimension; ++d) {
-      boundary_vertices[dimension * nvertex + d] = vertex[d];
+    boundary_vertices.resize(number_of_vertices *
+                             static_cast<std::size_t>(dimension));
+    boundary_indices.resize(number_of_vertices);
+    std::size_t nvertex = 0;
+    for (const auto& elem : unique_border_vertices) {
+      boundary_indices[nvertex] = elem;
+      const double* vertex = parallel_mesh_m->GetVertex(elem);
+      for (int d = 0; d < dimension; ++d) {
+        boundary_vertices[dimension * nvertex + d] = vertex[d];
+      }
+      ++nvertex;
     }
-    ++nvertex;
+    SPDLOG_LOGGER_INFO(MAIN_LOG,
+                       "Built boundary vertex position list. Has length {} "
+                       "consisting of {} vertices.",
+                       boundary_vertices.size(),
+                       boundary_vertices.size() / dimension);
   }
-  SPDLOG_LOGGER_INFO(MAIN_LOG,
-                     "Built boundary vertex position list. Has length {} "
-                     "consisting of {} vertices.",
-                     boundary_vertices.size(),
-                     boundary_vertices.size() / dimension);
-
-  return std::make_pair(boundary_vertices, boundary_vertex_indices);
+  return std::make_pair(&boundary_vertices, &boundary_indices);
 }
 
 Mesh::~Mesh(void) {
@@ -199,6 +206,13 @@ void Mesh::GatherOptions(void) {
       "boundaries to be periodic. Provided as string with axis names (e.g., "
       "\"xy\" to mark as periodic.",
       "");
+  parser_m.AddOption(
+      "Mesh/Precice/mesh_base_name",
+      "Base name for naming preCICE meshes. Final name will be "
+      "\"BaseName_00[tag_value]\". Only matters if preCICE is active.");
+  parser_m.AddOption("Mesh/Precice/precice_tags",
+                     "Boundary attribute tags to create preCICE meshes for. "
+                     "Only matters if preCICE is active.");
   SPDLOG_LOGGER_INFO(MAIN_LOG, "All options added to parser for Mesh class");
 }
 
@@ -306,6 +320,39 @@ void Mesh::AllocateVariables(void) {
   MPI_Scan(&local_elems, &element_offset_m, 1, MPI_LONG, MPI_SUM,
            this->GetMPIComm());
   element_offset_m -= local_elems;
+
+  boundary_vertices_m.resize(this->GetNumberOfBoundaryTagValues());
+}
+
+void Mesh::CreateAndRegisterPreciceMeshes(void) {
+  if (this->TiedToSimulation() && sim_m->PreciceActive()) {
+    const auto precice_tags =
+        parser_m["Mesh/Precice/precice_tags"].get<std::vector<int>>();
+    const auto base_name =
+        parser_m["Mesh/Precice/mesh_base_name"].get<std::string>();
+    const std::vector<double>* vertex_positions;
+    const std::vector<int>* vertex_indices;
+    for (const auto& elem : precice_tags) {
+      DEBUG_ASSERT(elem <= this->GetNumberOfBoundaryTagValues(),
+                   global_assert{}, DebugLevel::CHEAP{},
+                   "Boundary tag provided for preCICE that is greater than "
+                   "that which existson the mesh.");
+      const std::string mesh_name = base_name + '_' + ZeroFill(elem, 3);
+      sim_m->GetPreciceAdapter().AddMesh(mesh_name);
+      std::tie(vertex_positions, vertex_indices) =
+          this->GetBoundaryVertices(elem);
+      sim_m->GetPreciceAdapter().SetVertexPositions(mesh_name,
+                                                    *vertex_positions);
+    }
+  }
+}
+
+std::string Mesh::GetPreciceMeshName(const int a_tag) const {
+  DEBUG_ASSERT(this->TiedToSimulation() && sim_m->PreciceActive(),
+               global_assert{}, DebugLevel::CHEAP{},
+               "Mesh is not tied to a simulation actively using precice");
+  return parser_m["Mesh/Precice/mesh_base_name"].get<std::string>() + '_' +
+         ZeroFill(a_tag, 3);
 }
 
 std::pair<mfem::Mesh*, double*> Mesh::GenerateLineMesh(

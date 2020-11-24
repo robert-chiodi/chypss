@@ -15,6 +15,7 @@
 #include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
 #include "chyps/simulation.hpp"
+#include "chyps/string_manipulation.hpp"
 
 namespace chyps {
 
@@ -67,7 +68,7 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
   double time = a_time;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Setting operator parameters at time {:8.6E}",
                      a_time);
-  operator_m->UpdateBoundaryConditions(temperature_m);
+  this->UpdateBoundaryConditions(temperature_m);
   operator_m->SetParameters(temperature_m);
   ode_solver_m->Step(temperature_m, time, taken_time_step);
   SPDLOG_LOGGER_INFO(MAIN_LOG,
@@ -285,8 +286,35 @@ HeatSolver::~HeatSolver(void) {
 
 void HeatSolver::InitializeBoundaryConditions(void) {
   for (auto& manager : boundary_conditions_m) {
-    manager.second.Initialize(sim_m.GetMesh());
+    manager.second.Initialize(sim_m);
   }
+  if (sim_m.PreciceActive()) {
+    for (auto& manager : boundary_conditions_m) {
+      for (int n = 0; n < manager.second.GetNumberOfBoundaryConditions(); ++n) {
+        if (manager.second.PreciceBoundaryCondition(n + 1)) {
+          sim_m.GetPreciceAdapter().AddData(
+              manager.first + '_' + ZeroFill(n + 1, 3),
+              sim_m.GetMesh().GetPreciceMeshName(n + 1), DataOperation::READ);
+        }
+      }
+    }
+  }
+}
+
+void HeatSolver::UpdateBoundaryConditions(mfem::Vector& a_temperature) {
+  if (sim_m.PreciceActive()) {
+    for (auto& manager : boundary_conditions_m) {
+      for (int n = 0; n < manager.second.GetNumberOfBoundaryConditions(); ++n) {
+        if (manager.second.PreciceBoundaryCondition(n + 1)) {
+          sim_m.GetPreciceAdapter().ReadBlockScalarData(
+              manager.first + '_' + ZeroFill(n + 1, 3),
+              manager.second.GetDataBuffer(n + 1));
+        }
+      }
+    }
+  }
+
+  operator_m->UpdateBoundaryConditions(temperature_m);
 }
 
 bool HeatSolver::FileWritingEnabled(void) const {

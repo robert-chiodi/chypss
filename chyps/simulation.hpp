@@ -75,17 +75,23 @@ class Simulation {
 
   void RunToEnd(void);
 
-  bool PreciceActive(void) const;
-
   Mesh& GetMesh(void);
   const Mesh& GetMesh(void) const;
+
   IO& GetIO(void);
   const IO& GetIO(void) const;
+
   const MPIParallel& GetMPI(void) const;
+
   MonitorManager& GetMonitorManager(void);
   const MonitorManager& GetMonitorManager(void) const;
+
   TimerManager& GetTimerManager(void);
   const TimerManager& GetTimerManager(void) const;
+
+  bool PreciceActive(void) const;
+  PreciceAdapter& GetPreciceAdapter(void);
+  const PreciceAdapter& GetPreciceAdapter(void) const;
 
   ~Simulation(void);
 
@@ -110,7 +116,7 @@ class Simulation {
   TimerManager timer_manager_m;
   Mesh mesh_m;
   HeatSolver heat_solver_m;
-  PreciceAdapter* precice_m;
+  PreciceAdapter* precice_adapter_m;
   IterationInfo step_info_m;
   SimulationRestrictions restrictions_m;
   SimulationGoals goals_m;

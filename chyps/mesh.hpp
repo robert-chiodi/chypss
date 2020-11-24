@@ -29,6 +29,10 @@ class Simulation;
 
 enum class MeshElement { ELEMENT = 0, VERTEX };
 
+/// \brief A class to handle access to MFEM mesh.
+///
+/// NOTE: If precice is active, meshes will be created in precice with
+/// the argument Mesh/Precice/mesh_base_name+'_'+ZeroFill(tag,3).
 class Mesh {
  public:
   Mesh(void) = delete;
@@ -67,11 +71,18 @@ class Mesh {
   /// mesh.
   int GetNumberOfBoundaryTagValues(void) const;
 
-  /// \brief Function computes and returns a std::vector of vertex positions for
-  /// border vertices in a_mesh tagged with a_tag. Number of vertices is
+  /// \brief Function that returns the vertex positions and indices for the
+  /// boundary labeled with a_tag. The returned vectors are lazily evaluated and
+  /// stored for later reuse.
+  ///
+  /// NOTE: Number of vertices is
   /// vector.size()/Mesh::GetDimension();
-  std::pair<std::vector<double>, std::vector<int>> GetBoundaryVertices(
-      const int a_tag) const;
+  std::pair<const std::vector<double>*, const std::vector<int>*>
+  GetBoundaryVertices(const int a_tag) const;
+
+  /// \brief Returns name of preCICE surface mesh for the boundary
+  /// marked by a_tag.
+  std::string GetPreciceMeshName(const int a_tag) const;
 
   /// \brief Writes the mesh to the file opened in file_io_m.
   ///
@@ -89,6 +100,7 @@ class Mesh {
   void AddIOVariables(void);
   void ReadAndRefineMesh(void);
   void AllocateVariables(void);
+  void CreateAndRegisterPreciceMeshes(void);
 
   /// \brief Generate a line mesh of a 1D domain for use by MFEM.
   ///
@@ -127,6 +139,8 @@ class Mesh {
   Simulation* sim_m;
   const MPIParallel& mpi_session_m;
   IO& file_io_m;
+  mutable std::vector<std::pair<std::vector<double>, std::vector<int>>>
+      boundary_vertices_m;
   mfem::ParMesh* parallel_mesh_m;
   std::size_t element_offset_m;
 };

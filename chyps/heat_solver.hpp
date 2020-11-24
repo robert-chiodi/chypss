@@ -81,12 +81,7 @@ class HeatSolver : public SolverInterface {
 
   void RegisterFieldsForIO(void);
 
-  // Set spatially varying condition onto solver true DOFs
-  void SetTrueDofsFromVertexData(const std::size_t a_size,
-                                 const int* a_vertex_list,
-                                 const double* a_vertex_data,
-                                 mfem::Array<int>& a_boundary,
-                                 mfem::ParGridFunction& a_temperature_gf);
+  void UpdateBoundaryConditions(mfem::Vector& a_temperature);
 
   bool FileWritingEnabled(void) const;
   bool RestartFileActive(void) const;

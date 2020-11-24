@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+
+<precice-configuration>
+
+  <solver-interface dimensions="2">
+    
+    <data:scalar name="temperature_004" />
+    
+    <mesh name="CHyPSmesh_004">
+      <use-data name="temperature_004" />
+    </mesh>
+
+    <mesh name="DummyMesh">
+      <use-data name="temperature_004" />
+    </mesh>
+
+    <participant name="CHyPS">
+      <use-mesh name="DummyMesh" from="DummySolver" />
+      <use-mesh name="CHyPSmesh_004" provide="yes" />
+      <read-data  name="temperature_004" mesh="CHyPSmesh_004" />
+      <mapping:nearest-neighbor direction="read" from="DummyMesh" to="CHyPSmesh_004" constraint="consistent"  />
+    </participant>
+
+    <participant name="DummySolver">
+      <use-mesh name="DummyMesh" provide="yes"/>
+      <write-data name="temperature_004" mesh="DummyMesh" />
+    </participant>
+
+    <m2n:sockets from="DummySolver" to="CHyPS" network="lo0"/>
+
+    <coupling-scheme:serial-explicit>
+      <participants first="DummySolver" second="CHyPS" />
+      <max-time value="0.5"/>
+      <time-window-size value="0.01"/>
+      <exchange data="temperature_004" mesh="DummyMesh" from="DummySolver" to="CHyPS"/>
+    </coupling-scheme:serial-explicit>
+
+  </solver-interface>
+
+</precice-configuration>

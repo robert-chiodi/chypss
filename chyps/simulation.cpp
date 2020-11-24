@@ -38,7 +38,7 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
       timer_manager_m(&mpi_session_m),
       mesh_m(parser_m, *this),
       heat_solver_m(parser_m, *this),
-      precice_m(nullptr),
+      precice_adapter_m(nullptr),
       step_info_m(0.0, 0.0, 0.0),
       restrictions_m(),
       goals_m(),
@@ -63,9 +63,9 @@ void Simulation::Initialize(int argc, char** argv) {
   }
   this->SetupFileIO();
   // Note, order is important here. Mesh must be initialized first.
+  this->ActivatePrecice();
   mesh_m.Initialize();
   heat_solver_m.Initialize();
-  this->ActivatePrecice();
   this->InitializeStepInfo();
   this->InitializeRestrictions();
   this->InitializeGoals();
@@ -98,7 +98,7 @@ void Simulation::RunToEnd(void) {
     SPDLOG_LOGGER_INFO(MAIN_LOG, "Starting time-iteration {} for time {:8.6E}",
                        step_info_m.iteration, step_info_m.time);
     // if (this->PreciceActive()) {
-    //   precice_m->ReadBlockScalarData("Temperature", temperature_bc);
+    //   precice_adapter_m->ReadBlockScalarData("Temperature", temperature_bc);
     // }
 
     double dt_adj = heat_solver_m.AdjustTimeStep(step_info_m.dt);
@@ -117,7 +117,7 @@ void Simulation::RunToEnd(void) {
     ++step_info_m.iteration;
 
     restrictions_m.max_dt = this->PreciceActive()
-                                ? precice_m->Advance(step_info_m.dt)
+                                ? precice_adapter_m->Advance(step_info_m.dt)
                                 : restrictions_m.max_dt;
 
     // Write out visualization files and checkpoints
@@ -136,7 +136,7 @@ void Simulation::RunToEnd(void) {
           step_info_m.iteration, step_info_m.time, step_info_m.dt);
     }
 
-    if (this->PreciceActive() && !precice_m->IsCouplingOngoing()) {
+    if (this->PreciceActive() && !precice_adapter_m->IsCouplingOngoing()) {
       SPDLOG_LOGGER_INFO(MAIN_LOG,
                          "Precice coupling done at iteration {} and time {}",
                          step_info_m.iteration, step_info_m.time);
@@ -150,11 +150,9 @@ void Simulation::RunToEnd(void) {
                      step_info_m.time);
 
   if (this->PreciceActive()) {
-    precice_m->Finalize();
+    precice_adapter_m->Finalize();
   }
 }
-
-bool Simulation::PreciceActive(void) const { return precice_m != nullptr; }
 
 Mesh& Simulation::GetMesh(void) { return mesh_m; }
 
@@ -178,9 +176,25 @@ const TimerManager& Simulation::GetTimerManager(void) const {
   return timer_manager_m;
 }
 
+bool Simulation::PreciceActive(void) const {
+  return precice_adapter_m != nullptr;
+}
+
+PreciceAdapter& Simulation::GetPreciceAdapter(void) {
+  DEBUG_ASSERT(this->PreciceActive(), global_assert{}, DebugLevel::CHEAP{},
+               "Precice must be active to request the adapter.");
+  return *precice_adapter_m;
+}
+
+const PreciceAdapter& Simulation::GetPreciceAdapter(void) const {
+  DEBUG_ASSERT(this->PreciceActive(), global_assert{}, DebugLevel::CHEAP{},
+               "Precice must be active to request the adapter.");
+  return *precice_adapter_m;
+}
+
 Simulation::~Simulation(void) {
-  delete precice_m;
-  precice_m = nullptr;
+  delete precice_adapter_m;
+  precice_adapter_m = nullptr;
   if (parser_m["Simulation/output_screen"] != "cout") {
     fclose(output_m.output_screen);
     delete output_m.output_screen;
@@ -277,55 +291,13 @@ void Simulation::SetupFileIO(void) {
 }
 
 void Simulation::ActivatePrecice(void) {
-  precice_m =
+  precice_adapter_m =
       parser_m["Simulation/use_precice"].get<bool>()
           ? new PreciceAdapter(
-                "HeatSolver", "HeatSolverMesh",
+                "CHyPS",
                 parser_m["Simulation/precice_config"].get<std::string>(),
                 mpi_session_m.MyRank(), mpi_session_m.NumberOfRanks())
           : nullptr;
-
-  // double* temperature_bc = nullptr;
-  std::vector<double> vertex_positions;
-  std::vector<int> vertex_indices;
-  if (this->PreciceActive()) {
-    std::cout << "Need to figure new way to handle preCICE coupling within new "
-                 "boundary condition manager "
-              << std::endl;
-    return;
-    // std::tie(vertex_positions, vertex_indices) =
-    // mesh_m.GetBoundaryVertices(4);
-    // precice_m->SetVertexPositions(vertex_positions);
-    // precice_m->AddData("Temperature", DataOperation::READ);
-    // temperature_bc = new double[precice_m->ScalarDataSize()];
-    // // Note, BC will not be used prior to being set in
-    // // ConductionOperator during solver.Advance().
-    // std::fill(temperature_bc, temperature_bc + precice_m->ScalarDataSize(),
-    //           -10.0);
-  }
-
-  // BoundaryCondition(BoundaryConditionType::HOMOGENEOUS_NEUMANN);
-  // auto condition =
-  //     BoundaryCondition(BoundaryConditionType::DIRICHLET, true, true);
-  // // TESTING START
-  // std::tie(vertex_positions, vertex_indices) = mesh_m.GetBoundaryVertices(4);
-  // temperature_bc = new double[vertex_indices.size()];
-  // for (std::size_t n = 0; n < vertex_indices.size(); ++n) {
-  //   temperature_bc[n] = vertex_positions[2 * n];
-  // }
-  // condition.SetValues(vertex_indices.size(), temperature_bc,
-  //                     vertex_indices.data(), false);
-  // mesh_m.SetBoundaryCondition(4, condition);
-  // // TESTING END
-  // condition = BoundaryCondition(BoundaryConditionType::HOMOGENEOUS_NEUMANN,
-  //                               false, false);
-  // //  condition.SetValues(1.0);
-  // mesh_m.SetBoundaryCondition(1, condition);
-  // //  condition.SetValues(1.0);
-  // mesh_m.SetBoundaryCondition(2, condition);
-  // //  condition.SetValues(2.5);
-  // mesh_m.SetBoundaryCondition(3, condition);
-  // mesh_m.CommitBoundaryConditions();
 }
 
 void Simulation::InitializeStepInfo(void) {
@@ -344,7 +316,7 @@ void Simulation::InitializeStepInfo(void) {
 void Simulation::InitializeRestrictions(void) {
   restrictions_m.max_dt = step_info_m.dt;
   if (this->PreciceActive()) {
-    restrictions_m.max_dt = precice_m->Initialize();
+    restrictions_m.max_dt = precice_adapter_m->Initialize();
   }
 }
 

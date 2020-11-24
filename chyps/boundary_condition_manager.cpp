@@ -15,7 +15,7 @@
 
 #include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
-#include "chyps/mesh.hpp"
+#include "chyps/simulation.hpp"
 
 namespace chyps {
 
@@ -36,7 +36,7 @@ BoundaryConditionManager::BoundaryConditionManager(
     InputParser& a_parser, const std::string& a_parser_prefix)
     : parser_m(a_parser),
       parser_prefix_m(a_parser_prefix),
-      mesh_m(nullptr),
+      sim_m(nullptr),
       boundary_condition_counts_m(),
       boundary_conditions_m(),
       precice_condition_m(),
@@ -46,15 +46,16 @@ BoundaryConditionManager::BoundaryConditionManager(
   this->GatherOptions();
 }
 
-void BoundaryConditionManager::Initialize(const Mesh& a_mesh) {
-  mesh_m = &a_mesh;
+void BoundaryConditionManager::Initialize(Simulation& a_sim) {
+  sim_m = &a_sim;
   std::size_t number_of_bcs =
-      static_cast<std::size_t>(mesh_m->GetNumberOfBoundaryTagValues());
+      static_cast<std::size_t>(sim_m->GetMesh().GetNumberOfBoundaryTagValues());
   boundary_condition_counts_m.resize(details::BCType::COUNT, 0);
   boundary_conditions_m.resize(number_of_bcs);
   precice_condition_m.resize(number_of_bcs, false);
+  vertex_positions_m.resize(number_of_bcs, nullptr);
+  indices_m.resize(number_of_bcs, nullptr);
   values_m.resize(number_of_bcs);
-  indices_m.resize(number_of_bcs);
 
   this->SetBoundaryConditionsFromInput();
 }
@@ -93,11 +94,11 @@ void BoundaryConditionManager::SetBoundaryConditionType(
       a_bc_type == BoundaryConditionType::NEUMANN) {
     if (a_spatially_varying) {
       std::tie(vertex_positions_m[a_tag - 1], indices_m[a_tag - 1]) =
-          mesh_m->GetBoundaryVertices(a_tag);
-      values_m[a_tag - 1].resize(indices_m[a_tag - 1].size());
+          sim_m->GetMesh().GetBoundaryVertices(a_tag);
+      values_m[a_tag - 1].resize(indices_m[a_tag - 1]->size());
       boundary_conditions_m[a_tag - 1].SetValues(
           values_m[a_tag - 1].size(), values_m[a_tag - 1].data(),
-          indices_m[a_tag - 1].data(), false);
+          indices_m[a_tag - 1]->data(), false);
     } else {
       values_m[a_tag - 1].resize(1);
       boundary_conditions_m[a_tag - 1].SetValues(values_m[a_tag - 1].data(),
@@ -131,8 +132,7 @@ BoundaryConditionManager::GetBoundaryVertices(const int a_tag) const {
                DebugLevel::CHEAP{},
                "Arrays have not been setup. Make sure to set the boundary "
                "condition for the tag first with SetBoundaryConditionType.");
-  return std::make_pair(&(vertex_positions_m[a_tag - 1]),
-                        &(indices_m[a_tag - 1]));
+  return std::make_pair(vertex_positions_m[a_tag - 1], indices_m[a_tag - 1]);
 }
 
 void BoundaryConditionManager::SetBoundaryConditionValues(
@@ -221,8 +221,22 @@ double* BoundaryConditionManager::GetDataBuffer(const int a_tag) {
                global_assert{}, DebugLevel::CHEAP{},
                "Data buffer only exists for DIRICHLET and NEUMANN conditions.");
   DEBUG_ASSERT(precice_condition_m[a_tag - 1], global_assert{},
-               DebugLevel::CHEAP{});
+               DebugLevel::CHEAP{},
+               "Raw buffers can only be supplied for precice conditions.");
   return values_m[a_tag - 1].data();
+}
+
+bool BoundaryConditionManager::PreciceBoundaryCondition(const int a_tag) const {
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
+  return precice_condition_m[a_tag - 1];
 }
 
 const BoundaryCondition& BoundaryConditionManager::GetBoundaryCondition(
@@ -245,14 +259,12 @@ int BoundaryConditionManager::GetNumberOfHomogeneousDirichletConditions(
 }
 
 int BoundaryConditionManager::GetNumberOfDirichletConditions(void) const {
-  return boundary_condition_counts_m[details::BCType::DIRICHLET];
+  return boundary_condition_counts_m[details::BCType::DIRICHLET] +
+         boundary_condition_counts_m[details::BCType::TV_DIRICHLET];
 }
 
 int BoundaryConditionManager::GetNumberOfTimeVaryingDirichletConditions(
     void) const {
-  DEBUG_ASSERT(boundary_condition_counts_m[details::BCType::TV_DIRICHLET] <=
-                   boundary_condition_counts_m[details::BCType::DIRICHLET],
-               global_assert{}, DebugLevel::CHEAP{});
   return boundary_condition_counts_m[details::BCType::TV_DIRICHLET];
 }
 
@@ -262,14 +274,13 @@ int BoundaryConditionManager::GetNumberOfHomogeneousNeumannConditions(
 }
 
 int BoundaryConditionManager::GetNumberOfNeumannConditions(void) const {
-  return boundary_condition_counts_m[details::BCType::NEUMANN];
+  return boundary_condition_counts_m[details::BCType::NEUMANN] +
+         boundary_condition_counts_m[details::BCType::TV_NEUMANN];
+  ;
 }
 
 int BoundaryConditionManager::GetNumberOfTimeVaryingNeumannConditions(
     void) const {
-  DEBUG_ASSERT(boundary_condition_counts_m[details::BCType::TV_NEUMANN] <=
-                   boundary_condition_counts_m[details::BCType::NEUMANN],
-               global_assert{}, DebugLevel::CHEAP{});
   return boundary_condition_counts_m[details::BCType::TV_NEUMANN];
 }
 
@@ -330,7 +341,16 @@ void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
                  "Each boundary condition must specify its type.");
     const auto bc_type =
         this->BoundaryConditionNameToEnum(value["type"].get<std::string>());
-    this->SetBoundaryConditionType(tag, bc_type, false, false);
+
+    // Right now only allow temporally and spatially varying
+    // condition as precice (and assume all precice are)
+    if (value.contains("precice") && value["precice"].get<bool>()) {
+      this->SetBoundaryConditionType(tag, bc_type, true, true);
+      this->SetBoundaryConditionAsPrecice(tag);
+      continue;
+    } else {
+      this->SetBoundaryConditionType(tag, bc_type, false, false);
+    }
 
     double bc_value = 0.0;
     if (bc_type == BoundaryConditionType::DIRICHLET ||
@@ -342,18 +362,11 @@ void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
       bc_value = value["value"].get<double>();
       this->SetBoundaryConditionValues(tag, bc_value);
     }
-    bool precice_condition = false;
-    if (value.contains("precice")) {
-      precice_condition = value["precice"].get<bool>();
-      if (precice_condition) {
-        this->SetBoundaryConditionAsPrecice(tag);
-      }
-    }
   }
 }
 
 bool BoundaryConditionManager::HasBeenInitialized(void) const {
-  return mesh_m != nullptr;
+  return sim_m != nullptr;
 }
 
 BoundaryConditionType BoundaryConditionManager::BoundaryConditionNameToEnum(

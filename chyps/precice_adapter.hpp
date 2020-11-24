@@ -27,20 +27,45 @@ namespace chyps {
 /// read into the supplied buffer.
 enum class DataOperation { READ = 0, WRITE };
 
+/// \class PreciceMesh precice_adapter.hpp chyps/precice_adapter.hpp
+/// \brief Wrapper to store preCICE mesh objects that are initialized.
+class PreciceMesh {
+ public:
+  PreciceMesh(void) = default;
+
+  /// \brief Construct a PreciceMesh object, storing the mesh_id.
+  PreciceMesh(const int a_mesh_id);
+
+  void SetVertexPositions(const std::vector<double>& a_positions,
+                          const int a_dimension,
+                          precice::SolverInterface& a_interface);
+  const std::vector<int>& GetVertexIds(void) const;
+  std::size_t NumberOfVertices(void) const;
+  int GetId(void) const;
+
+ private:
+  int mesh_id_m;
+  std::vector<int> vertex_ids_m;
+};
+
 /// \class PreciceData precice_adapter.hpp chyps/precice_adapter.hpp
 /// \brief Wrapper for data information used in Precice for exchaning data
 /// between solvers.
 class PreciceData {
  public:
-  /// \brief Default constructor.
-  PreciceData(void) = default;
+  /// \brief Default constructor delete due to storage of mesh reference.
+  PreciceData(void) = delete;
 
   /// \brief Constructor that stores reference ID used in Precice and whether
   /// data is for reading or writing.
-  PreciceData(const int a_data_id, const DataOperation a_operation);
+  PreciceData(const int a_data_id, const DataOperation a_operation,
+              const PreciceMesh& a_mesh);
 
   /// \brief Return data ID used by Precice.
-  int GetDataID(void) const;
+  int GetId(void) const;
+
+  /// \brief Return associated mesh.
+  const PreciceMesh& GetMesh(void) const;
 
   /// \brief Return true if data is intended to be read.
   bool ForReading(void) const;
@@ -49,6 +74,7 @@ class PreciceData {
   bool ForWriting(void) const;
 
  private:
+  const PreciceMesh& associated_mesh_m;
   int data_id_m;
   DataOperation data_operation_m;
 };
@@ -63,16 +89,18 @@ class PreciceAdapter {
   PreciceAdapter(void) = delete;
 
   /// \brief Constructor that sets up initial parallel interface in Precice.
-  ///
-  /// Assumed that the mesh used will be "mfem_mesh", which must match in the
-  /// Precice XML config file.
   PreciceAdapter(const std::string& a_solver_name,
-                 const std::string& a_mesh_name,
                  const std::string& a_config_file_name, const int a_proc_rank,
                  const int a_proc_size);
 
   /// \brief Initializes Precice SolverInterface and returns initial timestep.
+  ///
+  /// NOTE: The name initialize comes from preCICE and should not be considered
+  /// analogous to most Initialize() methods using in CHyPS.
   double Initialize(void);
+
+  /// \brief Add a mesh to be used with coupling in preCICE.
+  void AddMesh(const std::string& a_mesh_name);
 
   /// \brief Set the vertices for the surface mesh coupling solvers in Precice.
   ///
@@ -80,25 +108,20 @@ class PreciceAdapter {
   /// Each individual vertex should be supplied as dimension_m doubles.
   /// For example, if the mesh consistents of 10 vertices for a 2D surface,
   /// a_positions.size() = 20, ordered as V0_x V0_y V1_x V1_y ...
-  void SetVertexPositions(const std::vector<double>& a_positions);
-
-  /// \brief Return the number of vertices that exist in the coupling mesh.
-  int NumberOfVertices(void) const;
+  void SetVertexPositions(const std::string& a_mesh_name,
+                          const std::vector<double>& a_positions);
 
   /// \brief Return if precice is still actively coupling multiple solvers.
   bool IsCouplingOngoing(void) const;
 
-  /// \brief Add Data to be tracked by Precice. This does not do any update
-  /// itself, but registers it inside Precice.
-  void AddData(const std::string& a_name, const DataOperation a_operation);
-
-  /// \brief Size of scalar data passed through precice. Is
-  /// this->NumberOfVertices().
-  std::size_t ScalarDataSize(void) const;
-
-  /// \brief Size of vector data passed through precice. Is
-  /// this->NumberOfVertices()*dimension_m.
-  std::size_t VectorDataSize(void) const;
+  /// \brief Add Data to be tracked by preCICE, which is stored on the mesh
+  /// `a_mesh_name`. This does not do any update itself, but registers it inside
+  /// Precice.
+  ///
+  /// NOTE: The mesh with `a_mesh_name` must have already been added through use
+  /// of the /// AddMesh() method.
+  void AddData(const std::string& a_name, const std::string& a_mesh_name,
+               const DataOperation a_operation);
 
   /// \brief Write the data to be read by the other solver(s).
   ///
@@ -144,10 +167,9 @@ class PreciceAdapter {
 
  private:
   precice::SolverInterface interface_m;
-  std::vector<int> vertex_ids_m;
   std::unordered_map<std::string, PreciceData> data_m;
+  std::unordered_map<std::string, PreciceMesh> meshes_m;
   int dimension_m;
-  int mesh_id_m;
 };
 
 }  // namespace chyps

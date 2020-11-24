@@ -15,15 +15,16 @@
 
 #include "chyps/boundary_condition.hpp"
 #include "chyps/input_parser.hpp"
-#include "chyps/mesh.hpp"
 
 namespace chyps {
 
+// Forward declare Simulation
+class Simulation;
+
 class BoundaryConditionManager {
  public:
-  /// \brief Constructor for boundary condition manager with a specified default
-  /// BC type.
-  ///
+  /// \brief Constructor for BoundaryConditionManager object that stores parser
+  /// prefix to boundary condition description.
   BoundaryConditionManager(InputParser& a_parser,
                            const std::string& a_parser_prefix);
 
@@ -34,10 +35,10 @@ class BoundaryConditionManager {
   /// BoundaryConditionType::HOMOGENEOUS_NEUMANN are valid default types.
   ///
   /// NOTE: A reference is held to the provided mesh. Do not invalidate it.
-  void Initialize(const Mesh& a_mesh);
+  void Initialize(Simulation& a_simulation);
 
-  /// \brief Set the type of boundary condition for a_tag. The value of a_tag
-  /// must have corresponding boundary elements in a_mesh.
+  /// \brief Set the type of boundary condition for a_tag. The value of
+  /// a_tag must have corresponding boundary elements in a_mesh.
   void SetBoundaryConditionType(const int a_tag,
                                 const BoundaryConditionType& a_bc_type,
                                 const bool a_spatially_varying,
@@ -76,6 +77,10 @@ class BoundaryConditionManager {
   /// \brief Return number of boundary conditions.
   int GetNumberOfBoundaryConditions(void) const;
 
+  /// \brief Return if boundaey condition with tag `a_tag` should be through
+  /// preCICE.
+  bool PreciceBoundaryCondition(const int a_tag) const;
+
   /// \brief Return boundary condition for boundary element tag a_tag.
   const BoundaryCondition& GetBoundaryCondition(const int a_tag) const;
 
@@ -111,12 +116,12 @@ class BoundaryConditionManager {
 
   InputParser& parser_m;
   const std::string parser_prefix_m;
-  const Mesh* mesh_m;
+  const Simulation* sim_m;
   std::vector<int> boundary_condition_counts_m;
   std::vector<BoundaryCondition> boundary_conditions_m;
   std::vector<bool> precice_condition_m;
-  std::vector<std::vector<double>> vertex_positions_m;
-  std::vector<std::vector<int>> indices_m;
+  std::vector<const std::vector<double>*> vertex_positions_m;
+  std::vector<const std::vector<int>*> indices_m;
   std::vector<std::vector<double>> values_m;
 };
 
