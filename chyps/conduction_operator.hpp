@@ -16,7 +16,7 @@
 #include <mfem/mfem.hpp>
 
 #include "chyps/boundary_condition_manager.hpp"
-#include "chyps/conduction_operator_base.hpp"
+#include "chyps/conductivity.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/mesh.hpp"
 
@@ -25,14 +25,15 @@ namespace chyps {
 // Forward declare Simulation
 class Simulation;
 
-class ConductionOperator : public ConductionOperatorBase {
+class ConductionOperator : public mfem::TimeDependentOperator {
  public:
   ConductionOperator(
       const InputParser& a_parser, Simulation& a_sim,
       const std::unordered_map<std::string, BoundaryConditionManager>&
           a_boundary_conditions,
       mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-      mfem::Vector& a_temperature, mfem::Vector& a_rho, mfem::Vector& a_cp);
+      mfem::Vector& a_temperature, mfem::Vector& a_rho, mfem::Vector& a_cp,
+      Conductivity& a_kappa);
 
   virtual void Mult(const mfem::Vector& u,
                     mfem::Vector& du_dt) const override final;
@@ -43,17 +44,19 @@ class ConductionOperator : public ConductionOperatorBase {
 
   /// \brief Update the diffusion BilinearForm K using the given true-dof vector
   /// `u`.
-  void SetParameters(const mfem::Vector& u) override final;
+  void SetParameters(const mfem::Vector& u);
 
   /// \brief Update boundary conditions if they are time-varying. Might require
   /// changing boundaries in u.
-  virtual void UpdateBoundaryConditions(mfem::Vector& u) override final;
+  void UpdateBoundaryConditions(mfem::Vector& u);
 
-  virtual ~ConductionOperator(void) override final;
+  ~ConductionOperator(void);
 
   static void GatherOptions(InputParser& a_parser);
 
- protected:
+ private:
+  mfem::Array<int> ess_tdof_list;
+  mfem::ParFiniteElementSpace& fespace;
   mfem::ParFiniteElementSpace& fespace_linear_m;
 
   Simulation& sim_m;
@@ -74,8 +77,6 @@ class ConductionOperator : public ConductionOperatorBase {
   mfem::Solver* T_prec;     // Preconditioner for the implicit solver
 
   mfem::OperatorPtr T_op, M_op, K_op;
-
-  std::vector<double> tensor_kappa_m;
 
   mutable mfem::Vector z;  // auxiliary vector
   mutable mfem::OperatorHandle A;
@@ -98,8 +99,9 @@ class ConductionOperator : public ConductionOperatorBase {
   void AddNeumannCondition(const int a_tag, const double a_value);
   void FinalizeNeumannCondition(void);
 
-  mfem::MatrixConstantCoefficient* tensor_thermal_coeff_m;
-  mfem::ScalarMatrixProductCoefficient* dt_tensor_thermal_coeff_m;
+  Conductivity& kappa_m;
+  mfem::ProductCoefficient* dt_kappa_scalar_m;
+  mfem::ScalarMatrixProductCoefficient* dt_kappa_matrix_m;
   bool inhomogeneous_neumann_active_m;
   bool tensor_basis;
   bool use_partial_assembly;

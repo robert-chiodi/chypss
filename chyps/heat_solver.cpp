@@ -32,6 +32,7 @@ HeatSolver::HeatSolver(InputParser& a_parser, Simulation& a_simulation)
       temperature_m(),
       rho_m(),
       cp_m(),
+      kappa_m(nullptr),
       visit_collection_m(nullptr) {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing HeatSolver object.");
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Gathering options of HeatSolver class.");
@@ -208,13 +209,15 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
   coarse_element_space_m = new mfem::ParFiniteElementSpace(
       &sim_m.GetMesh().GetMfemMesh(), coarse_element_collection_m);
 
+  kappa_m = new Conductivity(sim_m, *element_space_m);
+
   // Allocates temperature and sets initial values.
   this->SetInitialConditions();
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Creating new conduction operator.");
   operator_m = new ConductionOperator(parser_m, sim_m, boundary_conditions_m,
                                       *coarse_element_space_m, *element_space_m,
-                                      temperature_m, rho_m, cp_m);
+                                      temperature_m, rho_m, cp_m, *kappa_m);
 }
 
 void HeatSolver::RegisterFieldsForIO(void) {
@@ -279,6 +282,8 @@ HeatSolver::~HeatSolver(void) {
   coarse_element_collection_m = nullptr;
   delete coarse_element_space_m;
   coarse_element_space_m = nullptr;
+  delete kappa_m;
+  kappa_m = nullptr;
   delete operator_m;
   operator_m = nullptr;
   SPDLOG_LOGGER_INFO(MAIN_LOG, "HeatSolver successfully destructed");

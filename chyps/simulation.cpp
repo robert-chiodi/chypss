@@ -154,6 +154,10 @@ void Simulation::RunToEnd(void) {
   }
 }
 
+InputParser& Simulation::GetParser(void) { return parser_m; }
+
+const InputParser& Simulation::GetParser(void) const { return parser_m; }
+
 Mesh& Simulation::GetMesh(void) { return mesh_m; }
 
 const Mesh& Simulation::GetMesh(void) const { return mesh_m; }

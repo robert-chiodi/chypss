@@ -23,8 +23,11 @@ ConductionOperator::ConductionOperator(
     const std::unordered_map<std::string, BoundaryConditionManager>&
         a_boundary_conditions,
     mfem::ParFiniteElementSpace& f_linear, mfem::ParFiniteElementSpace& f,
-    mfem::Vector& a_temperature, mfem::Vector& a_rho, mfem::Vector& a_cp)
-    : ConductionOperatorBase(f),
+    mfem::Vector& a_temperature, mfem::Vector& a_rho, mfem::Vector& a_cp,
+    Conductivity& a_kappa)
+    : mfem::TimeDependentOperator(f.GetTrueVSize(), 0.0),
+      ess_tdof_list(),
+      fespace(f),
       fespace_linear_m(f_linear),
       sim_m(a_sim),
       boundary_conditions_m(a_boundary_conditions),
@@ -37,29 +40,28 @@ ConductionOperator::ConductionOperator(
       M_prec(nullptr),
       T_solver(f.GetComm()),
       T_prec(nullptr),
-      tensor_kappa_m(),
       z(height),  // Note, height inherited from mfem::TimeDependentOperator
       neumann_coefficient_m(sim_m.GetMesh().GetNumberOfBoundaryTagValues(),
                             nullptr),
       boundary_marker_m(sim_m.GetMesh().GetNumberOfBoundaryTagValues()),
-      tensor_thermal_coeff_m(nullptr),
-      dt_tensor_thermal_coeff_m(nullptr),
+      kappa_m(a_kappa),
+      dt_kappa_scalar_m(nullptr),
+      dt_kappa_matrix_m(nullptr),
       inhomogeneous_neumann_active_m(false),
       tensor_basis(false),
       use_partial_assembly(false) {
-  // Set values from parser;
-  tensor_kappa_m = a_parser["HeatSolver/ConductionOperator/kappa"]
-                       .get<std::vector<double>>();
+  // Only support certain Conductivity types for now.
   DEBUG_ASSERT(
-      tensor_kappa_m.size() ==
-          static_cast<std::size_t>(sim_m.GetMesh().GetDimension() *
-                                   sim_m.GetMesh().GetDimension()),
-      global_assert{}, DebugLevel::CHEAP{},
-      "Thermal coefficient tensor (kappa) of incorrect size. Provide as a "
-      "column-major array of size MESH_DIM*MESH_DIM= " +
-          std::to_string(sim_m.GetMesh().GetDimension() *
-                         sim_m.GetMesh().GetDimension()));
+      kappa_m.GetType() == ConductivityType::CONSTANT_SCALAR ||
+          kappa_m.GetType() == ConductivityType::CONSTANT_MATRIX ||
+          kappa_m.GetType() == ConductivityType::MATERIAL_VARYING_SCALAR ||
+          kappa_m.GetType() == ConductivityType::MATERIAL_VARYING_MATRIX ||
+          kappa_m.GetType() == ConductivityType::ELEMENT_VARYING_SCALAR ||
+          kappa_m.GetType() == ConductivityType::ELEMENT_VARYING_MATRIX,
+      global_assert{}, DebugLevel::ALWAYS{},
+      "Element varying conductivity types not yet supported.");
 
+  // Check tensor basis to see if partial assembly can be allowed.
   tensor_basis = mfem::UsesTensorBasis(fespace);
   use_partial_assembly =
       tensor_basis &&
@@ -101,9 +103,9 @@ ConductionOperator::ConductionOperator(
       "\"temperature\" not found in supplied boundary conditions.");
   const auto& bc_manager = boundary_conditions_m.at("temperature");
   if (bc_manager.GetNumberOfNeumannConditions() > 0) {
-    SPDLOG_LOGGER_INFO(
-        MAIN_LOG,
-        "Neumann boundary conditions exist. Turning on Neumann ParLinearForm");
+    SPDLOG_LOGGER_INFO(MAIN_LOG,
+                       "Neumann boundary conditions exist. Turning on "
+                       "Neumann ParLinearForm");
     inhomogeneous_neumann_active_m = true;
     this->ResetNeumannCondition();
   }
@@ -195,6 +197,7 @@ ConductionOperator::ConductionOperator(
     M->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
   }
 
+  // With all essential boundaries set, now setup operators
   mfem::ParGridFunction rho_gf(&fespace);
   rho_gf.SetFromTrueDofs(a_rho);
   mfem::GridFunctionCoefficient rho_gfc(&rho_gf);
@@ -217,6 +220,32 @@ ConductionOperator::ConductionOperator(
   }
   M_solver.SetPreconditioner(*M_prec);
   M_solver.SetOperator(*M_op);
+
+  // Add integrator with appropriate coefficient
+  if (!kappa_m.CanTimeVary()) {
+    // Setup diffusion coefficient
+    K = new mfem::ParBilinearForm(&fespace);
+    if (use_partial_assembly) {
+      K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
+    } else {
+      K->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
+    }
+    if (kappa_m.IsScalarCoefficient()) {
+      K->AddDomainIntegrator(
+          new mfem::DiffusionIntegrator(kappa_m.GetScalarCoefficient()));
+      // dt will be reset instead of 1.0 in implicit solve
+      dt_kappa_scalar_m =
+          new mfem::ProductCoefficient(1.0, kappa_m.GetScalarCoefficient());
+    } else if (kappa_m.IsMatrixCoefficient()) {
+      K->AddDomainIntegrator(
+          new mfem::DiffusionIntegrator(kappa_m.GetMatrixCoefficient()));
+      // dt will be reset instead of 1.0 in implicit solve
+      dt_kappa_matrix_m = new mfem::ScalarMatrixProductCoefficient(
+          1.0, kappa_m.GetMatrixCoefficient());
+    }
+    K->Assemble();  // keep sparsity pattern of M and K the same
+    K->Finalize();
+  }
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished constructing ConductionOperator");
 }
@@ -258,9 +287,13 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
     }
     T->AddDomainIntegrator(new mfem::MassIntegrator());
 
-    dt_tensor_thermal_coeff_m->SetAConst(dt);
-    T->AddDomainIntegrator(
-        new mfem::DiffusionIntegrator(*dt_tensor_thermal_coeff_m));
+    if (kappa_m.IsScalarCoefficient()) {
+      dt_kappa_scalar_m->SetAConst(dt);
+      T->AddDomainIntegrator(new mfem::DiffusionIntegrator(*dt_kappa_scalar_m));
+    } else if (kappa_m.IsMatrixCoefficient()) {
+      dt_kappa_matrix_m->SetAConst(dt);
+      T->AddDomainIntegrator(new mfem::DiffusionIntegrator(*dt_kappa_matrix_m));
+    }
     T->Assemble();
     T->FormSystemMatrix(ess_tdof_list, T_op);
 
@@ -299,35 +332,30 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
 }
 
 void ConductionOperator::SetParameters(const mfem::Vector& u) {
-  // Since thermal coefficient is not time varying (for now)
-  if (K == nullptr) {
-    mfem::DenseMatrix full_value(tensor_kappa_m.data(),
-                                 sim_m.GetMesh().GetDimension(),
-                                 sim_m.GetMesh().GetDimension());
-
-    // Make assert that this (full_value) is positive definite
-    DEBUG_ASSERT(full_value.Det() > 0.0, global_assert{}, DebugLevel::CHEAP{},
-                 "Negative determinant value for tensor thermal coefficient. "
-                 "Not Positive Definite. Determinant value: " +
-                     std::to_string(full_value.Det()));
-
-    delete tensor_thermal_coeff_m;
-    tensor_thermal_coeff_m = new mfem::MatrixConstantCoefficient(full_value);
-
-    // dt will be reset instead of 1.0 in below in implicit solve
-    delete dt_tensor_thermal_coeff_m;
-    dt_tensor_thermal_coeff_m =
-        new mfem::ScalarMatrixProductCoefficient(1.0, *tensor_thermal_coeff_m);
-
+  if (kappa_m.CanTimeVary()) {
     delete K;
+    // Setup diffusion coefficient
     K = new mfem::ParBilinearForm(&fespace);
     if (use_partial_assembly) {
       K->SetAssemblyLevel(mfem::AssemblyLevel::PARTIAL);
     } else {
       K->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
     }
-    K->AddDomainIntegrator(
-        new mfem::DiffusionIntegrator(*tensor_thermal_coeff_m));
+    if (kappa_m.IsScalarCoefficient()) {
+      K->AddDomainIntegrator(
+          new mfem::DiffusionIntegrator(kappa_m.GetScalarCoefficient()));
+      // dt will be reset instead of 1.0 in below in implicit solve
+      delete dt_kappa_scalar_m;
+      dt_kappa_scalar_m =
+          new mfem::ProductCoefficient(1.0, kappa_m.GetScalarCoefficient());
+    } else if (kappa_m.IsMatrixCoefficient()) {
+      K->AddDomainIntegrator(
+          new mfem::DiffusionIntegrator(kappa_m.GetMatrixCoefficient()));
+      // dt will be reset instead of 1.0 in below in implicit solve
+      delete dt_kappa_matrix_m;
+      dt_kappa_matrix_m = new mfem::ScalarMatrixProductCoefficient(
+          1.0, kappa_m.GetMatrixCoefficient());
+    }
     K->Assemble();  // keep sparsity pattern of M and K the same
     K->Finalize();
   }
@@ -456,15 +484,11 @@ ConductionOperator::~ConductionOperator(void) {
     elem = nullptr;
   }
   delete neumann_m;
-  delete tensor_thermal_coeff_m;
-  delete dt_tensor_thermal_coeff_m;
+  delete dt_kappa_scalar_m;
+  delete dt_kappa_matrix_m;
 }
 
 void ConductionOperator::GatherOptions(InputParser& a_parser) {
-  a_parser.AddOption(
-      "HeatSolver/ConductionOperator/kappa",
-      "Array of thermal coefficients representing tensor in column major "
-      "ordering. Should be MESH_DIM*MESH_DIM in size.");
   a_parser.AddOption(
       "HeatSolver/ConductionOperator/use_partial_assembly",
       "If \"true\", use partial assembly for MFEM bilinear "
@@ -481,6 +505,14 @@ void ConductionOperator::GatherOptions(InputParser& a_parser) {
   a_parser.AddOption(
       "HeatSolver/ConductionOperator/solver_max_iter",
       "Maximum allowed iterations for iterative solves of X=A^{-1} B", 100);
+  a_parser.AddOption(
+      "HeatSolver/ConductionOperator/conductivity_type",
+      "Conductivity model to use. Types are: \"constant_scalar\", "
+      "\"constant_matrix\", \"material_varying_scalar\", "
+      "\"material_varying_matrix\", \"element_varying_scalar\", and "
+      "\"element_varying_matrix\". See Documentation for or comments in "
+      "conduction_operator.cpp for definition of each type. Types may require "
+      "additional arguments.");
 }
 
 void ConductionOperator::SetTrueDofsFromVertexData(

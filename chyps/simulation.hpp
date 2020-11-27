@@ -75,6 +75,9 @@ class Simulation {
 
   void RunToEnd(void);
 
+  InputParser& GetParser(void);
+  const InputParser& GetParser(void) const;
+
   Mesh& GetMesh(void);
   const Mesh& GetMesh(void) const;
 

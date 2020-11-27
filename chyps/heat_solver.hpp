@@ -20,6 +20,7 @@
 #include "chyps/boundary_condition.hpp"
 #include "chyps/boundary_condition_manager.hpp"
 #include "chyps/conduction_operator.hpp"
+#include "chyps/conductivity.hpp"
 #include "chyps/input_parser.hpp"
 #include "chyps/io.hpp"
 #include "chyps/mesh.hpp"
@@ -99,6 +100,7 @@ class HeatSolver : public SolverInterface {
   mfem::Vector temperature_m;
   mfem::Vector rho_m;
   mfem::Vector cp_m;
+  Conductivity* kappa_m;
   MfemVisItCollection* visit_collection_m;
 };
 

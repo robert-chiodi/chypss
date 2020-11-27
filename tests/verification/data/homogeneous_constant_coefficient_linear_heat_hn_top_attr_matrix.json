@@ -19,7 +19,7 @@
 	"Arguments":{
                         "pulse_amplitude": 1.0,
                         "approximation_terms": 1,
-                        "boundary_configuration":"DNDD"
+                        "boundary_configuration":"DDDN"
 
 			}
 		}
@@ -40,8 +40,10 @@
     "HeatSolver":{
 		    "alpha": 0.0,
 		    "ConductionOperator":{
-                    "conductivity_type": "constant_scalar",
-                    "ConstantScalar": 0.5
+		    "conductivity_type": "material_varying_matrix",
+		    "MaterialVaryingMatrix": {
+					      "1":[0.5,0.0,0.0,0.5]
+					     }
 	            },
 		    "order": 2,
 		    "time_advancement": 3,
@@ -49,7 +51,7 @@
 					 "temperature":{
 					    "bc_default": "HOMOGENEOUS_DIRICHLET",
 					    "bc_list":{
-        			        	"2":{
+        			        	"4":{
 			 	                   "type": "HOMOGENEOUS_NEUMANN"
 						    }
 			        	      }
