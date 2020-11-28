@@ -39,7 +39,7 @@ BoundaryConditionManager::BoundaryConditionManager(
       sim_m(nullptr),
       boundary_condition_counts_m(),
       boundary_conditions_m(),
-      precice_condition_m(),
+      precice_name_m(),
       vertex_positions_m(),
       indices_m(),
       values_m() {
@@ -52,7 +52,7 @@ void BoundaryConditionManager::Initialize(Simulation& a_sim) {
       static_cast<std::size_t>(sim_m->GetMesh().GetNumberOfBoundaryTagValues());
   boundary_condition_counts_m.resize(details::BCType::COUNT, 0);
   boundary_conditions_m.resize(number_of_bcs);
-  precice_condition_m.resize(number_of_bcs, false);
+  precice_name_m.resize(number_of_bcs, "");
   vertex_positions_m.resize(number_of_bcs, nullptr);
   indices_m.resize(number_of_bcs, nullptr);
   values_m.resize(number_of_bcs);
@@ -184,7 +184,8 @@ void BoundaryConditionManager::SetBoundaryConditionValues(
   values_m[a_tag - 1][0] = a_value;
 }
 
-void BoundaryConditionManager::SetBoundaryConditionAsPrecice(const int a_tag) {
+void BoundaryConditionManager::SetBoundaryConditionAsPrecice(
+    const int a_tag, const std::string& a_data_name) {
   DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
                DebugLevel::CHEAP{});
   DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
@@ -201,7 +202,7 @@ void BoundaryConditionManager::SetBoundaryConditionAsPrecice(const int a_tag) {
                global_assert{}, DebugLevel::CHEAP{},
                "Use of preCICE is only possible with boundary conditions set "
                "as DIRICHLET or NEUMANN.");
-  precice_condition_m[a_tag - 1] = true;
+  precice_name_m[a_tag - 1] = a_data_name;
 }
 
 double* BoundaryConditionManager::GetDataBuffer(const int a_tag) {
@@ -220,13 +221,14 @@ double* BoundaryConditionManager::GetDataBuffer(const int a_tag) {
                        BoundaryConditionType::NEUMANN,
                global_assert{}, DebugLevel::CHEAP{},
                "Data buffer only exists for DIRICHLET and NEUMANN conditions.");
-  DEBUG_ASSERT(precice_condition_m[a_tag - 1], global_assert{},
+  DEBUG_ASSERT(this->IsPreciceBoundaryCondition(a_tag), global_assert{},
                DebugLevel::CHEAP{},
                "Raw buffers can only be supplied for precice conditions.");
   return values_m[a_tag - 1].data();
 }
 
-bool BoundaryConditionManager::PreciceBoundaryCondition(const int a_tag) const {
+bool BoundaryConditionManager::IsPreciceBoundaryCondition(
+    const int a_tag) const {
   DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
                DebugLevel::CHEAP{});
   DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
@@ -236,7 +238,23 @@ bool BoundaryConditionManager::PreciceBoundaryCondition(const int a_tag) const {
                DebugLevel::CHEAP{},
                "Tag value must exist on mesh. Current tag value is: " +
                    std::to_string(a_tag));
-  return precice_condition_m[a_tag - 1];
+  return precice_name_m[a_tag - 1] != "";
+}
+
+std::string BoundaryConditionManager::PreciceName(const int a_tag) const {
+  DEBUG_ASSERT(this->HasBeenInitialized(), global_assert{},
+               DebugLevel::CHEAP{});
+  DEBUG_ASSERT(a_tag > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Tag value must be strictly positive. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(a_tag <= this->GetNumberOfBoundaryConditions(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Tag value must exist on mesh. Current tag value is: " +
+                   std::to_string(a_tag));
+  DEBUG_ASSERT(this->IsPreciceBoundaryCondition(a_tag), global_assert{},
+               DebugLevel::CHEAP{},
+               "Raw buffers can only be supplied for precice conditions.");
+  return precice_name_m[a_tag - 1];
 }
 
 const BoundaryCondition& BoundaryConditionManager::GetBoundaryCondition(
@@ -297,7 +315,8 @@ void BoundaryConditionManager::GatherOptions() {
       "inside bc_list should be the tag of the boundary condition being set. "
       "Inside this tag their should be {key,value} pairs. Valid {key,value} "
       "pairs are: {type, HOMOGENEOUS_DIRICHLET || HOMOGENEOUS_NEUMANN || "
-      "DIRICHLET || NEUMANN}, {value, double}, {precice, true || false}");
+      "DIRICHLET || NEUMANN}, {value, double}, {precice, true || false}, "
+      "{precice_name, string}");
 }
 
 void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
@@ -345,8 +364,9 @@ void BoundaryConditionManager::SetBoundaryConditionsFromInput(void) {
     // Right now only allow temporally and spatially varying
     // condition as precice (and assume all precice are)
     if (value.contains("precice") && value["precice"].get<bool>()) {
+      const std::string& data_name = value["precice_name"].get<std::string>();
       this->SetBoundaryConditionType(tag, bc_type, true, true);
-      this->SetBoundaryConditionAsPrecice(tag);
+      this->SetBoundaryConditionAsPrecice(tag, data_name);
       continue;
     } else {
       this->SetBoundaryConditionType(tag, bc_type, false, false);

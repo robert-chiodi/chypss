@@ -57,12 +57,12 @@ class HeatSolver : public SolverInterface {
   /// \brief Advance the solver by a dt (or less) amount of time.
   virtual double Advance(const double a_time, const double dt) override final;
 
+  /// \brief Write data (if needed to preCICE).
+  void WriteDataToPrecice(void);
+
   /// \brief Write out data to disk for visualization in VisIt.
   virtual void WriteFields(const int a_cycle,
                            const double a_time) override final;
-
-  /// \brief Return reference to built mesh.
-  const mfem::ParMesh& GetMesh(void) const;
 
   /// \brief Destructor that free all heap allocated variables.
   ~HeatSolver(void);
@@ -102,6 +102,7 @@ class HeatSolver : public SolverInterface {
   mfem::Vector cp_m;
   Conductivity* kappa_m;
   MfemVisItCollection* visit_collection_m;
+  std::vector<std::string> precice_write_names_m;
 };
 
 }  // namespace chyps

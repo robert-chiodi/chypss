@@ -11,6 +11,7 @@
 #include "chyps/heat_solver.hpp"
 
 #include <array>
+#include <tuple>
 
 #include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
@@ -78,6 +79,45 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
   return taken_time_step;
 }
 
+void HeatSolver::WriteDataToPrecice(void) {
+  DEBUG_ASSERT(sim_m.PreciceActive(), global_assert{}, DebugLevel::CHEAP{},
+               "preCICE is not active in simulation.");
+
+  mfem::ParGridFunction tmp_fine_gf(element_space_m);
+  tmp_fine_gf.SetFromTrueDofs(temperature_m);
+  mfem::GridFunctionCoefficient map_coeff(&tmp_fine_gf);
+  mfem::ParGridFunction tmp_coarse_gf(coarse_element_space_m);
+
+  mfem::Array<int> border(sim_m.GetMesh().GetNumberOfBoundaryTagValues());
+  mfem::Vector values;
+
+  std::pair<const std::vector<double>*, const std::vector<int>*> bdr_info_pair;
+
+  const BoundaryConditionManager& temperature_bc =
+      boundary_conditions_m.at("temperature");
+  const int size = static_cast<int>(precice_write_names_m.size());
+  for (int n = 0; n < size; ++n) {
+    if (precice_write_names_m[n] == "") {
+      // Not a precice condition
+      continue;
+    }
+    // Get mesh information
+    bdr_info_pair = temperature_bc.GetBoundaryVertices(n + 1);
+    auto vertex_indices = bdr_info_pair.second;
+
+    // Wrap data in mfem objects.
+    // CASTING AWAY CONST TO WRAP IN MFEM VALUES. WILL NOT MODIFY
+    mfem::Array<int> indices(const_cast<int*>(vertex_indices->data()),
+                             static_cast<int>(vertex_indices->size()));
+    border = 0;
+    border[n] = 1;
+    tmp_coarse_gf.ProjectBdrCoefficient(map_coeff, border);
+    tmp_coarse_gf.GetSubVector(indices, values);
+    sim_m.GetPreciceAdapter().WriteBlockScalarData(precice_write_names_m[n],
+                                                   values.GetData());
+  }
+}
+
 void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
   if (parser_m["Simulation/use_visit"].get<bool>()) {
     visit_collection_m->UpdateField("temperature", temperature_m);
@@ -110,6 +150,13 @@ void HeatSolver::GatherOptions(void) {
       "ODE solver: 1 - Backward Euler, 2 - SDIRK2, 3 - SDIRK3,\n\t"
       "\t   11 - Forward Euler, 12 - RK2, 13 - RK3 SSP, 14 - RK4.",
       3);
+  parser_m.AddOption(
+      "HeatSolver/PreciceWrite/temperature/",
+      "Handles ability to write temperature on boundaries to preCICE for "
+      "coupling. To add a boundary, include boundary as a key value with the "
+      "precice name as the value. As an example:\n \"1\": "
+      "\"temperature_name_in_precice\"");
+
   // TODO Add a flag and way to specify which variables we wish to export to
   // VisIt.
 
@@ -211,6 +258,29 @@ void HeatSolver::AllocateVariablesAndOperators(void) {
 
   kappa_m = new Conductivity(sim_m, *element_space_m);
 
+  if (parser_m.OptionSet("HeatSolver/PreciceWrite/temperature")) {
+    DEBUG_ASSERT(sim_m.PreciceActive(), global_assert{}, DebugLevel::CHEAP{},
+                 "Precice coupling must be active to set write-fields.");
+    precice_write_names_m.resize(sim_m.GetMesh().GetNumberOfBoundaryTagValues(),
+                                 "");
+    // Fill with precice write names.
+    const auto& write_group = parser_m["HeatSolver/PreciceWrite/temperature"];
+    for (const auto& elem : write_group.items()) {
+      const int index = std::stoi(elem.key());
+      DEBUG_ASSERT(index > 0, global_assert{}, DebugLevel::CHEAP{},
+                   "Tag value must be >0");
+      DEBUG_ASSERT(
+          static_cast<std::size_t>(index - 1) < precice_write_names_m.size(),
+          global_assert{}, DebugLevel::CHEAP{},
+          "Tag value must exist on mesh. Mesh expects all attribute values are "
+          "contiguous and in range [1,number_of_attribute_tags]");
+      precice_write_names_m[index - 1] = elem.value().get<std::string>();
+      sim_m.GetPreciceAdapter().AddData(
+          precice_write_names_m[index - 1],
+          sim_m.GetMesh().GetPreciceMeshName(index), DataOperation::WRITE);
+    }
+  }
+
   // Allocates temperature and sets initial values.
   this->SetInitialConditions();
 
@@ -296,9 +366,9 @@ void HeatSolver::InitializeBoundaryConditions(void) {
   if (sim_m.PreciceActive()) {
     for (auto& manager : boundary_conditions_m) {
       for (int n = 0; n < manager.second.GetNumberOfBoundaryConditions(); ++n) {
-        if (manager.second.PreciceBoundaryCondition(n + 1)) {
+        if (manager.second.IsPreciceBoundaryCondition(n + 1)) {
           sim_m.GetPreciceAdapter().AddData(
-              manager.first + '_' + ZeroFill(n + 1, 3),
+              manager.second.PreciceName(n + 1),
               sim_m.GetMesh().GetPreciceMeshName(n + 1), DataOperation::READ);
         }
       }
@@ -310,9 +380,9 @@ void HeatSolver::UpdateBoundaryConditions(mfem::Vector& a_temperature) {
   if (sim_m.PreciceActive()) {
     for (auto& manager : boundary_conditions_m) {
       for (int n = 0; n < manager.second.GetNumberOfBoundaryConditions(); ++n) {
-        if (manager.second.PreciceBoundaryCondition(n + 1)) {
+        if (manager.second.IsPreciceBoundaryCondition(n + 1)) {
           sim_m.GetPreciceAdapter().ReadBlockScalarData(
-              manager.first + '_' + ZeroFill(n + 1, 3),
+              manager.second.PreciceName(n + 1),
               manager.second.GetDataBuffer(n + 1));
         }
       }

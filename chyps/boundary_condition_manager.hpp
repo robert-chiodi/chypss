@@ -66,8 +66,9 @@ class BoundaryConditionManager {
   void SetBoundaryConditionValues(const int a_tag, const double a_value);
 
   /// \brief Mark as a boundary condition that will be set through preCICE
-  /// coupling to another solver.
-  void SetBoundaryConditionAsPrecice(const int a_tag);
+  /// coupling to another solver. Provide the name that will be used in preCICE.
+  void SetBoundaryConditionAsPrecice(const int a_tag,
+                                     const std::string& a_data_name);
 
   /// \brief Return pointer to the data buffer for the values of the boundary
   /// condition marked with a_tag. This is only allowed for preCICE boundary
@@ -77,9 +78,12 @@ class BoundaryConditionManager {
   /// \brief Return number of boundary conditions.
   int GetNumberOfBoundaryConditions(void) const;
 
-  /// \brief Return if boundaey condition with tag `a_tag` should be through
+  /// \brief Return if boundary condition with tag `a_tag` should be through
   /// preCICE.
-  bool PreciceBoundaryCondition(const int a_tag) const;
+  bool IsPreciceBoundaryCondition(const int a_tag) const;
+
+  /// \brief Get the name of data in preCICE, as according to the input file.
+  std::string PreciceName(const int a_tag) const;
 
   /// \brief Return boundary condition for boundary element tag a_tag.
   const BoundaryCondition& GetBoundaryCondition(const int a_tag) const;
@@ -119,7 +123,7 @@ class BoundaryConditionManager {
   const Simulation* sim_m;
   std::vector<int> boundary_condition_counts_m;
   std::vector<BoundaryCondition> boundary_conditions_m;
-  std::vector<bool> precice_condition_m;
+  std::vector<std::string> precice_name_m;
   std::vector<const std::vector<double>*> vertex_positions_m;
   std::vector<const std::vector<int>*> indices_m;
   std::vector<std::vector<double>> values_m;

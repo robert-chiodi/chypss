@@ -112,6 +112,9 @@ void Simulation::RunToEnd(void) {
       SPDLOG_LOGGER_INFO(MAIN_LOG, "Begun last step.");
     }
 
+    if (this->PreciceActive()) {
+      heat_solver_m.WriteDataToPrecice();
+    }
     step_info_m.dt = heat_solver_m.Advance(step_info_m.time, dt_adj);
     step_info_m.time += step_info_m.dt;
     ++step_info_m.iteration;

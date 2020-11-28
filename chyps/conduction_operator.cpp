@@ -528,7 +528,7 @@ void ConductionOperator::SetTrueDofsFromVertexData(
 
   mfem::GridFunctionCoefficient map_coeff(&coarse_temperature_gf);
 
-  a_temperature_gf = 0.0;
+  a_temperature_gf = 0.0;  // Is this needed?
   a_temperature_gf.ProjectBdrCoefficient(map_coeff, a_boundary);
 }
 
