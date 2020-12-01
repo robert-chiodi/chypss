@@ -88,9 +88,10 @@ void InitializeData(const DataFieldType a_field_type,
 namespace matrix {
 
 void AddParserOptions(InputParser& a_parser) {
-  a_parser.AddOption("SimulationInitializer/Initializers/constant/matrix/value",
-                     "A JSON object with keys of attribute names with values "
-                     "that are a matrix of the appropriate size.");
+  a_parser.AddOption(
+      "SimulationInitializer/Initializers/attribute_varying/matrix/value",
+      "A JSON object with keys of attribute names with values "
+      "that are a matrix of the appropriate size.");
 }
 
 bool SupportedFieldType(const DataFieldType a_field_type) {
