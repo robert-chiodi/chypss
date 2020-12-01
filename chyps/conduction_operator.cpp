@@ -198,13 +198,13 @@ ConductionOperator::ConductionOperator(
   }
 
   // With all essential boundaries set, now setup operators
-  mfem::ParGridFunction rho_gf(&fespace);
-  rho_gf.SetFromTrueDofs(a_rho);
-  mfem::GridFunctionCoefficient rho_gfc(&rho_gf);
+  rho_grid_function_m = new mfem::ParGridFunction(&fespace);
+  rho_grid_function_m->SetFromTrueDofs(a_rho);
+  mfem::GridFunctionCoefficient rho_gfc(rho_grid_function_m);
 
-  mfem::ParGridFunction cp_gf(&fespace);
-  cp_gf.SetFromTrueDofs(a_cp);
-  mfem::GridFunctionCoefficient cp_gfc(&cp_gf);
+  cp_grid_function_m = new mfem::ParGridFunction(&fespace);
+  cp_grid_function_m->SetFromTrueDofs(a_cp);
+  mfem::GridFunctionCoefficient cp_gfc(cp_grid_function_m);
 
   mfem::ProductCoefficient mass_integrator_multiplier(cp_gfc, rho_gfc);
   M->AddDomainIntegrator(new mfem::MassIntegrator(mass_integrator_multiplier));
@@ -285,7 +285,12 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
     } else {
       T->SetAssemblyLevel(mfem::AssemblyLevel::LEGACYFULL);
     }
-    T->AddDomainIntegrator(new mfem::MassIntegrator());
+
+    mfem::GridFunctionCoefficient rho_gfc(rho_grid_function_m);
+    mfem::GridFunctionCoefficient cp_gfc(cp_grid_function_m);
+    mfem::ProductCoefficient mass_integrator_multiplier(cp_gfc, rho_gfc);
+    T->AddDomainIntegrator(
+        new mfem::MassIntegrator(mass_integrator_multiplier));
 
     if (kappa_m.IsScalarCoefficient()) {
       dt_kappa_scalar_m->SetAConst(dt);

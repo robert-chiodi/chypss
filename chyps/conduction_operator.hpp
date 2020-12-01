@@ -100,6 +100,8 @@ class ConductionOperator : public mfem::TimeDependentOperator {
   void FinalizeNeumannCondition(void);
 
   Conductivity& kappa_m;
+  mfem::ParGridFunction* rho_grid_function_m;
+  mfem::ParGridFunction* cp_grid_function_m;
   mfem::ProductCoefficient* dt_kappa_scalar_m;
   mfem::ScalarMatrixProductCoefficient* dt_kappa_matrix_m;
   bool inhomogeneous_neumann_active_m;
