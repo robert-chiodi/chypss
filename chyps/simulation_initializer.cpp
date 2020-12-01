@@ -16,6 +16,7 @@
 #include "chyps/io.hpp"
 
 // List of configuration header files
+#include "chyps/simulation_configurations/attribute_varying.hpp"
 #include "chyps/simulation_configurations/constant.hpp"
 #include "chyps/simulation_configurations/cooled_rod.hpp"
 #include "chyps/simulation_configurations/quadratic_pulse.hpp"
@@ -68,8 +69,10 @@ RequiredData::RequiredData(const MPIParallel& a_mpi_session,
   constant::scalar::AddParserOptions(parser_m);
   quadratic_pulse::scalar::AddParserOptions(parser_m);
   cooled_rod::scalar::AddParserOptions(parser_m);
+  attribute_varying::scalar::AddParserOptions(parser_m);
 
   constant::matrix::AddParserOptions(parser_m);
+  attribute_varying::matrix::AddParserOptions(parser_m);
 }
 
 void RequiredData::Initialize(void) { mesh_m.Initialize(); }
@@ -177,6 +180,12 @@ void RequiredData::ApplyScalarInitializer(
     constant::scalar::InitializeData(a_field_enum, a_initializer_arguments,
                                      a_full_parser, a_mesh,
                                      a_finite_element_space, a_field);
+  } else if (a_initializer == "attribute_varying") {
+    DEBUG_ASSERT(attribute_varying::scalar::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    attribute_varying::scalar::InitializeData(
+        a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
+        a_finite_element_space, a_field);
   } else if (a_initializer == "cooled_rod") {
     DEBUG_ASSERT(cooled_rod::scalar::SupportedFieldType(a_field_enum),
                  global_assert{}, DebugLevel::CHEAP{});
@@ -207,6 +216,12 @@ void RequiredData::ApplyMatrixInitializer(
     DEBUG_ASSERT(constant::matrix::SupportedFieldType(a_field_enum),
                  global_assert{}, DebugLevel::CHEAP{});
     constant::matrix::InitializeData(
+        a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
+        a_finite_element_space, a_number_of_rows, a_number_of_columns, a_field);
+  } else if (a_initializer == "attribute_varying") {
+    DEBUG_ASSERT(attribute_varying::matrix::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    attribute_varying::matrix::InitializeData(
         a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
         a_finite_element_space, a_number_of_rows, a_number_of_columns, a_field);
   } else {

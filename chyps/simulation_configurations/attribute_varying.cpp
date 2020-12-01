@@ -8,7 +8,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include "chyps/simulation_configurations/constant.hpp"
+#include "chyps/simulation_configurations/attribute_varying.hpp"
 
 #include <array>
 #include <functional>
@@ -18,13 +18,15 @@
 
 namespace chyps {
 
-namespace constant {
+namespace attribute_varying {
 
 namespace scalar {
 
 void AddParserOptions(InputParser& a_parser) {
-  a_parser.AddOption("SimulationInitializer/Initializers/constant/scalar/value",
-                     "Sets the value of all nodes to the supplied value.");
+  a_parser.AddOption(
+      "SimulationInitializer/Initializers/attribute_varying/scalar/value",
+      "Array of values with one entry per element attribute (material) on the "
+      "mesh.");
 }
 
 bool SupportedFieldType(const DataFieldType a_field_type) {
@@ -40,13 +42,17 @@ void InitializeData(const DataFieldType a_field_type,
                     const InputParser& a_full_parser, const Mesh& a_mesh,
                     mfem::ParFiniteElementSpace& a_finite_element_space,
                     mfem::Vector& a_data) {
-  const auto value = a_json_object["value"].get<double>();
+  auto value = a_json_object["value"].get<std::vector<double>>();
+
+  DEBUG_ASSERT(value.size() == static_cast<std::size_t>(
+                                   a_mesh.GetMfemMesh().attributes.Size()),
+               global_assert{}, DebugLevel::CHEAP{});
 
   switch (a_field_type) {
     case DataFieldType::GRID_FUNCTION: {
       mfem::ParGridFunction grid_function(&a_finite_element_space);
-
-      mfem::ConstantCoefficient value_setter_function(value);
+      mfem::Vector vec(value.data(), static_cast<int>(value.size()));
+      mfem::PWConstCoefficient value_setter_function(vec);
       grid_function.ProjectCoefficient(value_setter_function);
       grid_function.GetTrueDofs(a_data);
       a_data = grid_function;
@@ -55,8 +61,8 @@ void InitializeData(const DataFieldType a_field_type,
 
     case DataFieldType::TRUE_DOF: {
       mfem::ParGridFunction grid_function(&a_finite_element_space);
-
-      mfem::ConstantCoefficient value_setter_function(value);
+      mfem::Vector vec(value.data(), static_cast<int>(value.size()));
+      mfem::PWConstCoefficient value_setter_function(vec);
       grid_function.ProjectCoefficient(value_setter_function);
       grid_function.GetTrueDofs(a_data);
       break;
@@ -64,7 +70,10 @@ void InitializeData(const DataFieldType a_field_type,
 
     case DataFieldType::ELEMENT: {
       a_data.SetSize(a_mesh.GetLocalCount<MeshElement::ELEMENT>());
-      a_data = value;
+      for (int n = 0; n < a_data.Size(); ++n) {
+        a_data(n) = value[a_mesh.GetMfemMesh().GetAttribute(n)];
+      }
+
       break;
     }
 
@@ -80,7 +89,8 @@ namespace matrix {
 
 void AddParserOptions(InputParser& a_parser) {
   a_parser.AddOption("SimulationInitializer/Initializers/constant/matrix/value",
-                     "Array of length row*column in column-major order.");
+                     "A JSON object with keys of attribute names with values "
+                     "that are a matrix of the appropriate size.");
 }
 
 bool SupportedFieldType(const DataFieldType a_field_type) {
@@ -96,17 +106,33 @@ void InitializeData(const DataFieldType a_field_type,
                     mfem::ParFiniteElementSpace& a_finite_element_space,
                     const int a_number_of_rows, const int a_number_of_columns,
                     std::vector<mfem::DenseMatrix>& a_data) {
-  auto values = a_json_object["value"].get<std::vector<double>>();
-  DEBUG_ASSERT(values.size() == static_cast<std::size_t>(a_number_of_rows *
-                                                         a_number_of_columns),
-               global_assert{}, DebugLevel::CHEAP{},
-               "Supplied array form of matrix is of incorrect size.");
+  auto value_object = a_json_object["value"];
 
-  mfem::DenseMatrix base_matrix(values.data(), a_number_of_rows,
-                                a_number_of_columns);
+  const int number_of_attributes = a_mesh.GetMfemMesh().attributes.Size();
+
+  std::vector<mfem::DenseMatrix> base_matrices(
+      number_of_attributes,
+      mfem::DenseMatrix(a_number_of_rows, a_number_of_columns));
+  for (int n = 1; n <= number_of_attributes; ++n) {
+    auto flat_matrix =
+        value_object[std::to_string(n)].get<std::vector<double>>();
+    DEBUG_ASSERT(
+        flat_matrix.size() ==
+            static_cast<std::size_t>(a_number_of_rows * a_number_of_columns),
+        global_assert{}, DebugLevel::CHEAP{});
+    for (int j = 0; j < a_number_of_columns; ++j) {
+      for (int i = 0; i < a_number_of_rows; ++i) {
+        base_matrices[n - 1](i, j) = flat_matrix[i + j * a_number_of_rows];
+      }
+    }
+  }
+
   switch (a_field_type) {
     case DataFieldType::ELEMENT: {
-      a_data.resize(a_mesh.GetLocalCount<MeshElement::ELEMENT>(), base_matrix);
+      a_data.resize(a_mesh.GetLocalCount<MeshElement::ELEMENT>());
+      for (int n = 0; n < static_cast<int>(a_data.size()); ++n) {
+        a_data[n] = base_matrices[a_mesh.GetMfemMesh().GetAttribute(n)];
+      }
       break;
     }
     default:
@@ -114,8 +140,9 @@ void InitializeData(const DataFieldType a_field_type,
                    "Unknown field type.");
   }
 }
+
 }  // namespace matrix
 
-}  // namespace constant
+}  // namespace attribute_varying
 
 }  // namespace chyps

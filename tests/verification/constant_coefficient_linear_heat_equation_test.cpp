@@ -168,6 +168,51 @@ TEST(ConstantCoefficientLinearHeatEquation, AttributeMatrixTop) {
       ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
 }
 
+TEST(ConstantCoefficientLinearHeatEquation, ElementScalarTop) {
+  std::string file_name =
+      "tests/verification/data/"
+      "homogeneous_constant_coefficient_linear_heat_hn_top_element_scalar.json";
+  static constexpr int number_of_refinements = 3;
+
+  std::ifstream myfile(file_name.c_str());
+  nlohmann::json input_file =
+      nlohmann::json::parse(myfile, nullptr, true, true);
+  myfile.close();
+
+  const auto coefficient =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/Conductivity/kappa"]["Arguments"]["value"]
+                    .get<double>();
+
+  auto solution_lambda = TopLambda(input_file, coefficient);
+
+  auto test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+}
+
+TEST(ConstantCoefficientLinearHeatEquation, ElementMatrixTop) {
+  std::string file_name =
+      "tests/verification/data/"
+      "homogeneous_constant_coefficient_linear_heat_hn_top_element_matrix.json";
+  static constexpr int number_of_refinements = 3;
+
+  std::ifstream myfile(file_name.c_str());
+  nlohmann::json input_file =
+      nlohmann::json::parse(myfile, nullptr, true, true);
+  myfile.close();
+
+  const auto coefficient_vec =
+      input_file["SimulationInitializer"]["FieldInitialization"]
+                ["HeatSolver/Conductivity/kappa"]["Arguments"]["value"]
+                    .get<std::vector<double>>();
+  const auto coefficient = coefficient_vec[0];
+
+  auto solution_lambda = TopLambda(input_file, coefficient);
+
+  auto test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+}
+
 TEST(ConstantCoefficientLinearHeatEquation, ScalarBot) {
   std::string file_name =
       "tests/verification/data/"

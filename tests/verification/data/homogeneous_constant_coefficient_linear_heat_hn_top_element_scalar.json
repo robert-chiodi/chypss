@@ -1,0 +1,88 @@
+{
+	"SimulationInitializer": {
+		"out_data": "tests/verification/data/HomogeneousCCInit",
+		"FieldInitialization": {
+			"HeatSolver/rho": {
+				"Dimensionality": "scalar",
+				"FieldType": "true_dof",
+				"Initializer": "constant",
+				"Arguments": {
+					"value": 1.0
+				}
+			},
+			"HeatSolver/cp": {
+				"Dimensionality": "scalar",
+				"FieldType": "true_dof",
+				"Initializer": "constant",
+				"Arguments": {
+					"value": 1.0
+				}
+			},
+			"HeatSolver/temperature": {
+				"Dimensionality": "scalar",
+				"FieldType": "true_dof",
+				"Initializer": "quadratic_pulse",
+				"Arguments": {
+					"pulse_amplitude": 1.0,
+					"approximation_terms": 1,
+					"boundary_configuration": "DDDN"
+
+				}
+			},
+			"HeatSolver/Conductivity/kappa": {
+				"Dimensionality": "scalar",
+				"FieldType": "element",
+				"Initializer": "constant",
+				"Arguments": {
+					"value": 0.5
+				}
+			}
+
+		}
+	},
+	"Simulation": {
+		"in_data": "tests/verification/data/HomogeneousCCInit",
+		"out_data": "tests/verification/data/HomogeneousCCSolution",
+		"end_time": 0.01,
+		"time_step": 0.001,
+		"use_adios2": false,
+		"use_visit": false,
+		"viz_steps": 100000000,
+		"output_screen": "off",
+		"write_to_monitor": false
+	},
+	"HeatSolver": {
+		"alpha": 0.0,
+		"Conductivity": {
+			"type": "element_varying_scalar"
+		},
+		"order": 2,
+		"time_advancement": 3,
+		"BoundaryConditions": {
+			"temperature": {
+				"bc_default": "HOMOGENEOUS_DIRICHLET",
+				"bc_list": {
+					"4": {
+						"type": "HOMOGENEOUS_NEUMANN"
+					}
+				}
+
+			}
+		}
+	},
+	"Mesh": {
+		"rotation": 0.0,
+		"gen_blx": 0.0,
+		"gen_bly": 0.0,
+		"gen_blz": -1.0,
+		"gen_bux": 2.0,
+		"gen_buy": 2.0,
+		"gen_buz": 1.0,
+		"gen_nx": 10,
+		"gen_ny": 10,
+		"gen_nz": -1,
+		"mesh_file": "generate",
+		"parallel_refine": 0,
+		"serial_refine": 0
+	}
+}

@@ -58,6 +58,12 @@ mfem::ParMesh& Mesh::GetMfemMesh(void) {
   return *parallel_mesh_m;
 }
 
+const mfem::ParMesh& Mesh::GetMfemMesh(void) const {
+  DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
+               DebugLevel::CHEAP{});
+  return *parallel_mesh_m;
+}
+
 int Mesh::GetDimension(void) const {
   DEBUG_ASSERT(parallel_mesh_m != nullptr, global_assert{},
                DebugLevel::CHEAP{});

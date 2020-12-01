@@ -51,6 +51,9 @@ class Mesh {
   /// \brief Return the underlying MFEM mesh.
   mfem::ParMesh& GetMfemMesh(void);
 
+  /// \brief Return the underlying MFEM mesh.
+  const mfem::ParMesh& GetMfemMesh(void) const;
+
   /// \brief Return spatial dimension of the mesh.
   int GetDimension(void) const;
 
