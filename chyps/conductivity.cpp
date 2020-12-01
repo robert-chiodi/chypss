@@ -284,7 +284,7 @@ ConductivityType Conductivity::StringToType(const std::string& a_name) {
   std::array<std::string, static_cast<std::size_t>(ConductivityType::SIZE)>
       name_to_enum({"constant_scalar", "constant_matrix",
                     "material_varying_scalar", "material_varying_matrix",
-                    "material_varying_scalar", "material_varying_matrix"});
+                    "element_varying_scalar", "element_varying_matrix"});
   const auto location =
       std::find(name_to_enum.begin(), name_to_enum.end(), a_name);
   DEBUG_ASSERT(
