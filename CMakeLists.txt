@@ -10,7 +10,13 @@ project(CHyPS VERSION 0.1
 
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules"
-"${PROJECT_SOURCE_DIR}/cmake/Utils")
+		      "${PROJECT_SOURCE_DIR}/cmake/Utils")
+
+### Require out-of-source builds
+file(TO_CMAKE_PATH "${PROJECT_BINARY_DIR}/CMakeLists.txt" LOC_PATH)
+if(EXISTS "${LOC_PATH}")
+    message(FATAL_ERROR "You cannot build in a source directory (or any directory with a CMakeLists.txt file). Please make a build subdirectory.")
+endif()
 
 find_package(MPI REQUIRED)
 find_package(HYPRE REQUIRED)
