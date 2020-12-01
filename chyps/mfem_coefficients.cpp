@@ -75,6 +75,14 @@ double ElementVaryingScalarCoefficient::operator[](
   return element_values_m[a_element_index];
 }
 
+std::vector<double>& ElementVaryingScalarCoefficient::GetData(void) {
+  return element_values_m;
+}
+const std::vector<double>& ElementVaryingScalarCoefficient::GetData(
+    void) const {
+  return element_values_m;
+}
+
 double ElementVaryingScalarCoefficient::Eval(
     mfem::ElementTransformation& a_T, const mfem::IntegrationPoint& a_ip) {
   DEBUG_ASSERT(
@@ -109,6 +117,14 @@ const mfem::DenseMatrix& ElementVaryingMatrixCoefficient::operator[](
       static_cast<std::size_t>(a_element_index) < element_matrices_m.size(),
       global_assert{}, DebugLevel::CHEAP{});
   return element_matrices_m[a_element_index];
+}
+
+std::vector<mfem::DenseMatrix>& ElementVaryingMatrixCoefficient::GetData(void) {
+  return element_matrices_m;
+}
+const std::vector<mfem::DenseMatrix>& ElementVaryingMatrixCoefficient::GetData(
+    void) const {
+  return element_matrices_m;
 }
 
 void ElementVaryingMatrixCoefficient::Eval(mfem::DenseMatrix& a_K,

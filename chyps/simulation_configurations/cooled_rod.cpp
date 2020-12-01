@@ -18,19 +18,27 @@ namespace chyps {
 
 namespace cooled_rod {
 
+namespace scalar {
+
 void AddParserOptions(InputParser& a_parser) {
   a_parser.AddOption(
-      "SimulationInitializer/Initializers/cooled_rod/"
+      "SimulationInitializer/Initializers/cooled_rod/scalar/"
       "approximation_terms",
       "Number of terms to use in CooledRod solution approximation", 1);
 }
 
-void InitializeData(const nlohmann::json& a_json_object,
-                    const InputParser& a_full_parser,
+bool SupportedFieldType(const DataFieldType a_field_type) {
+  static constexpr std::array<DataFieldType, 2> supported_types{
+      {DataFieldType::GRID_FUNCTION, DataFieldType::TRUE_DOF}};
+  return std::find(supported_types.begin(), supported_types.end(),
+                   a_field_type) != supported_types.end();
+}
+
+void InitializeData(const DataFieldType a_field_type,
+                    const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser, const Mesh& a_mesh,
                     mfem::ParFiniteElementSpace& a_finite_element_space,
                     mfem::Vector& a_data) {
-  mfem::ParGridFunction grid_function(&a_finite_element_space);
-
   const auto approximation_terms =
       a_json_object["approximation_terms"].get<std::size_t>();
   auto value_setter = [=](const mfem::Vector& position) {
@@ -46,9 +54,29 @@ void InitializeData(const nlohmann::json& a_json_object,
   };
 
   mfem::FunctionCoefficient value_setter_function(value_setter);
-  grid_function.ProjectCoefficient(value_setter_function);
-  grid_function.GetTrueDofs(a_data);
+
+  switch (a_field_type) {
+    case DataFieldType::GRID_FUNCTION: {
+      mfem::ParGridFunction grid_function(&a_finite_element_space);
+      grid_function.ProjectCoefficient(value_setter_function);
+      a_data = grid_function;
+      break;
+    }
+
+    case DataFieldType::TRUE_DOF: {
+      mfem::ParGridFunction grid_function(&a_finite_element_space);
+      grid_function.ProjectCoefficient(value_setter_function);
+      grid_function.GetTrueDofs(a_data);
+      break;
+    }
+
+    default:
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Unknown field type.");
+  }
 }
+
+}  // namespace scalar
 }  // namespace cooled_rod
 
 }  // namespace chyps

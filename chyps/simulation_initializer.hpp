@@ -13,6 +13,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <mfem/mfem.hpp>
 
@@ -22,6 +23,8 @@
 #include "chyps/mpi_parallel.hpp"
 
 namespace chyps {
+
+enum class DataFieldType { GRID_FUNCTION = 0, TRUE_DOF, ELEMENT };
 
 class RequiredData {
  public:
@@ -49,12 +52,24 @@ class RequiredData {
   void SetFiniteElementSpace(
       mfem::ParFiniteElementSpace* a_finite_element_space);
 
-  /// \brief Add the true DOF field (with data correctly set) to the
-  /// RequiredData object under the name `a_name`.
+  /// \brief Add the scalar field (with data correctly set) to the
+  /// RequiredData object under the name `a_name`. This will then be written
+  /// to file.
   ///
   /// NOTE: RequiredData object will take ownership of the mfem::Vector object.
-  void AddTrueDofField(const std::string& a_name,
-                       mfem::Vector* a_grid_function);
+  void AddScalarField(const std::string& a_name,
+                      const DataFieldType a_field_type,
+                      mfem::Vector* a_grid_function);
+
+  /// \brief Add the matrix list (with data correctly set) to the
+  /// RequiredData object under the name `a_name`. This will then be written
+  /// to file.
+  ///
+  /// NOTE: RequiredData object will take ownership of the
+  /// std::vector<mfem::DenseMatrix> object.
+  void AddMatrixField(const std::string& a_name,
+                      const DataFieldType a_field_type,
+                      std::vector<mfem::DenseMatrix>* a_grid_function);
 
   /// \brief Write out mesh and data fields to file to be used for initializing
   /// a simulation.
@@ -66,14 +81,23 @@ class RequiredData {
   ~RequiredData(void);
 
  private:
-  static void ApplyInitializer(
-      const std::string& a_initializer,
+  static void ApplyScalarInitializer(
+      const DataFieldType a_field_type, const std::string& a_initializer,
       const nlohmann::json& a_initializer_arguments,
-      const InputParser& a_full_paser,
+      const InputParser& a_full_paser, const Mesh& a_mesh,
       mfem::ParFiniteElementSpace& a_finite_element_space,
       mfem::Vector& a_field);
+  static void ApplyMatrixInitializer(
+      const DataFieldType a_field_enum, const std::string& a_initializer,
+      const nlohmann::json& a_initializer_arguments,
+      const InputParser& a_full_parser, const Mesh& a_mesh,
+      mfem::ParFiniteElementSpace& a_finite_element_space,
+      const int a_number_of_rows, const int a_number_of_columns,
+      std::vector<mfem::DenseMatrix>& a_field);
+
   void CheckAllRequiredFieldsAvailable(void) const;
   void WriteDataFields(void);
+  static DataFieldType FieldStringToEnum(const std::string& a_field_type);
 
   const MPIParallel& mpi_session_m;
   InputParser& parser_m;
@@ -81,7 +105,11 @@ class RequiredData {
   Mesh mesh_m;
   mfem::FiniteElementCollection* finite_element_collection_m;
   mfem::ParFiniteElementSpace* finite_element_space_m;
-  std::unordered_map<std::string, mfem::Vector*> data_fields_m;
+  std::unordered_map<std::string, std::pair<DataFieldType, mfem::Vector*>>
+      scalar_fields_m;
+  std::unordered_map<std::string,
+                     std::pair<DataFieldType, std::vector<mfem::DenseMatrix>*>>
+      matrix_fields_m;
 };
 
 /// Simulation configuration types must contain no spaces and should be all

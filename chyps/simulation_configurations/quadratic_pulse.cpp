@@ -10,6 +10,7 @@
 
 #include "chyps/simulation_configurations/quadratic_pulse.hpp"
 
+#include <array>
 #include <functional>
 
 #include "chyps/debug_assert.hpp"
@@ -18,38 +19,63 @@ namespace chyps {
 
 namespace quadratic_pulse {
 
+namespace scalar {
+
 static std::function<double(const mfem::Vector&)> SelectInitialConditions(
     const nlohmann::json& a_json_object, const InputParser& a_full_parser);
 
 void AddParserOptions(InputParser& a_parser) {
   a_parser.AddOption(
-      "SimulationInitializer/Initializers/quadratic_pulse/"
+      "SimulationInitializer/Initializers/quadratic_pulse/scalar/"
       "pulse_amplitude",
       "Amplitude of quadratic pulse (value at center)", 1.0);
   a_parser.AddOption(
-      "SimulationInitializer/Initializers/quadratic_pulse/"
+      "SimulationInitializer/Initializers/quadratic_pulse/scalar/"
       "approximation_terms",
       "Number of terms to use in pulse approximation", 1);
   a_parser.AddOption(
-      "SimulationInitializer/Initializers/quadratic_pulse/"
+      "SimulationInitializer/Initializers/quadratic_pulse/scalar/"
       "boundary_configuration",
       "Configuration of homogeneous boundary conditions. Supplied by string of "
       "4 characters, D for Dirichlet and N for Neumann, correspoding to tag "
       "locations, (e.g.,\"HHNN\")");
 }
 
-void InitializeData(const nlohmann::json& a_json_object,
-                    const InputParser& a_full_parser,
+bool SupportedFieldType(const DataFieldType a_field_type) {
+  static constexpr std::array<DataFieldType, 2> supported_types{
+      {DataFieldType::GRID_FUNCTION, DataFieldType::TRUE_DOF}};
+  return std::find(supported_types.begin(), supported_types.end(),
+                   a_field_type) != supported_types.end();
+}
+
+void InitializeData(const DataFieldType a_field_type,
+                    const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser, const Mesh& a_mesh,
                     mfem::ParFiniteElementSpace& a_finite_element_space,
                     mfem::Vector& a_data) {
-  mfem::ParGridFunction grid_function(&a_finite_element_space);
-
   std::function<double(const mfem::Vector&)> value_setter =
       SelectInitialConditions(a_json_object, a_full_parser);
-
   mfem::FunctionCoefficient value_setter_function(value_setter);
-  grid_function.ProjectCoefficient(value_setter_function);
-  grid_function.GetTrueDofs(a_data);
+
+  switch (a_field_type) {
+    case DataFieldType::GRID_FUNCTION: {
+      mfem::ParGridFunction grid_function(&a_finite_element_space);
+      grid_function.ProjectCoefficient(value_setter_function);
+      a_data = grid_function;
+      break;
+    }
+
+    case DataFieldType::TRUE_DOF: {
+      mfem::ParGridFunction grid_function(&a_finite_element_space);
+      grid_function.ProjectCoefficient(value_setter_function);
+      grid_function.GetTrueDofs(a_data);
+      break;
+    }
+
+    default:
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Unknown field type.");
+  }
 }
 
 std::function<double(const mfem::Vector&)> SelectInitialConditions(
@@ -221,6 +247,8 @@ std::function<double(const mfem::Vector&)> SelectInitialConditions(
   }
   return [](const mfem::Vector& position) { return 0.0; };
 }
+
+}  // namespace scalar
 
 }  // namespace quadratic_pulse
 

@@ -29,25 +29,47 @@ RequiredData::RequiredData(const MPIParallel& a_mpi_session,
       file_io_m(a_file_io),
       mesh_m(a_mpi_session, parser_m, file_io_m),
       finite_element_collection_m(nullptr),
-      finite_element_space_m(nullptr) {
+      finite_element_space_m(nullptr),
+      scalar_fields_m(),
+      matrix_fields_m() {
   parser_m.AddOption(
-      "SimulationInitializer/FieldInitialization",
-      "A JSON object that lists the field names to be initialized as keys and "
-      "values of individual initializers for how to initialize them.  As an "
-      "example:\n"
-      "\"HeatSolver/temperature\": {\n"
-      " \"Initializer\": "
-      "\"constant\",\n"
-      "\" Arguments\":{"
-      "\n \"value\": 1.0\n"
-      "}\n"
-      "See the options themselves in Initializers for the arguments that must "
-      "be supplied to them");
+      "SimulationInitializer/FieldInitialization/DataName/Dimensionality",
+      "The type of object to initialize. Value options are either \"scalar\" "
+      "or \"matrix\".");
+
+  parser_m.AddOption(
+      "SimulationInitializer/FieldInitialization/DataName/NumberOfRows",
+      "Number of rows in matrix if \"Dimensionality\" is of matrix type. "
+      "Otherwise not required.");
+
+  parser_m.AddOption(
+      "SimulationInitializer/FieldInitialization/DataName/NumberOfColumns",
+      "Number of columns in matrix if \"Dimensionality\" is of matrix type. "
+      "Otherwise not required.");
+
+  parser_m.AddOption(
+      "SimulationInitializer/FieldInitialization/DataName/FieldType",
+      "Location/type of field. Valid values are \"grid_function\", "
+      "\"true_dof\", and "
+      "\"element\".");
+
+  parser_m.AddOption(
+      "SimulationInitializer/FieldInitialization/DataName/Initializer",
+      "Name of initializer to use for the field. See section "
+      "SimulationInitializer/Initializers for list and options. Note: Not all "
+      "initializers support all dimensionalities or field types.");
+
+  parser_m.AddOption(
+      "SimulationInitializer/FieldInitialization/DataName/Arguments",
+      "Arguments passed to initializer. See description of individual "
+      "initializers for expected arguments.");
 
   // Add parser options from all Initializers
-  constant::AddParserOptions(parser_m);
-  quadratic_pulse::AddParserOptions(parser_m);
-  cooled_rod::AddParserOptions(parser_m);
+  constant::scalar::AddParserOptions(parser_m);
+  quadratic_pulse::scalar::AddParserOptions(parser_m);
+  cooled_rod::scalar::AddParserOptions(parser_m);
+
+  constant::matrix::AddParserOptions(parser_m);
 }
 
 void RequiredData::Initialize(void) { mesh_m.Initialize(); }
@@ -67,18 +89,41 @@ void RequiredData::InitializeFields(void) {
   for (const auto& field : field_initialization_arguments.items()) {
     const std::string& field_name = field.key();
     const auto& field_initialization_params = field.value();
-    const auto& initializer =
+
+    const auto field_type =
+        field_initialization_params["FieldType"].get<std::string>();
+    const auto field_enum = this->FieldStringToEnum(field_type);
+    const auto initializer =
         field_initialization_params["Initializer"].get<std::string>();
     const auto& arguments_for_initializer =
         field_initialization_params["Arguments"];
 
-    auto true_dof_field = new mfem::Vector;
-    this->ApplyInitializer(initializer, arguments_for_initializer, parser_m,
-                           *finite_element_space, *true_dof_field);
+    const std::string dimensionality =
+        field_initialization_params["Dimensionality"].get<std::string>();
 
-    // RequiredData destructor will
-    // handle freeing the memory allocated
-    this->AddTrueDofField(field_name, true_dof_field);
+    if (dimensionality == "scalar") {
+      auto scalar_field = new mfem::Vector;
+      this->ApplyScalarInitializer(field_enum, initializer,
+                                   arguments_for_initializer, parser_m, mesh_m,
+                                   *finite_element_space, *scalar_field);
+      this->AddScalarField(field_name, field_enum, scalar_field);
+    } else if (dimensionality == "matrix") {
+      auto matrix_list = new std::vector<mfem::DenseMatrix>;
+      const auto number_of_rows =
+          field_initialization_params["NumberOfRows"].get<int>();
+      const auto number_of_columns =
+          field_initialization_params["NumberOfColumns"].get<int>();
+      this->ApplyMatrixInitializer(field_enum, initializer,
+                                   arguments_for_initializer, parser_m, mesh_m,
+                                   *finite_element_space, number_of_rows,
+                                   number_of_columns, *matrix_list);
+      this->AddMatrixField(field_name, field_enum, matrix_list);
+
+    } else {
+      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                   "Unknown dimensionality of \"" + dimensionality +
+                       "\" for field named \"" + field_name + "\".");
+    }
   }
 }
 
@@ -92,13 +137,24 @@ void RequiredData::SetFiniteElementSpace(
   finite_element_space_m = a_finite_element_space;
 }
 
-void RequiredData::AddTrueDofField(const std::string& a_name,
-                                   mfem::Vector* a_grid_function) {
+void RequiredData::AddScalarField(const std::string& a_name,
+                                  const DataFieldType a_field_type,
+                                  mfem::Vector* a_grid_function) {
   DEBUG_ASSERT(
-      data_fields_m.find(a_name) == data_fields_m.end(), global_assert{},
+      scalar_fields_m.find(a_name) == scalar_fields_m.end(), global_assert{},
       DebugLevel::CHEAP{},
-      "mfem::Vector under name \"" + a_name + "\" has already been added.");
-  data_fields_m[a_name] = a_grid_function;
+      "Scalar field under name \"" + a_name + "\" has already been added.");
+  scalar_fields_m[a_name] = std::make_pair(a_field_type, a_grid_function);
+}
+
+void RequiredData::AddMatrixField(
+    const std::string& a_name, const DataFieldType a_field_type,
+    std::vector<mfem::DenseMatrix>* a_matrix_list) {
+  DEBUG_ASSERT(
+      matrix_fields_m.find(a_name) == matrix_fields_m.end(), global_assert{},
+      DebugLevel::CHEAP{},
+      "Matrix field under name \"" + a_name + "\" has already been added.");
+  matrix_fields_m[a_name] = std::make_pair(a_field_type, a_matrix_list);
 }
 
 void RequiredData::WriteToFile(void) {
@@ -109,30 +165,71 @@ void RequiredData::WriteToFile(void) {
   file_io_m.EndWriteStep();
 }
 
-void RequiredData::ApplyInitializer(
-    const std::string& a_initializer,
+void RequiredData::ApplyScalarInitializer(
+    const DataFieldType a_field_enum, const std::string& a_initializer,
     const nlohmann::json& a_initializer_arguments,
-    const InputParser& a_full_parser,
+    const InputParser& a_full_parser, const Mesh& a_mesh,
     mfem::ParFiniteElementSpace& a_finite_element_space,
     mfem::Vector& a_field) {
   if (a_initializer == "constant") {
-    constant::InitializeData(a_initializer_arguments, a_full_parser,
-                             a_finite_element_space, a_field);
+    DEBUG_ASSERT(constant::scalar::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    constant::scalar::InitializeData(a_field_enum, a_initializer_arguments,
+                                     a_full_parser, a_mesh,
+                                     a_finite_element_space, a_field);
   } else if (a_initializer == "cooled_rod") {
-    cooled_rod::InitializeData(a_initializer_arguments, a_full_parser,
-                               a_finite_element_space, a_field);
+    DEBUG_ASSERT(cooled_rod::scalar::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    cooled_rod::scalar::InitializeData(a_field_enum, a_initializer_arguments,
+                                       a_full_parser, a_mesh,
+                                       a_finite_element_space, a_field);
 
   } else if (a_initializer == "quadratic_pulse") {
-    quadratic_pulse::InitializeData(a_initializer_arguments, a_full_parser,
-                                    a_finite_element_space, a_field);
+    DEBUG_ASSERT(quadratic_pulse::scalar::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    quadratic_pulse::scalar::InitializeData(
+        a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
+        a_finite_element_space, a_field);
   } else {
     DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
-                 "Unknown configuration type of : " + a_initializer);
+                 "Unknown scalar configuration type of : " + a_initializer);
   }
 }
 
+void RequiredData::ApplyMatrixInitializer(
+    const DataFieldType a_field_enum, const std::string& a_initializer,
+    const nlohmann::json& a_initializer_arguments,
+    const InputParser& a_full_parser, const Mesh& a_mesh,
+    mfem::ParFiniteElementSpace& a_finite_element_space,
+    const int a_number_of_rows, const int a_number_of_columns,
+    std::vector<mfem::DenseMatrix>& a_field) {
+  if (a_initializer == "constant") {
+    DEBUG_ASSERT(constant::matrix::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    constant::matrix::InitializeData(
+        a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
+        a_finite_element_space, a_number_of_rows, a_number_of_columns, a_field);
+  } else {
+    DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                 "Unknown matrix configuration type of : " + a_initializer);
+  }
+}
+
+DataFieldType RequiredData::FieldStringToEnum(const std::string& a_field_type) {
+  if (a_field_type == "grid_function") {
+    return DataFieldType::GRID_FUNCTION;
+  } else if (a_field_type == "true_dof") {
+    return DataFieldType::TRUE_DOF;
+  } else if (a_field_type == "element") {
+    return DataFieldType::ELEMENT;
+  }
+  DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+               "Unknown FieldType string of \"" + a_field_type + "\"");
+  return DataFieldType::TRUE_DOF;  // Will never reach.
+}
+
 void RequiredData::CheckAllRequiredFieldsAvailable(void) const {
-  static const std::vector<std::string> required_variables{
+  static constexpr std::array<const char*, 3> required_variables{
       {"HeatSolver/temperature", "HeatSolver/rho", "HeatSolver/cp"}};
 
   DEBUG_ASSERT(finite_element_collection_m != nullptr, global_assert{},
@@ -146,33 +243,103 @@ void RequiredData::CheckAllRequiredFieldsAvailable(void) const {
                "SetFiniteElementSpace method.");
 
   for (const auto elem : required_variables) {
-    DEBUG_ASSERT(
-        data_fields_m.find(elem) != data_fields_m.end(), global_assert{},
-        DebugLevel::ALWAYS{},
-        "Required variable \"" + elem + "\" missing in initialization.");
+    DEBUG_ASSERT(scalar_fields_m.find(elem) != scalar_fields_m.end(),
+                 global_assert{}, DebugLevel::ALWAYS{},
+                 "Required variable \"" + std::string(elem) +
+                     "\" missing in initialization.");
 
-    DEBUG_ASSERT(data_fields_m.at(elem) != nullptr, global_assert{},
-                 DebugLevel::CHEAP{},
-                 "Required variable \"" + elem + "\" points to a nullptr.");
+    DEBUG_ASSERT(
+        scalar_fields_m.at(elem).second != nullptr, global_assert{},
+        DebugLevel::CHEAP{},
+        "Required variable \"" + std::string(elem) + "\" points to a nullptr.");
+  }
+
+  if (parser_m.OptionSet("HeatSolver/Conductivity")) {
+    if (parser_m["HeatSolver/Conductivity/type"] == "element_varying_scalar") {
+      DEBUG_ASSERT(scalar_fields_m.find("HeatSolver/Conductivity/kappa") !=
+                       scalar_fields_m.end(),
+                   global_assert{}, DebugLevel::ALWAYS{},
+                   "Element varying scalar kappa is being used but was not "
+                   "initialized.");
+    }
+    if (parser_m["HeatSolver/Conductivity/type"] == "element_varying_matrix") {
+      DEBUG_ASSERT(matrix_fields_m.find("HeatSolver/Conductivity/kappa") !=
+                       matrix_fields_m.end(),
+                   global_assert{}, DebugLevel::ALWAYS{},
+                   "Element varying matrix kappa is being used but was not "
+                   "initialized.");
+    }
   }
 }
 
 void RequiredData::WriteDataFields(void) {
-  for (const auto& elem : data_fields_m) {
+  // Write scalar fields
+  for (const auto& elem : scalar_fields_m) {
     DEBUG_ASSERT(
-        elem.second != nullptr, global_assert{}, DebugLevel::CHEAP{},
+        elem.second.second != nullptr, global_assert{}, DebugLevel::CHEAP{},
         "Variable \"" + elem.first + "\" is a nullptr in initializaton.");
-    file_io_m.AddVariableForTrueDofs(elem.first, *finite_element_space_m, true);
-    file_io_m.PutDeferred(elem.first, *elem.second);
+    switch (elem.second.first) {
+      case DataFieldType::GRID_FUNCTION: {
+        file_io_m.AddVariableForGridFunction(elem.first,
+                                             *finite_element_space_m, true);
+        break;
+      }
+
+      case DataFieldType::TRUE_DOF: {
+        file_io_m.AddVariableForTrueDofs(elem.first, *finite_element_space_m,
+                                         true);
+        break;
+      }
+
+      case DataFieldType::ELEMENT: {
+        file_io_m.AddVariableForMesh<double>(elem.first, mesh_m,
+                                             MeshElement::ELEMENT);
+        break;
+      }
+
+      default:
+        DEBUG_ASSERT(false, global_assert{}, DebugLevel::CHEAP{},
+                     "Unhandled field type for writing scalar field to file.");
+    }
+
+    file_io_m.PutDeferred(elem.first, *(elem.second.second));
+  }
+
+  // Write matrix fields
+  for (const auto& elem : matrix_fields_m) {
+    DEBUG_ASSERT(
+        elem.second.second != nullptr, global_assert{}, DebugLevel::CHEAP{},
+        "Variable \"" + elem.first + "\" is a nullptr in initializaton.");
+    switch (elem.second.first) {
+      case DataFieldType::ELEMENT: {
+        const mfem::DenseMatrix& matrix = (*elem.second.second)[0];
+        const std::size_t number_of_rows =
+            static_cast<std::size_t>(matrix.NumRows());
+        const std::size_t number_of_columns =
+            static_cast<std::size_t>(matrix.NumCols());
+        file_io_m.AddMatrixForMesh(elem.first, mesh_m, MeshElement::ELEMENT,
+                                   number_of_rows, number_of_columns);
+        break;
+      }
+
+      default:
+        DEBUG_ASSERT(false, global_assert{}, DebugLevel::CHEAP{},
+                     "Unhandled field type for writing matrix field to file.");
+    }
+    file_io_m.PutDeferred(elem.first, *(elem.second.second));
   }
 }
 
 Mesh& RequiredData::GetMesh(void) { return mesh_m; }
 
 RequiredData::~RequiredData(void) {
-  for (auto& elem : data_fields_m) {
-    delete elem.second;
-    elem.second = nullptr;
+  for (auto& elem : scalar_fields_m) {
+    delete elem.second.second;
+    elem.second.second = nullptr;
+  }
+  for (auto& elem : matrix_fields_m) {
+    delete elem.second.second;
+    elem.second.second = nullptr;
   }
   delete finite_element_space_m;
   delete finite_element_collection_m;

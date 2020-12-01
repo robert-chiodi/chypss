@@ -14,6 +14,50 @@
 #include "chyps/logger.hpp"
 
 namespace chyps {
+// Specialization
+template <>
+void IO::GetBlock(const std::string& a_variable_name,
+                  std::vector<mfem::DenseMatrix>& a_data,
+                  const adios2::Mode a_mode) {
+  auto adios_variable = read_m.InquireVariable<double>(a_variable_name);
+  DEBUG_ASSERT(
+      adios_variable, global_assert{}, DebugLevel::CHEAP{},
+      "ADIOS2 variable with name \"" + a_variable_name + "\" not found.");
+  DEBUG_ASSERT(this->IsReadModeActive(), global_assert{}, DebugLevel::CHEAP{},
+               "IO must be in read mode for reading from fields.");
+  const auto block_id = static_cast<std::size_t>(mpi_session_m.MyRank());
+  adios_variable.SetBlockSelection(block_id);
+  // FIXME: Might be better to allow users to find the step to load by being
+  // closest to a time? Right now just take latest data.
+  const auto step_to_load = adios_variable.Steps();
+  adios_variable.SetStepSelection({step_to_load - 1, 1});
+  std::vector local_shape = adios_variable.Count();
+  const std::size_t number_of_matrices = local_shape[0];
+  const std::size_t number_of_columns = local_shape[1];
+  const std::size_t number_of_rows = local_shape[2];
+  a_data.resize(number_of_matrices,
+                mfem::DenseMatrix(static_cast<int>(number_of_rows),
+                                  static_cast<int>(number_of_columns)));
+  std::vector<double> block_data;
+  read_engine_m->Get(adios_variable, block_data, a_mode);
+
+  DEBUG_ASSERT(block_data.size() ==
+                   number_of_matrices * number_of_rows * number_of_columns,
+               global_assert{}, DebugLevel::CHEAP{},
+               "Read flat data does not match expected length.");
+
+  std::size_t matrix_offset = 0;
+  for (std::size_t n = 0; n < number_of_matrices; ++n) {
+    mfem::DenseMatrix& matrix = a_data[n];
+    for (std::size_t j = 0; j < number_of_columns; ++j) {
+      for (std::size_t i = 0; i < number_of_rows; ++i) {
+        matrix(i, j) = block_data[matrix_offset + j * number_of_rows + i];
+      }
+    }
+    matrix_offset += number_of_rows * number_of_columns;
+  }
+}
+
 IO::IO(const MPIParallel& a_mpi_session, const std::string a_io_name)
     : io_driver_m(a_mpi_session.GetComm()),
       mpi_session_m(a_mpi_session),
@@ -82,6 +126,23 @@ void IO::MarkAsPointVariable(const std::string a_name, const int a_order) {
     point_data_variables_m.push_back(a_name);
     point_data_orders_m.push_back(a_order);
   }
+}
+
+// For writing in column-major ordering
+void IO::AddMatrixForMesh(const std::string a_variable_name, const Mesh& a_mesh,
+                          const MeshElement a_type,
+                          const std::size_t a_number_of_rows,
+                          const std::size_t a_number_of_columns) {
+  DEBUG_ASSERT(a_type == MeshElement::ELEMENT, global_assert{},
+               DebugLevel::CHEAP{},
+               "Matrix can only be added for element of mesh.");
+  const std::size_t number_of_elements =
+      a_mesh.GetLocalCount<MeshElement::ELEMENT>();
+
+  write_m.DefineVariable<double>(
+      a_variable_name, {}, {},
+      {number_of_elements, a_number_of_columns, a_number_of_rows},
+      !a_mesh.UsesAMR());
 }
 
 // Note: This routine is for all ranks writing their own section. Need to work
@@ -244,6 +305,42 @@ void IO::PutDeferred(const std::string& a_variable_name,
   this->Put(a_variable_name, a_vector.GetData(), adios2::Mode::Deferred);
 }
 
+void IO::PutDeferred(const std::string& a_variable_name,
+                     const std::vector<mfem::DenseMatrix>& a_matrix_list) {
+  DEBUG_ASSERT(this->IsWriteModeActive(), global_assert{}, DebugLevel::CHEAP{},
+               "IO must be in write mode for writing to fields.");
+  DEBUG_ASSERT(this->OngoingWriteStep(), global_assert{}, DebugLevel::CHEAP{},
+               "An ongoing IO step is required for writing.");
+  DEBUG_ASSERT(a_matrix_list.size() > 0, global_assert{}, DebugLevel::CHEAP{},
+               "Vector of DenseMatrix cannot be empty.");
+
+  // Assume that all DenseMatrix are of the same size.
+  const std::size_t number_of_rows =
+      static_cast<std::size_t>(a_matrix_list[0].NumRows());
+  const std::size_t number_of_columns =
+      static_cast<std::size_t>(a_matrix_list[0].NumCols());
+
+  auto span = this->PutSpan<double>(a_variable_name);
+  std::size_t matrix_offset = 0;
+  for (std::size_t n = 0; n < a_matrix_list.size(); ++n) {
+    const mfem::DenseMatrix& matrix = a_matrix_list[n];
+    for (std::size_t j = 0; j < number_of_columns; ++j) {
+      for (std::size_t i = 0; i < number_of_rows; ++i) {
+        span[matrix_offset + j * number_of_rows + i] = matrix(i, j);
+      }
+    }
+    matrix_offset += number_of_rows * number_of_columns;
+  }
+}
+
+void IO::GetImmediateBlock(const std::string& a_variable_name,
+                           std::vector<mfem::DenseMatrix>& a_matrix_list) {
+  DEBUG_ASSERT(this->IsReadModeActive(), global_assert{}, DebugLevel::CHEAP{},
+               "IO must be in read mode for reading from fields.");
+
+  this->GetBlock(a_variable_name, a_matrix_list, adios2::Mode::Sync);
+}
+
 void IO::PerformPuts(void) {
   DEBUG_ASSERT(this->IsWriteModeActive(), global_assert{}, DebugLevel::CHEAP{},
                "IO must be in write mode for writing to fields.");
@@ -310,12 +407,13 @@ std::array<std::size_t, 3> IO::GetMeshSizes(const Mesh& a_mesh,
                "Local offset: " +
                    std::to_string(mesh_sizes[1]) +
                    "\nGlobal size: " + std::to_string(mesh_sizes[0]));
-  DEBUG_ASSERT(
-      mesh_sizes[2] <= mesh_sizes[0], global_assert{}, DebugLevel::CHEAP{},
-      "Local size must be less than or equal to the global size of the data.\n"
-      "Local size: " +
-          std::to_string(mesh_sizes[2]) +
-          "\nGlobal size: " + std::to_string(mesh_sizes[0]));
+  DEBUG_ASSERT(mesh_sizes[2] <= mesh_sizes[0], global_assert{},
+               DebugLevel::CHEAP{},
+               "Local size must be less than or equal to the global size of "
+               "the data.\n"
+               "Local size: " +
+                   std::to_string(mesh_sizes[2]) +
+                   "\nGlobal size: " + std::to_string(mesh_sizes[0]));
 
   return mesh_sizes;
 }

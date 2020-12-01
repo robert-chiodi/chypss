@@ -21,8 +21,8 @@ template <class T>
 void IO::AddVariableForMesh(const std::string a_variable_name,
                             const Mesh& a_mesh, const MeshElement a_type) {
   auto io_mesh_sizes = this->GetMeshSizes(a_mesh, a_type);
-  this->AddVariable<T>(a_variable_name, {io_mesh_sizes[0]}, {io_mesh_sizes[1]},
-                       {io_mesh_sizes[2]}, !a_mesh.UsesAMR());
+  this->AddVariable<T>(a_variable_name, {}, {}, {io_mesh_sizes[2]},
+                       !a_mesh.UsesAMR());
 }
 
 template <class T>

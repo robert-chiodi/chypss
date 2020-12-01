@@ -3,6 +3,8 @@
 	"out_data": "tests/verification/data/checkpointLO_init",
 	"FieldInitialization":{
 		"HeatSolver/temperature":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
 			"Initializer": "constant",
 			"Arguments":{
 				"value": 10.0
@@ -10,12 +12,16 @@
 			}
 		},
 		"HeatSolver/rho":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
 			"Initializer" : "constant",
 			"Arguments": {
 				"value":1.0
 			}
 		},
                 "HeatSolver/cp":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
                         "Initializer" : "constant",
                         "Arguments": {
                                 "value":1.0
@@ -32,8 +38,8 @@
 		    "write_to_monitor": false
 		 },
     "HeatSolver":{
-		    "ConductionOperator":{
-                    "conductivity_type": "constant_scalar",
+		    "Conductivity":{
+                    "type": "constant_scalar",
                     "ConstantScalar": 1.0
 		    },
 		    "order": 4,

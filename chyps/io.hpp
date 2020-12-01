@@ -28,6 +28,8 @@ namespace chyps {
 
 enum class ExistenceLocation { NONE = 0, READ, WRITE, BOTH };
 
+/// \brief IO class is currently written to write out chunks for each MPI Rank.
+/// This means the same number of ranks must be used to read and write data.
 class IO {
  public:
   IO(void) = delete;
@@ -63,6 +65,13 @@ class IO {
   template <class T>
   void AddVariableForMesh(const std::string a_variable_name, const Mesh& a_mesh,
                           const MeshElement a_type);
+
+  /// \brief Add a mfem::DenseMatrix variable for later export (through
+  /// PutDeferred or PutImmediate). Column-major ordering will be used.
+  void AddMatrixForMesh(const std::string a_variable_name, const Mesh& a_mesh,
+                        const MeshElement a_type,
+                        const std::size_t a_number_of_rows,
+                        const std::size_t a_number_of_columns);
 
   /// \brief Add ParGridFunction variable for later export (through PutDeferred
   /// or PutImmediate). Underlying data assumed to be of type double. The data
@@ -283,6 +292,22 @@ class IO {
   void PutDeferred(const std::string& a_variable_name,
                    const mfem::Vector& a_vector);
 
+  /// \brief Taking a std::vector of mfem::DenseMatrix objects, flatten
+  /// the matrix into an ADIOS2::Span for writing. The matrix will be written
+  /// in column major ordering to match that used by mfem::DenseMatrix.
+  /// The underlying type is assumed to be double and all matrices
+  /// in `a_matrix_list` are assumed to be the same shape.
+  ///
+  /// The variable with name a_variable_name must have been previously
+  /// added through a call to AddMatrixForMesh.
+  ///
+  /// Note: DO NOT modify data contained in
+  /// a_data or the validity of the pointer until after the call to EndStep.
+  // FIXME : Check if filling a span would make this a PutImmediate or
+  // PutDeferred
+  void PutDeferred(const std::string& a_variable_name,
+                   const std::vector<mfem::DenseMatrix>& a_matrix_list);
+
   /// \brief Deferred Put of data for I/O. Will hold reference to data
   /// given to it between BeginStep and EndStep and write during EndStep.
   /// This should be used by default for better performance.
@@ -430,9 +455,7 @@ class IO {
   void GetImmediateValue(const std::string& a_variable_name, T* a_data);
 
   /// \brief Immediate Get of data for I/O. Will read data into a_data before
-  /// returning. The a_local_start and a_local_count indicate the
-  /// (potentially multidimensional) slice of data that should be read from the
-  /// larger global size.
+  /// returning.
   ///
   ///
   /// Note: Prefer GetDeferred for better performance.
@@ -457,6 +480,18 @@ class IO {
   template <class T>
   void GetImmediateBlock(const std::string& a_variable_name,
                          std::vector<T>& a_data);
+
+  /// \brief Immediate Get of data for I/O. Will resize a_matrix_list and return
+  /// filled. Only reads a rank-local block of the data.
+  ///
+  ///
+  /// Note: Prefer GetDeferred for better performance.
+  ///
+  /// Note: When performing a Get, the variable SHOULD NOT be added first
+  /// via a AddVariable method. The variables will be populated from the file
+  /// open for reading.
+  void GetImmediateBlock(const std::string& a_variable_name,
+                         std::vector<mfem::DenseMatrix>& a_matrix_list);
 
   /// \brief Effectively performs a flush on all PutDeferred variables
   /// that have yet to be written.

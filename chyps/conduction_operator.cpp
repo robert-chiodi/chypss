@@ -505,14 +505,6 @@ void ConductionOperator::GatherOptions(InputParser& a_parser) {
   a_parser.AddOption(
       "HeatSolver/ConductionOperator/solver_max_iter",
       "Maximum allowed iterations for iterative solves of X=A^{-1} B", 100);
-  a_parser.AddOption(
-      "HeatSolver/ConductionOperator/conductivity_type",
-      "Conductivity model to use. Types are: \"constant_scalar\", "
-      "\"constant_matrix\", \"material_varying_scalar\", "
-      "\"material_varying_matrix\", \"element_varying_scalar\", and "
-      "\"element_varying_matrix\". See Documentation for or comments in "
-      "conduction_operator.cpp for definition of each type. Types may require "
-      "additional arguments.");
 }
 
 void ConductionOperator::SetTrueDofsFromVertexData(

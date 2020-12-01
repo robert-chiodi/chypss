@@ -43,8 +43,8 @@ enum class ConductivityType {
 // For constant_scalar type.
 //
 // "HeatSolver" : {
-// "ConductionOperator":{
-//                 "conductivity_type": "constant_scalar",
+// "Conductivity":{
+//                 "type": "constant_scalar",
 //                 "ConstantScalar": 1.0 // constant value
 //                }
 //                }
@@ -54,8 +54,8 @@ enum class ConductivityType {
 // For constant_matrix type.
 //
 // "HeatSolver" : {
-// "ConductionOperator":{
-//                 "conductivity_type": "constant_matrix",
+// "Conductivity":{
+//                 "type": "constant_matrix",
 //                 // MESH_DIM*MESH_DIM
 //                 // long array in column-major ordering for matrix
 //                 "ConstantMatrix": [1.0, 0.0, 0.0, 1.0]
@@ -66,8 +66,8 @@ enum class ConductivityType {
 // For material_varying_scalar type.
 //
 // "HeatSolver" : {
-// "ConductionOperator":{
-//                 "conductivity_type": "material_varying_scalar",
+// "Conductivity":{
+//                 "type": "material_varying_scalar",
 //                 // One vector entry per tag, tag value is entry index + 1
 //                 // Below would be for tag values [1,4]
 //                 "MaterialVaryingScalar": [0.25, 0.5, 0.75, 1.0]
@@ -78,8 +78,8 @@ enum class ConductivityType {
 // For material_varying_matrix type.
 //
 // "HeatSolver" : {
-// "ConductionOperator":{
-//                 "conductivity_type": "material_varying_matrix",
+// "Conductivity":{
+//                 "type": "material_varying_matrix",
 //                 // Attribute (Material) tag used as key.
 //                 // Each key gets MESH_DIM*MESH_DIM array in column-major
 //                 "MaterialVaryingMatrix":{
@@ -95,8 +95,8 @@ enum class ConductivityType {
 // For element_varying_scalar type.
 //
 // "HeatSolver" : {
-// "ConductionOperator":{
-//                 "conductivity_type": "element_varying_scalar",
+// "Conductivity":{
+//                 "type": "element_varying_scalar",
 //                 // Provide path to data providing one value per element
 //                 "ElementVaryingScalar": "path_to_data_in_BP4_file"
 //                }
@@ -106,8 +106,8 @@ enum class ConductivityType {
 // For element_varying_matrix type.
 //
 // "HeatSolver" : {
-// "ConductionOperator":{
-//                 "conductivity_type": "element_varying_matrix",
+// "Conductivity":{
+//                 "type": "element_varying_matrix",
 //                 // Provide path to data providing MESH_DIM*MESH_DIM  values
 //                 // per element in column-major order
 //                 "ElementVaryingScalar":  "path_to_data_in_BP4_file"
@@ -117,7 +117,7 @@ enum class ConductivityType {
 //
 
 /// \class Conductivity chyps/conductivity.hpp conductivity.hpp
-/// \brief Class to control the conductivity used in the ConductionOperator. Can
+/// \brief Class to control the conductivity used for the HeatSolver. Can
 /// handle scalar or tensor values that are constant, vary based on element
 /// attribute, or vary based on element index. It is assumed only those that
 /// vary with element index change in time.

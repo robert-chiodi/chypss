@@ -20,6 +20,8 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 	"out_data": "tests/verification/data/CooledRod",
 "FieldInitialization":{
 		"HeatSolver/temperature":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
 			"Initializer": "cooled_rod",
 			"Arguments":{
 				"approximation_terms": 1
@@ -27,12 +29,16 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 			}
 		},
 		"HeatSolver/rho":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
 			"Initializer" : "constant",
 			"Arguments": {
 				"value":1.0
 			}
 		},
                 "HeatSolver/cp":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
                         "Initializer" : "constant",
                         "Arguments": {
                                 "value":1.0
@@ -51,8 +57,8 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
                     "output_screen": "off"
 		 },
     "HeatSolver":{
-		    "ConductionOperator":{
-		    "conductivity_type" : "constant_scalar",
+		    "Conductivity":{
+		    "type" : "constant_scalar",
 		    "ConstantScalar" : 1.0
 	            },
 		    "order": 2,

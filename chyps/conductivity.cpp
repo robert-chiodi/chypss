@@ -29,18 +29,17 @@ Conductivity::Conductivity(Simulation& a_simulation,
       sim_m.GetMesh().GetMfemMesh().attributes.Size();
   const int dimension = sim_m.GetMesh().GetDimension();
 
-  type_m = this->StringToType(
-      parser["HeatSolver/ConductionOperator/conductivity_type"]);
+  type_m = this->StringToType(parser["HeatSolver/Conductivity/type"]);
   switch (type_m) {
     case ConductivityType::CONSTANT_SCALAR: {
       auto value =
-          parser["HeatSolver/ConductionOperator/ConstantScalar"].get<double>();
+          parser["HeatSolver/Conductivity/ConstantScalar"].get<double>();
       scalar_coefficient_m = new mfem::ConstantCoefficient(value);
 
       break;
     }
     case ConductivityType::CONSTANT_MATRIX: {
-      auto value = parser["HeatSolver/ConductionOperator/ConstantMatrix"]
+      auto value = parser["HeatSolver/Conductivity/ConstantMatrix"]
                        .get<std::vector<double>>();
       DEBUG_ASSERT(
           value.size() == static_cast<std::size_t>(dimension * dimension),
@@ -54,7 +53,7 @@ Conductivity::Conductivity(Simulation& a_simulation,
     }
 
     case ConductivityType::MATERIAL_VARYING_SCALAR: {
-      auto value = parser["HeatSolver/ConductionOperator/MaterialVaryingScalar"]
+      auto value = parser["HeatSolver/Conductivity/MaterialVaryingScalar"]
                        .get<std::vector<double>>();
 
       DEBUG_ASSERT(
@@ -71,7 +70,7 @@ Conductivity::Conductivity(Simulation& a_simulation,
 
     case ConductivityType::MATERIAL_VARYING_MATRIX: {
       const auto value_list =
-          parser["HeatSolver/ConductionOperator/MaterialVaryingMatrix"];
+          parser["HeatSolver/Conductivity/MaterialVaryingMatrix"];
       matrix_coefficient_m =
           new MaterialVaryingMatrixCoefficient(a_finite_element_space);
       auto& material_varying_matrix =
@@ -103,20 +102,18 @@ Conductivity::Conductivity(Simulation& a_simulation,
     }
 
     case ConductivityType::ELEMENT_VARYING_SCALAR: {
-      // Figure out way to write/read this
-      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{});
-      const auto name_in_file =
-          parser["HeatSolver/ConductionOperator/ElementVaryingScalar"]
-              .get<std::string>();
+      scalar_coefficient_m =
+          new ElementVaryingScalarCoefficient(a_finite_element_space);
+      // Reading/filling of values will happen in
+      // HeatSolver::SetInitialConditions
       break;
     }
 
     case ConductivityType::ELEMENT_VARYING_MATRIX: {
-      // Figure out way to write/read this
-      DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{});
-      const auto name_in_file =
-          parser["HeatSolver/ConductionOperator/ElementVaryingMatrix"]
-              .get<std::string>();
+      matrix_coefficient_m =
+          new ElementVaryingMatrixCoefficient(a_finite_element_space);
+      // Reading/filling of values will happen in
+      // HeatSolver::SetInitialConditions
       break;
     }
 

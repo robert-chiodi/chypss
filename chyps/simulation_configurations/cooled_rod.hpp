@@ -16,16 +16,21 @@
 #include <mfem/mfem.hpp>
 
 #include "chyps/input_parser.hpp"
+#include "chyps/mesh.hpp"
+#include "chyps/simulation_initializer.hpp"
 
 namespace chyps {
 
 namespace cooled_rod {
-
+namespace scalar {
 void AddParserOptions(InputParser& a_parser);
-void InitializeData(const nlohmann::json& a_json_object,
-                    const InputParser& a_full_parser,
+bool SupportedFieldType(const DataFieldType a_field_type);
+void InitializeData(const DataFieldType a_field_type,
+                    const nlohmann::json& a_json_object,
+                    const InputParser& a_full_parser, const Mesh& a_mesh,
                     mfem::ParFiniteElementSpace& a_finite_element_space,
                     mfem::Vector& a_data);
+}  // namespace scalar
 }  // namespace cooled_rod
 
 }  // namespace chyps

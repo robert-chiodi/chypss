@@ -45,6 +45,9 @@ class ElementVaryingScalarCoefficient : public mfem::Coefficient {
 
   double operator[](const int a_element_index) const;
 
+  std::vector<double>& GetData(void);
+  const std::vector<double>& GetData(void) const;
+
   virtual double Eval(mfem::ElementTransformation& a_T,
                       const mfem::IntegrationPoint& a_ip) override final;
 
@@ -63,6 +66,9 @@ class ElementVaryingMatrixCoefficient : public mfem::MatrixCoefficient {
   mfem::DenseMatrix& operator[](const int a_element_index);
 
   const mfem::DenseMatrix& operator[](const int a_element_index) const;
+
+  std::vector<mfem::DenseMatrix>& GetData(void);
+  const std::vector<mfem::DenseMatrix>& GetData(void) const;
 
   virtual void Eval(mfem::DenseMatrix& a_K, mfem::ElementTransformation& a_T,
                     const mfem::IntegrationPoint& a_ip) override final;

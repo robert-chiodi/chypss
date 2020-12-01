@@ -15,6 +15,7 @@
 
 #include "chyps/debug_assert.hpp"
 #include "chyps/logger.hpp"
+#include "chyps/mesh.hpp"
 #include "chyps/simulation.hpp"
 #include "chyps/string_manipulation.hpp"
 
@@ -136,6 +137,18 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
     sim_m.GetIO().PutDeferred("HeatSolver/temperature", temperature_m);
     sim_m.GetIO().PutDeferred("HeatSolver/rho", rho_m);
     sim_m.GetIO().PutDeferred("HeatSolver/cp", cp_m);
+    if (kappa_m->CanTimeVary()) {
+      if (kappa_m->IsScalarCoefficient()) {
+        sim_m.GetIO().PutDeferred(
+            "HeatSolver/kappa",
+            kappa_m->GetElementVaryingScalarCoefficient().GetData().data());
+      } else if (kappa_m->IsMatrixCoefficient()) {
+        sim_m.GetIO().PutDeferred(
+            "HeatSolver/kappa",
+            kappa_m->GetElementVaryingMatrixCoefficient().GetData());
+      }
+    }
+
     sim_m.GetIO().PerformPuts();
   }
 }
@@ -156,6 +169,14 @@ void HeatSolver::GatherOptions(void) {
       "coupling. To add a boundary, include boundary as a key value with the "
       "precice name as the value. As an example:\n \"1\": "
       "\"temperature_name_in_precice\"");
+  parser_m.AddOption(
+      "HeatSolver/Conductivity/type",
+      "Conductivity model to use. Types are: \"constant_scalar\", "
+      "\"constant_matrix\", \"material_varying_scalar\", "
+      "\"material_varying_matrix\", \"element_varying_scalar\", and "
+      "\"element_varying_matrix\". See Documentation for or comments in "
+      "conduction_operator.cpp for definition of each type. Types may require "
+      "additional arguments.");
 
   // TODO Add a flag and way to specify which variables we wish to export to
   // VisIt.
@@ -309,6 +330,16 @@ void HeatSolver::RegisterFieldsForIO(void) {
                                          true);
     sim_m.GetIO().AddVariableForTrueDofs("HeatSolver/cp", *element_space_m,
                                          true);
+    if (kappa_m->CanTimeVary()) {
+      if (kappa_m->IsScalarCoefficient()) {
+        sim_m.GetIO().AddVariableForMesh<double>(
+            "HeatSolver/kappa", sim_m.GetMesh(), MeshElement::ELEMENT);
+      } else if (kappa_m->IsMatrixCoefficient()) {
+        sim_m.GetIO().AddMatrixForMesh(
+            "HeatSolver/kappa", sim_m.GetMesh(), MeshElement::ELEMENT,
+            sim_m.GetMesh().GetDimension(), sim_m.GetMesh().GetDimension());
+      }
+    }
   }
 }
 
@@ -334,6 +365,18 @@ void HeatSolver::SetInitialConditions(void) {
   sim_m.GetIO().GetImmediateBlock("HeatSolver/cp", {0},
                                   {static_cast<std::size_t>(truedof_size)},
                                   cp_m.GetData());
+
+  if (kappa_m->CanTimeVary()) {
+    if (kappa_m->IsScalarCoefficient()) {
+      sim_m.GetIO().GetImmediateBlock(
+          "HeatSolver/kappa",
+          kappa_m->GetElementVaryingScalarCoefficient().GetData());
+    } else if (kappa_m->IsMatrixCoefficient()) {
+      sim_m.GetIO().GetImmediateBlock(
+          "HeatSolver/kappa",
+          kappa_m->GetElementVaryingMatrixCoefficient().GetData());
+    }
+  }
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Heat solver fields allocated and set");
 }
 

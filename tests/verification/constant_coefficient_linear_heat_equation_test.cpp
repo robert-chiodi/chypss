@@ -94,8 +94,7 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarTop) {
   myfile.close();
 
   const auto coefficient =
-      input_file["HeatSolver"]["ConductionOperator"]["ConstantScalar"]
-          .get<double>();
+      input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
 
   auto solution_lambda = TopLambda(input_file, coefficient);
 
@@ -115,7 +114,7 @@ TEST(ConstantCoefficientLinearHeatEquation, MatrixTop) {
   myfile.close();
 
   const auto coefficient_vec =
-      input_file["HeatSolver"]["ConductionOperator"]["ConstantMatrix"]
+      input_file["HeatSolver"]["Conductivity"]["ConstantMatrix"]
           .get<std::vector<double>>();
   const auto coefficient = coefficient_vec[0];
 
@@ -137,7 +136,7 @@ TEST(ConstantCoefficientLinearHeatEquation, AttributeScalarTop) {
   myfile.close();
 
   const auto coefficient_vec =
-      input_file["HeatSolver"]["ConductionOperator"]["MaterialVaryingScalar"]
+      input_file["HeatSolver"]["Conductivity"]["MaterialVaryingScalar"]
           .get<std::vector<double>>();
   const auto coefficient = coefficient_vec[0];
 
@@ -158,9 +157,9 @@ TEST(ConstantCoefficientLinearHeatEquation, AttributeMatrixTop) {
       nlohmann::json::parse(myfile, nullptr, true, true);
   myfile.close();
 
-  const auto coefficient_vec = input_file["HeatSolver"]["ConductionOperator"]
-                                         ["MaterialVaryingMatrix"]["1"]
-                                             .get<std::vector<double>>();
+  const auto coefficient_vec =
+      input_file["HeatSolver"]["Conductivity"]["MaterialVaryingMatrix"]["1"]
+          .get<std::vector<double>>();
   const auto coefficient = coefficient_vec[0];
 
   auto solution_lambda = TopLambda(input_file, coefficient);
@@ -197,8 +196,7 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarBot) {
                     .get<std::size_t>();
 
   const auto coefficient =
-      input_file["HeatSolver"]["ConductionOperator"]["ConstantScalar"]
-          .get<double>();
+      input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
     std::array<double, 2> rp;
@@ -265,8 +263,7 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarRight) {
                     .get<std::size_t>();
 
   const auto coefficient =
-      input_file["HeatSolver"]["ConductionOperator"]["ConstantScalar"]
-          .get<double>();
+      input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
     std::array<double, 2> rp;
@@ -334,8 +331,7 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarLeft) {
                     .get<std::size_t>();
 
   const auto coefficient =
-      input_file["HeatSolver"]["ConductionOperator"]["ConstantScalar"]
-          .get<double>();
+      input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
     std::array<double, 2> rp;
@@ -403,7 +399,7 @@ TEST(ConstantCoefficientLinearHeatEquation, HomogeneousAndTensorCoefficient) {
                     .get<std::size_t>();
 
   const std::vector<double> tensor_kappa =
-      input_file["HeatSolver"]["ConductionOperator"]["ConstantMatrix"]
+      input_file["HeatSolver"]["Conductivity"]["ConstantMatrix"]
           .get<std::vector<double>>();
   const double coefficient_x = tensor_kappa[0];
   const double coefficient_y = tensor_kappa[3];
@@ -457,8 +453,7 @@ TEST(ConstantCoefficientLinearHeatEquation, CooledRod) {
                DebugLevel::ALWAYS{}, "Test requires domain length of 1.0");
 
   const auto coefficient =
-      input_file["HeatSolver"]["ConductionOperator"]["ConstantScalar"]
-          .get<double>();
+      input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
   DEBUG_ASSERT(std::fabs(coefficient - 1.0) < 1.0e-15, global_assert{},
                DebugLevel::ALWAYS{},
                "Test requires thermal coefficient of 1.0");

@@ -3,18 +3,24 @@
 	"out_data": "tests/verification/data/HomogeneousCCInit",
 	"FieldInitialization":{
 	"HeatSolver/rho":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
 		"Initializer" : "constant",
 		"Arguments": {
 			"value":1.0
 		}
 	},
                "HeatSolver/cp":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
                         "Initializer" : "constant",
                        "Arguments": {
                                "value":1.0
                        }
                },
 	"HeatSolver/temperature":{
+			"Dimensionality":"scalar",
+			"FieldType":"true_dof",
 	"Initializer": "quadratic_pulse",
 	"Arguments":{
                         "pulse_amplitude": 1.0,
@@ -39,8 +45,8 @@
 		 },
     "HeatSolver":{
 		    "alpha": 0.0,
-		    "ConductionOperator":{
-		    "conductivity_type": "constant_scalar",
+		    "Conductivity":{
+		    "type": "constant_scalar",
 		    "ConstantScalar": 0.5
 	            },
 		    "order": 2,
