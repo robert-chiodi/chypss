@@ -140,11 +140,11 @@ void HeatSolver::WriteFields(const int a_cycle, const double a_time) {
     if (kappa_m->CanTimeVary()) {
       if (kappa_m->IsScalarCoefficient()) {
         sim_m.GetIO().PutDeferred(
-            "HeatSolver/kappa",
+            "HeatSolver/Conductivity/kappa",
             kappa_m->GetElementVaryingScalarCoefficient().GetData().data());
       } else if (kappa_m->IsMatrixCoefficient()) {
         sim_m.GetIO().PutDeferred(
-            "HeatSolver/kappa",
+            "HeatSolver/Conductivity/kappa",
             kappa_m->GetElementVaryingMatrixCoefficient().GetData());
       }
     }
