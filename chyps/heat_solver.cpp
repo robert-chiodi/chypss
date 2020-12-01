@@ -333,11 +333,13 @@ void HeatSolver::RegisterFieldsForIO(void) {
     if (kappa_m->CanTimeVary()) {
       if (kappa_m->IsScalarCoefficient()) {
         sim_m.GetIO().AddVariableForMesh<double>(
-            "HeatSolver/kappa", sim_m.GetMesh(), MeshElement::ELEMENT);
+            "HeatSolver/Conductivity/kappa", sim_m.GetMesh(),
+            MeshElement::ELEMENT);
       } else if (kappa_m->IsMatrixCoefficient()) {
-        sim_m.GetIO().AddMatrixForMesh(
-            "HeatSolver/kappa", sim_m.GetMesh(), MeshElement::ELEMENT,
-            sim_m.GetMesh().GetDimension(), sim_m.GetMesh().GetDimension());
+        sim_m.GetIO().AddMatrixForMesh("HeatSolver/Conductivity/kappa",
+                                       sim_m.GetMesh(), MeshElement::ELEMENT,
+                                       sim_m.GetMesh().GetDimension(),
+                                       sim_m.GetMesh().GetDimension());
       }
     }
   }
@@ -369,11 +371,11 @@ void HeatSolver::SetInitialConditions(void) {
   if (kappa_m->CanTimeVary()) {
     if (kappa_m->IsScalarCoefficient()) {
       sim_m.GetIO().GetImmediateBlock(
-          "HeatSolver/kappa",
+          "HeatSolver/Conductivity/kappa",
           kappa_m->GetElementVaryingScalarCoefficient().GetData());
     } else if (kappa_m->IsMatrixCoefficient()) {
       sim_m.GetIO().GetImmediateBlock(
-          "HeatSolver/kappa",
+          "HeatSolver/Conductivity/kappa",
           kappa_m->GetElementVaryingMatrixCoefficient().GetData());
     }
   }
