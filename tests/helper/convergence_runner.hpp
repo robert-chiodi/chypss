@@ -60,11 +60,13 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
     IO run_file(*mpi_session, "Run");
     run_file.SetRead(solution_file_name);
     std::vector<double> temperature_field;
+
     run_file.GetImmediateBlock("HeatSolver/temperature", temperature_field);
     std::vector<double> point_field;
     run_file.GetImmediateBlock("vertices", point_field);
     DEBUG_ASSERT(point_field.size() / 2 == temperature_field.size(),
                  global_assert{}, DebugLevel::CHEAP{});
+    int dimension = 2;
     std::vector<uint32_t> nvert(1);
     run_file.GetImmediateBlock("NumOfVertices", {0}, {1}, nvert.data());
     int send_temp = static_cast<int>(nvert[0]);
@@ -87,7 +89,14 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
         GlobalL2Diff(temperature_field, correct_solution, *mpi_session);
     const double global_linf =
         GlobalLinfDiff(temperature_field, correct_solution, *mpi_session);
-    error_metrics[r][0] = static_cast<double>(total_nodes);
+
+    if (dimension == 1) {
+      error_metrics[r][0] = static_cast<double>(total_nodes);
+    } else if (dimension == 2) {
+      error_metrics[r][0] = static_cast<double>(std::sqrt(total_nodes));
+    } else if (dimension == 3) {
+      error_metrics[r][0] = static_cast<double>(std::cbrt(total_nodes));
+    }
     error_metrics[r][1] = global_l1;
     error_metrics[r][2] = global_l2;
     error_metrics[r][3] = global_linf;
@@ -106,13 +115,13 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
       } else {
         const double l1_conv =
             log(error_metrics[r - 1][1] / error_metrics[r][1] /
-                (std::sqrt(error_metrics[r - 1][0] / error_metrics[r][0])));
+                (error_metrics[r - 1][0] / error_metrics[r][0]));
         const double l2_conv =
             log(error_metrics[r - 1][2] / error_metrics[r][2] /
-                (std::sqrt(error_metrics[r - 1][0] / error_metrics[r][0])));
+                (error_metrics[r - 1][0] / error_metrics[r][0]));
         const double linf_conv =
             log(error_metrics[r - 1][3] / error_metrics[r][3] /
-                (std::sqrt(error_metrics[r - 1][0] / error_metrics[r][0])));
+                (error_metrics[r - 1][0] / error_metrics[r][0]));
         printf("%16d %16.8E %16.8f %16.8E %16.8f %16.8E %16.8f\n",
                static_cast<int>(error_metrics[r][0]), error_metrics[r][1],
                l1_conv, error_metrics[r][2], l2_conv, error_metrics[r][3],
