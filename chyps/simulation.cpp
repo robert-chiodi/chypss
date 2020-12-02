@@ -203,8 +203,8 @@ const PreciceAdapter& Simulation::GetPreciceAdapter(void) const {
 Simulation::~Simulation(void) {
   delete precice_adapter_m;
   precice_adapter_m = nullptr;
-  if (parser_m["Simulation/output_screen"] != "cout" &&
-      parser_m["Simulation/output_screen"] != "off") {
+  if (parser_m["Simulation/output_screen"].get<std::string>() != "cout" &&
+      parser_m["Simulation/output_screen"].get<std::string>() != "off") {
     fclose(output_m.output_screen);
   }
   output_m.output_screen = nullptr;
