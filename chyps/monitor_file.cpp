@@ -129,7 +129,9 @@ void MonitorFile::ClearLine(void) { updated_m = false; }
 void MonitorFile::Flush(void) { fflush(monitor_file_m); }
 
 MonitorFile::~MonitorFile(void) {
-  fclose(monitor_file_m);
+  if (monitor_file_m != nullptr) {
+    fclose(monitor_file_m);
+  }
   monitor_file_m = nullptr;
 }
 
