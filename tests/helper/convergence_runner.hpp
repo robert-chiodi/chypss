@@ -68,7 +68,7 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
                  global_assert{}, DebugLevel::CHEAP{});
     int dimension = 2;
     std::vector<uint32_t> nvert(1);
-    run_file.GetImmediateBlock("NumOfVertices", {0}, {1}, nvert.data());
+    run_file.GetImmediateBlock("NumOfVertices", {1}, nvert.data());
     int send_temp = static_cast<int>(nvert[0]);
     int total_nodes = 0;
     MPI_Allreduce(&send_temp, &total_nodes, 1, MPI_INT, MPI_SUM,

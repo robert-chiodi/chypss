@@ -221,19 +221,31 @@ void IO::GetDeferred(const std::string& a_variable_name, const Mesh& a_mesh,
   DEBUG_ASSERT(this->OngoingReadStep(), global_assert{}, DebugLevel::CHEAP{},
                "An ongoing IO step is required for deferred reading.");
   auto io_mesh_sizes = this->GetMeshSizes(a_mesh, a_type);
-  this->Get(a_variable_name, {io_mesh_sizes[1]}, {io_mesh_sizes[2]}, a_data,
+  this->Get(a_variable_name, {}, {io_mesh_sizes[2]}, a_data,
             adios2::Mode::Deferred);
 }
 
 template <class T>
 void IO::GetDeferredBlock(const std::string& a_variable_name,
-                          const adios2::Dims& a_local_start,
+                          const Mesh& a_mesh, const MeshElement a_type,
+                          T* a_data) {
+  DEBUG_ASSERT(this->IsReadModeActive(), global_assert{}, DebugLevel::CHEAP{},
+               "IO must be in read mode for reading from fields.");
+  DEBUG_ASSERT(this->OngoingReadStep(), global_assert{}, DebugLevel::CHEAP{},
+               "An ongoing IO step is required for deferred reading.");
+  auto io_mesh_sizes = this->GetMeshSizes(a_mesh, a_type);
+  this->GetBlock(a_variable_name, {io_mesh_sizes[2]}, a_data,
+                 adios2::Mode::Deferred);
+}
+
+template <class T>
+void IO::GetDeferredBlock(const std::string& a_variable_name,
                           const adios2::Dims& a_local_count, T* a_data) {
   DEBUG_ASSERT(this->IsReadModeActive(), global_assert{}, DebugLevel::CHEAP{},
                "IO must be in read mode for reading from fields.");
   DEBUG_ASSERT(this->OngoingReadStep(), global_assert{}, DebugLevel::CHEAP{},
                "An ongoing IO step is required for deferred reading.");
-  this->GetBlock(a_variable_name, a_local_start, a_local_count, a_data,
+  this->GetBlock(a_variable_name, a_local_count, a_data,
                  adios2::Mode::Deferred);
 }
 
@@ -276,12 +288,10 @@ void IO::GetImmediate(const std::string& a_variable_name, const Mesh& a_mesh,
 
 template <class T>
 void IO::GetImmediateBlock(const std::string& a_variable_name,
-                           const adios2::Dims& a_local_start,
                            const adios2::Dims& a_local_count, T* a_data) {
   DEBUG_ASSERT(this->IsReadModeActive(), global_assert{}, DebugLevel::CHEAP{},
                "IO must be in read mode for reading from fields.");
-  this->GetBlock(a_variable_name, {a_local_start}, {a_local_count}, a_data,
-                 adios2::Mode::Sync);
+  this->GetBlock(a_variable_name, {a_local_count}, a_data, adios2::Mode::Sync);
 }
 
 template <class T>
@@ -328,7 +338,6 @@ void IO::Get(const std::string& a_variable_name,
 
 template <class T>
 void IO::GetBlock(const std::string& a_variable_name,
-                  const adios2::Dims& a_local_start,
                   const adios2::Dims& a_local_count, T* a_data,
                   const adios2::Mode a_mode) {
   auto adios_variable = read_m.InquireVariable<T>(a_variable_name);

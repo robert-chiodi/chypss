@@ -376,6 +376,22 @@ class IO {
 
   /// \brief Deferred Get of data for I/O. Will hold reference to data
   /// given to it between BeginStep and EndStep and populate it during EndStep.
+  /// Local size determined via the passed mesh object.  This method
+  /// should be used over the immediate version for better performance.
+
+  /// Note: DO NOT modify validity of the
+  /// pointer until after the call to EndStep. Do not try to use data until
+  /// after EndStep.
+  ///
+  /// Note: When performing a Get, the variable SHOULD NOT be added first
+  /// via a AddVariable method. The variables will be populated from the file
+  /// open for reading.
+  template <class T>
+  void GetDeferredBlock(const std::string& a_variable_name, const Mesh& a_mesh,
+                        const MeshElement a_type, T* a_data);
+
+  /// \brief Deferred Get of data for I/O. Will hold reference to data
+  /// given to it between BeginStep and EndStep and populate it during EndStep.
   /// This should be used to read blocks of data from locally written files
   /// (where one rank writes to one block). This method should be used over the
   /// immediate version  for better performance.
@@ -389,7 +405,6 @@ class IO {
   /// open for reading.
   template <class T>
   void GetDeferredBlock(const std::string& a_variable_name,
-                        const adios2::Dims& a_local_start,
                         const adios2::Dims& a_local_count, T* a_data);
 
   /// \brief Immediate Put of data for I/O. Will write data from a_data before
@@ -465,7 +480,6 @@ class IO {
   /// open for reading.
   template <class T>
   void GetImmediateBlock(const std::string& a_variable_name,
-                         const adios2::Dims& a_local_start,
                          const adios2::Dims& a_local_count, T* a_data);
 
   /// \brief Immediate Get of data for I/O. Will resize data automatically and
@@ -524,7 +538,6 @@ class IO {
            T* a_data, const adios2::Mode a_mode);
   template <class T>
   void GetBlock(const std::string& a_variable_name,
-                const adios2::Dims& a_local_start,
                 const adios2::Dims& a_local_count, T* a_data,
                 const adios2::Mode a_mode);
   template <class T>

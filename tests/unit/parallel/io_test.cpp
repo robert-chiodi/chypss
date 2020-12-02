@@ -376,7 +376,8 @@ TEST(IO, PutGetMesh) {
   file_in.SetRead(write_file_name);
   std::vector<int> read_data(mesh.GetLocalCount<MeshElement::ELEMENT>());
   file_in.BeginReadStep();
-  file_in.GetDeferred("VarName", mesh, MeshElement::ELEMENT, read_data.data());
+  file_in.GetDeferredBlock("VarName", mesh, MeshElement::ELEMENT,
+                           read_data.data());
   file_in.EndReadStep();
 
   // Check before ending step.

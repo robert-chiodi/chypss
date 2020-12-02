@@ -354,17 +354,17 @@ void HeatSolver::SetInitialConditions(void) {
   const int truedof_size = element_space_m->GetTrueVSize();
 
   temperature_m.SetSize(truedof_size);
-  sim_m.GetIO().GetImmediateBlock("HeatSolver/temperature", {0},
+  sim_m.GetIO().GetImmediateBlock("HeatSolver/temperature",
                                   {static_cast<std::size_t>(truedof_size)},
                                   temperature_m.GetData());
 
   rho_m.SetSize(truedof_size);
-  sim_m.GetIO().GetImmediateBlock("HeatSolver/rho", {0},
+  sim_m.GetIO().GetImmediateBlock("HeatSolver/rho",
                                   {static_cast<std::size_t>(truedof_size)},
                                   rho_m.GetData());
 
   cp_m.SetSize(truedof_size);
-  sim_m.GetIO().GetImmediateBlock("HeatSolver/cp", {0},
+  sim_m.GetIO().GetImmediateBlock("HeatSolver/cp",
                                   {static_cast<std::size_t>(truedof_size)},
                                   cp_m.GetData());
 
