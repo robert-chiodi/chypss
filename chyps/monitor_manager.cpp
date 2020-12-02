@@ -60,9 +60,9 @@ MonitorFile* MonitorManager::CreateMonitorFile(
     const std::string& a_name, const std::vector<std::string>& a_header,
     std::vector<FieldType>&& a_format) {
   if (this->IsOn()) {
-    auto insert_location = file_list_m.insert(
-        {a_name, MonitorFile(directory_base_m + '/' + a_name, a_header,
-                             std::move(a_format))});
+    auto insert_location =
+        file_list_m.emplace(a_name, MonitorFile(directory_base_m + '/' + a_name,
+                                                a_header, std::move(a_format)));
     DEBUG_ASSERT(insert_location.second, global_assert{}, DebugLevel::CHEAP{},
                  "Monitor file with name \"" + a_name + "\" already added.");
     return &(insert_location.first->second);
