@@ -10,13 +10,16 @@
 
 #include "chyps/monitor_manager.hpp"
 
-#include <filesystem>
 #include <utility>
+
+#include <boost/filesystem.hpp>
 
 #include "chyps/debug_assert.hpp"
 #include "chyps/string_manipulation.hpp"
 
 namespace chyps {
+
+namespace fs = boost::filesystem;
 
 MonitorManager::MonitorManager(void)
     : directory_base_m(), file_list_m(), on_m(false) {}
@@ -26,12 +29,12 @@ void MonitorManager::Initialize(const std::string& a_directory_name) {
 
   static constexpr uint32_t max_directory_attempt = 1000;
 
-  std::filesystem::path dir_path;
+  fs::path dir_path;
   uint32_t n = 0;
   for (n = 0; n < max_directory_attempt; ++n) {
     directory_base_m = "./" + a_directory_name + "_" + ZeroFill(n, 3);
-    dir_path = std::filesystem::path(directory_base_m);
-    if (!std::filesystem::is_directory(dir_path)) {
+    dir_path = fs::path(directory_base_m);
+    if (!fs::is_directory(dir_path)) {
       break;
     }
   }
@@ -39,7 +42,7 @@ void MonitorManager::Initialize(const std::string& a_directory_name) {
                "Cannot create monitor directory. More than " +
                    std::to_string(max_directory_attempt) +
                    " directories in existence.");
-  std::filesystem::create_directory(dir_path);
+  fs::create_directory(dir_path);
 }
 
 MonitorFile* MonitorManager::CreateMonitorFile(
