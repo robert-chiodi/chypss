@@ -31,7 +31,7 @@ void IO::GetBlock(const std::string& a_variable_name,
   // closest to a time? Right now just take latest data.
   const auto step_to_load = adios_variable.Steps();
   adios_variable.SetStepSelection({step_to_load - 1, 1});
-  std::vector local_shape = adios_variable.Count();
+  auto local_shape = adios_variable.Count();
   const std::size_t number_of_matrices = local_shape[0];
   const std::size_t number_of_columns = local_shape[1];
   const std::size_t number_of_rows = local_shape[2];
