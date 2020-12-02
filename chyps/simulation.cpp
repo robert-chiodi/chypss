@@ -58,7 +58,8 @@ Simulation::Simulation(MPIParallel& a_mpi_session,
 void Simulation::Initialize(int argc, char** argv) {
   this->GetTimerManager().StartTimer("Total");
   this->ParseOptions(argc, argv);
-  if (parser_m["Simulation/write_to_monitor"].get<bool>()) {
+  if (parser_m["Simulation/write_to_monitor"].get<bool>() &&
+      mpi_session_m.IAmRoot()) {
     this->GetMonitorManager().Initialize("monitor");
   }
   this->SetupFileIO();
