@@ -214,6 +214,8 @@ void Simulation::GatherOptions(void) {
   parser_m.AddOption("Simulation/use_precice",
                      "If preCICE will be used to couple to another solver.",
                      false);
+  parser_m.AddOption("Simulation/precice_solver_name",
+                     "Name to be used for solver in preCICE.", "CHyPS");
   parser_m.AddOption("Simulation/precice_config",
                      "XML File holding the configuration for preCICE",
                      std::string("../data/precice-config.xml"));
@@ -302,7 +304,7 @@ void Simulation::ActivatePrecice(void) {
   precice_adapter_m =
       parser_m["Simulation/use_precice"].get<bool>()
           ? new PreciceAdapter(
-                "CHyPS",
+                parser_m["Simulation/precice_solver_name"].get<std::string>(),
                 parser_m["Simulation/precice_config"].get<std::string>(),
                 mpi_session_m.MyRank(), mpi_session_m.NumberOfRanks())
           : nullptr;
