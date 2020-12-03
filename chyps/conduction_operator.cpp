@@ -309,11 +309,18 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
       T_solver.SetOperator(*T_op);
       T->Finalize();
     } else {
-      auto boomer_amg = new mfem::HypreBoomerAMG;
-      boomer_amg->SetPrintLevel(-1);
-      T_prec = boomer_amg;
-      T_solver.SetPreconditioner(*T_prec);
-      T_solver.SetOperator(*T_op);
+      if (sim_m.PreciceActive()) {
+        T_prec = new mfem::GSSmoother(0, 5);
+        T_solver.SetPreconditioner(*T_prec);
+        T_solver.SetOperator(*T_op);
+        T->Finalize();
+      } else {
+        auto boomer_amg = new mfem::HypreBoomerAMG;
+        boomer_amg->SetPrintLevel(-1);
+        T_prec = boomer_amg;
+        T_solver.SetPreconditioner(*T_prec);
+        T_solver.SetOperator(*T_op);
+      }
     }
     current_dt = dt;
   }
