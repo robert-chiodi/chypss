@@ -400,9 +400,8 @@ BoundaryConditionType BoundaryConditionManager::BoundaryConditionNameToEnum(
   } else if (a_bc_name == "NEUMANN") {
     return BoundaryConditionType::NEUMANN;
   } else {
-    // FIXME: Make proper error
-    std::cout << "Unknown boundary condition name in input file of: "
-              << a_bc_name << std::endl;
+    DEBUG_ASSERT(false, global_assert{}, DebugLevel::ALWAYS{},
+                 "Unknown BoundaryConditionType. Set type is: " + a_bc_name);
   }
   // NOTE: Will never get this far.
   return BoundaryConditionType::HOMOGENEOUS_DIRICHLET;
