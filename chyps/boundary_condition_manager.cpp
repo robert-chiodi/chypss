@@ -224,6 +224,9 @@ double* BoundaryConditionManager::GetDataBuffer(const int a_tag) {
   DEBUG_ASSERT(this->IsPreciceBoundaryCondition(a_tag), global_assert{},
                DebugLevel::CHEAP{},
                "Raw buffers can only be supplied for precice conditions.");
+  DEBUG_ASSERT(values_m[a_tag - 1].size() > 0, global_assert{},
+               DebugLevel::CHEAP{},
+               "Memory for boundary condition values is not allocated.");
   return values_m[a_tag - 1].data();
 }
 
