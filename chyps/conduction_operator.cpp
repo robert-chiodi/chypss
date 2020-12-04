@@ -303,24 +303,17 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
     T->FormSystemMatrix(ess_tdof_list, T_op);
 
     delete T_prec;
-    if (use_partial_assembly) {
+    if (use_partial_assembly || sim_m.PreciceActive()) {
       T_prec = new mfem::OperatorJacobiSmoother(*T, ess_tdof_list);
       T_solver.SetPreconditioner(*T_prec);
       T_solver.SetOperator(*T_op);
       T->Finalize();
     } else {
-      if (sim_m.PreciceActive()) {
-        T_prec = new mfem::GSSmoother(0, 5);
-        T_solver.SetPreconditioner(*T_prec);
-        T_solver.SetOperator(*T_op);
-        T->Finalize();
-      } else {
-        auto boomer_amg = new mfem::HypreBoomerAMG;
-        boomer_amg->SetPrintLevel(-1);
-        T_prec = boomer_amg;
-        T_solver.SetPreconditioner(*T_prec);
-        T_solver.SetOperator(*T_op);
-      }
+      auto boomer_amg = new mfem::HypreBoomerAMG;
+      boomer_amg->SetPrintLevel(-1);
+      T_prec = boomer_amg;
+      T_solver.SetPreconditioner(*T_prec);
+      T_solver.SetOperator(*T_op);
     }
     current_dt = dt;
   }
