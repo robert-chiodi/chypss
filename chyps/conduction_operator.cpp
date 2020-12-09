@@ -303,7 +303,7 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
     T->FormSystemMatrix(ess_tdof_list, T_op);
 
     delete T_prec;
-    if (use_partial_assembly || sim_m.PreciceActive()) {
+    if (use_partial_assembly) {
       T_prec = new mfem::OperatorJacobiSmoother(*T, ess_tdof_list);
       T_solver.SetPreconditioner(*T_prec);
       T_solver.SetOperator(*T_op);
