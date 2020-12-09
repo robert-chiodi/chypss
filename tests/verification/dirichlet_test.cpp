@@ -31,7 +31,7 @@ TEST(Dirichlet, Left) {
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
-  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  chyps::SimulationInitializer(argc, argv, *mpi_session);
   DeleteCommandLineInput(input_char);
 
   std::vector<std::string> input_string;
@@ -59,7 +59,7 @@ TEST(Dirichlet, Right) {
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
-  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  chyps::SimulationInitializer(argc, argv, *mpi_session);
   DeleteCommandLineInput(input_char);
 
   std::vector<std::string> input_string;
@@ -87,7 +87,7 @@ TEST(Dirichlet, Bottom) {
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
-  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  chyps::SimulationInitializer(argc, argv, *mpi_session);
   DeleteCommandLineInput(input_char);
 
   std::vector<std::string> input_string;
@@ -115,7 +115,7 @@ TEST(Dirichlet, Top) {
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
-  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  chyps::SimulationInitializer(argc, argv, *mpi_session);
   DeleteCommandLineInput(input_char);
 
   std::vector<std::string> input_string;

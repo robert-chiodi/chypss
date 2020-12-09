@@ -24,12 +24,48 @@
 
 namespace chyps {
 
+enum class InitializerType { INVALID = 0, SCALAR_POSITION, MATRIX_POSITION };
+
+// SCALAR_POSITION function signature is double(const mfem::Vector&)
+//
+// MATRIX_POSITION function signature is
+//  void(const mfem::Vector&, mfem::DenseMatrix&)
+class FunctionInitializers {
+  using ScalarPositionFunction = std::function<double(const mfem::Vector&)>;
+  using MatrixPositionFunction =
+      std::function<void(const mfem::Vector&, mfem::DenseMatrix&)>;
+
+ public:
+  FunctionInitializers(void) = default;
+
+  InitializerType Contains(const std::string& a_name) const;
+
+  void AddScalarPositionFunction(const std::string& a_name,
+                                 ScalarPositionFunction a_function);
+
+  void AddMatrixPositionFunction(const std::string& a_name,
+                                 MatrixPositionFunction a_function);
+
+  ScalarPositionFunction GetScalarPositionFunction(
+      const std::string& a_name) const;
+  MatrixPositionFunction GetMatrixPositionFunction(
+      const std::string& a_name) const;
+
+  ~FunctionInitializers(void) = default;
+
+ private:
+  std::unordered_map<std::string, ScalarPositionFunction>
+      scalar_position_functions_m;
+  std::unordered_map<std::string, MatrixPositionFunction>
+      matrix_position_functions_m;
+};
+
 enum class DataFieldType { GRID_FUNCTION = 0, TRUE_DOF, ELEMENT };
 
 class RequiredData {
  public:
   RequiredData(const MPIParallel& a_mpi_session, InputParser& a_parser,
-               IO& a_file_io);
+               IO& a_file_io, const FunctionInitializers* a_initializers);
 
   /// \brief Initialize objects using parsed parameters (mostly constructs
   /// mesh).
@@ -81,14 +117,16 @@ class RequiredData {
   ~RequiredData(void);
 
  private:
-  static void ApplyScalarInitializer(
-      const DataFieldType a_field_type, const std::string& a_initializer,
+  void ApplyScalarInitializer(
+      const std::string& a_field_name, const DataFieldType a_field_type,
+      const std::string& a_initializer,
       const nlohmann::json& a_initializer_arguments,
       const InputParser& a_full_paser, const Mesh& a_mesh,
       mfem::ParFiniteElementSpace& a_finite_element_space,
       mfem::Vector& a_field);
-  static void ApplyMatrixInitializer(
-      const DataFieldType a_field_enum, const std::string& a_initializer,
+  void ApplyMatrixInitializer(
+      const std::string& a_field_name, const DataFieldType a_field_enum,
+      const std::string& a_initializer,
       const nlohmann::json& a_initializer_arguments,
       const InputParser& a_full_parser, const Mesh& a_mesh,
       mfem::ParFiniteElementSpace& a_finite_element_space,
@@ -102,6 +140,7 @@ class RequiredData {
   const MPIParallel& mpi_session_m;
   InputParser& parser_m;
   IO& file_io_m;
+  const FunctionInitializers* initializers_m;
   Mesh mesh_m;
   mfem::FiniteElementCollection* finite_element_collection_m;
   mfem::ParFiniteElementSpace* finite_element_space_m;
@@ -113,17 +152,18 @@ class RequiredData {
 };
 
 /// Simulation configuration types must contain no spaces and should be all
-/// lowercase letters. The configuration name should be provided after the input
-/// file on the command line.
+/// lowercase letters.
 class SimulationInitializer {
  public:
   SimulationInitializer(int argc, char** argv, MPIParallel& a_mpi_session,
+                        const FunctionInitializers* a_initializers = nullptr,
                         SpdlogLevel a_log_level = SpdlogLevel::OFF);
 
   ~SimulationInitializer(void) = default;
 
  private:
   MPIParallel& mpi_session_m;
+  const FunctionInitializers* initializers_m;
   InputParser parser_m;
 };
 

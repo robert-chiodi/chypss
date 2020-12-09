@@ -22,11 +22,8 @@ http://reference.wolframcloud.com/language/PDEModels/tutorial/HeatTransfer/HeatT
 		"HeatSolver/temperature":{
 			"Dimensionality":"scalar",
 			"FieldType":"true_dof",
-			"Initializer": "cooled_rod",
-			"Arguments":{
-				"approximation_terms": 1
-
-			}
+			"Initializer": "function",
+			"Arguments":{}
 		},
 		"HeatSolver/rho":{
 			"Dimensionality":"scalar",

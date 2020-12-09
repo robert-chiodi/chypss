@@ -31,22 +31,15 @@ namespace {
 
 using namespace chyps;
 
-auto TopLambda(const nlohmann::json& a_input_file, const double a_coefficient) {
+auto TopLambda(const nlohmann::json& a_input_file, const double a_coefficient,
+               const double a_pulse_amplitude,
+               const std::size_t a_approximation_terms) {
   const double domain_length = a_input_file["Mesh"]["gen_bux"].get<double>() -
                                a_input_file["Mesh"]["gen_blx"].get<double>();
   const double domain_height = a_input_file["Mesh"]["gen_buy"].get<double>() -
                                a_input_file["Mesh"]["gen_bly"].get<double>();
   const double rotation = a_input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
-
-  const double amplitude =
-      a_input_file["SimulationInitializer"]["FieldInitialization"]
-                  ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
-                      .get<double>();
-  const std::size_t approximation_terms =
-      a_input_file["SimulationInitializer"]["FieldInitialization"]
-                  ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
-                      .get<std::size_t>();
 
   return [=](const double* a_position, const double a_time) {
     std::array<double, 2> rp;
@@ -55,12 +48,12 @@ auto TopLambda(const nlohmann::json& a_input_file, const double a_coefficient) {
     rp[1] = std::sin(-mesh_rotation_rad) * a_position[0] +
             std::cos(-mesh_rotation_rad) * a_position[1];
     double result = 0.0;
-    for (std::size_t m = 1; m <= approximation_terms; ++m) {
-      for (std::size_t n = 1; n <= approximation_terms; ++n) {
+    for (std::size_t m = 1; m <= a_approximation_terms; ++m) {
+      for (std::size_t n = 1; n <= a_approximation_terms; ++n) {
         const double dm = static_cast<double>(m);
         const double dn = static_cast<double>(n);
         const double ic_factor =
-            ((-1.0 + std::pow(-1.0, dn)) * amplitude *
+            ((-1.0 + std::pow(-1.0, dn)) * a_pulse_amplitude *
              (-8.0 * std::pow(domain_length, 2) +
               (-4.0 + std::pow(domain_length, 2)) * std::pow(dn, 2) *
                   std::pow(M_PI, 2)) *
@@ -96,10 +89,17 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarTop) {
   const auto coefficient =
       input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
 
-  auto solution_lambda = TopLambda(input_file, coefficient);
+  auto solution_lambda = TopLambda(input_file, coefficient, 1.0, 1);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, MatrixTop) {
@@ -118,10 +118,17 @@ TEST(ConstantCoefficientLinearHeatEquation, MatrixTop) {
           .get<std::vector<double>>();
   const auto coefficient = coefficient_vec[0];
 
-  auto solution_lambda = TopLambda(input_file, coefficient);
+  auto solution_lambda = TopLambda(input_file, coefficient, 1.0, 1);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, AttributeScalarTop) {
@@ -140,10 +147,17 @@ TEST(ConstantCoefficientLinearHeatEquation, AttributeScalarTop) {
           .get<std::vector<double>>();
   const auto coefficient = coefficient_vec[0];
 
-  auto solution_lambda = TopLambda(input_file, coefficient);
+  auto solution_lambda = TopLambda(input_file, coefficient, 1.0, 1);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, AttributeMatrixTop) {
@@ -162,10 +176,17 @@ TEST(ConstantCoefficientLinearHeatEquation, AttributeMatrixTop) {
           .get<std::vector<double>>();
   const auto coefficient = coefficient_vec[0];
 
-  auto solution_lambda = TopLambda(input_file, coefficient);
+  auto solution_lambda = TopLambda(input_file, coefficient, 1.0, 1);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, ElementScalarTop) {
@@ -184,10 +205,17 @@ TEST(ConstantCoefficientLinearHeatEquation, ElementScalarTop) {
                 ["HeatSolver/Conductivity/kappa"]["Arguments"]["value"]
                     .get<double>();
 
-  auto solution_lambda = TopLambda(input_file, coefficient);
+  auto solution_lambda = TopLambda(input_file, coefficient, 1.0, 1);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, ElementMatrixTop) {
@@ -207,10 +235,17 @@ TEST(ConstantCoefficientLinearHeatEquation, ElementMatrixTop) {
                     .get<std::vector<double>>();
   const auto coefficient = coefficient_vec[0];
 
-  auto solution_lambda = TopLambda(input_file, coefficient);
+  auto solution_lambda = TopLambda(input_file, coefficient, 1.0, 1);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, ScalarBot) {
@@ -231,14 +266,8 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarBot) {
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
-  const double amplitude =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
-                    .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
-                    .get<std::size_t>();
+  static constexpr double amplitude = 1.0;
+  static constexpr std::size_t approximation_terms = 1;
 
   const auto coefficient =
       input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
@@ -276,8 +305,16 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarBot) {
     return result;
   };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
+
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, ScalarRight) {
@@ -298,14 +335,8 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarRight) {
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
-  const double amplitude =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
-                    .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
-                    .get<std::size_t>();
+  static constexpr double amplitude = 1.0;
+  static constexpr std::size_t approximation_terms = 1;
 
   const auto coefficient =
       input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
@@ -344,8 +375,16 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarRight) {
     return result;
   };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
+
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, ScalarLeft) {
@@ -366,14 +405,8 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarLeft) {
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
-  const double amplitude =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
-                    .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
-                    .get<std::size_t>();
+  static constexpr double amplitude = 1.0;
+  static constexpr std::size_t approximation_terms = 1;
 
   const auto coefficient =
       input_file["HeatSolver"]["Conductivity"]["ConstantScalar"].get<double>();
@@ -412,8 +445,16 @@ TEST(ConstantCoefficientLinearHeatEquation, ScalarLeft) {
     return result;
   };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
+
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, HomogeneousAndTensorCoefficient) {
@@ -434,14 +475,8 @@ TEST(ConstantCoefficientLinearHeatEquation, HomogeneousAndTensorCoefficient) {
   const double rotation = input_file["Mesh"]["rotation"].get<double>();
   const double mesh_rotation_rad = rotation * M_PI / 180.0;
 
-  const double amplitude =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["pulse_amplitude"]
-                    .get<double>();
-  const std::size_t approximation_terms =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
-                    .get<std::size_t>();
+  static constexpr double amplitude = 1.0;
+  static constexpr std::size_t approximation_terms = 2;
 
   const std::vector<double> tensor_kappa =
       input_file["HeatSolver"]["Conductivity"]["ConstantMatrix"]
@@ -477,8 +512,16 @@ TEST(ConstantCoefficientLinearHeatEquation, HomogeneousAndTensorCoefficient) {
     return result;
   };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
+
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 TEST(ConstantCoefficientLinearHeatEquation, CooledRod) {
@@ -502,10 +545,8 @@ TEST(ConstantCoefficientLinearHeatEquation, CooledRod) {
   DEBUG_ASSERT(std::fabs(coefficient - 1.0) < 1.0e-15, global_assert{},
                DebugLevel::ALWAYS{},
                "Test requires thermal coefficient of 1.0");
-  const int approximation_terms =
-      input_file["SimulationInitializer"]["FieldInitialization"]
-                ["HeatSolver/temperature"]["Arguments"]["approximation_terms"]
-                    .get<int>();
+
+  static constexpr int approximation_terms = 1;
 
   auto solution_lambda = [=](const double* a_position, const double a_time) {
     double result = 0.0;
@@ -518,8 +559,16 @@ TEST(ConstantCoefficientLinearHeatEquation, CooledRod) {
     return result + 24.0 + a_position[0];
   };
 
-  auto test_result =
-      ConvergenceRunner(file_name, solution_lambda, number_of_refinements);
+  auto initial_condition_lambda = [=](const double* a_position) {
+    return solution_lambda(a_position, 0.0);
+  };
+
+  FunctionInitializers initializers;
+  initializers.AddScalarPositionFunction("HeatSolver/temperature",
+                                         initial_condition_lambda);
+
+  auto test_result = ConvergenceRunner(
+      file_name, solution_lambda, number_of_refinements, true, &initializers);
 }
 
 }  // namespace

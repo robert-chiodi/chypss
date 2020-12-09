@@ -21,13 +21,8 @@
 	"HeatSolver/temperature":{
 			"Dimensionality":"scalar",
 			"FieldType":"true_dof",
-	"Initializer": "quadratic_pulse",
-	"Arguments":{
-                        "pulse_amplitude": 1.0,
-                        "approximation_terms": 1,
-                        "boundary_configuration":"DNDD"
-
-			}
+			"Initializer": "function",
+			"Arguments":{}
 		}
 	}
 

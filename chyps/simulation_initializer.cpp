@@ -18,16 +18,66 @@
 // List of configuration header files
 #include "chyps/simulation_configurations/attribute_varying.hpp"
 #include "chyps/simulation_configurations/constant.hpp"
-#include "chyps/simulation_configurations/cooled_rod.hpp"
-#include "chyps/simulation_configurations/quadratic_pulse.hpp"
+#include "chyps/simulation_configurations/function.hpp"
 
 namespace chyps {
 
+InitializerType FunctionInitializers::Contains(
+    const std::string& a_name) const {
+  if (scalar_position_functions_m.find(a_name) !=
+      scalar_position_functions_m.end()) {
+    return InitializerType::SCALAR_POSITION;
+  }
+
+  if (matrix_position_functions_m.find(a_name) !=
+      matrix_position_functions_m.end()) {
+    return InitializerType::MATRIX_POSITION;
+  }
+
+  return InitializerType::INVALID;
+}
+
+void FunctionInitializers::AddScalarPositionFunction(
+    const std::string& a_name, ScalarPositionFunction a_function) {
+  DEBUG_ASSERT(this->Contains(a_name) == InitializerType::INVALID,
+               global_assert{}, DebugLevel::CHEAP{},
+               "Function for name \"" + a_name + "\" already added.");
+  scalar_position_functions_m[a_name] = a_function;
+}
+
+void FunctionInitializers::AddMatrixPositionFunction(
+    const std::string& a_name, MatrixPositionFunction a_function) {
+  DEBUG_ASSERT(this->Contains(a_name) == InitializerType::INVALID,
+               global_assert{}, DebugLevel::CHEAP{},
+               "Function for name \"" + a_name + "\" already added.");
+  matrix_position_functions_m[a_name] = a_function;
+}
+
+FunctionInitializers::ScalarPositionFunction
+FunctionInitializers::GetScalarPositionFunction(
+    const std::string& a_name) const {
+  DEBUG_ASSERT(this->Contains(a_name) == InitializerType::SCALAR_POSITION,
+               global_assert{}, DebugLevel::CHEAP{},
+               "Cannot find ScalarPosition function with name" + a_name);
+  return scalar_position_functions_m.at(a_name);
+}
+
+FunctionInitializers::MatrixPositionFunction
+FunctionInitializers::GetMatrixPositionFunction(
+    const std::string& a_name) const {
+  DEBUG_ASSERT(this->Contains(a_name) == InitializerType::MATRIX_POSITION,
+               global_assert{}, DebugLevel::CHEAP{},
+               "Cannot find MatrixPosition function with name" + a_name);
+  return matrix_position_functions_m.at(a_name);
+}
+
 RequiredData::RequiredData(const MPIParallel& a_mpi_session,
-                           InputParser& a_parser, IO& a_file_io)
+                           InputParser& a_parser, IO& a_file_io,
+                           const FunctionInitializers* a_initializers)
     : mpi_session_m(a_mpi_session),
       parser_m(a_parser),
       file_io_m(a_file_io),
+      initializers_m(a_initializers),
       mesh_m(a_mpi_session, parser_m, file_io_m),
       finite_element_collection_m(nullptr),
       finite_element_space_m(nullptr),
@@ -67,19 +117,19 @@ RequiredData::RequiredData(const MPIParallel& a_mpi_session,
 
   // Add parser options from all Initializers
   constant::scalar::AddParserOptions(parser_m);
-  quadratic_pulse::scalar::AddParserOptions(parser_m);
-  cooled_rod::scalar::AddParserOptions(parser_m);
+  function::scalar::AddParserOptions(parser_m);
   attribute_varying::scalar::AddParserOptions(parser_m);
 
   constant::matrix::AddParserOptions(parser_m);
+  function::matrix::AddParserOptions(parser_m);
   attribute_varying::matrix::AddParserOptions(parser_m);
 }
 
 void RequiredData::Initialize(void) { mesh_m.Initialize(); }
 
 void RequiredData::InitializeFields(void) {
-  // For now, require all added fields to be on H1 elements and
-  // of the same order
+  // For now, require all added grid function or True DOF fields to be on
+  // H1 elements and of the same order
   auto finite_element_collection = new mfem::H1_FECollection(
       parser_m["HeatSolver/order"].get<int>(), mesh_m.GetDimension());
   auto finite_element_space = new mfem::ParFiniteElementSpace(
@@ -106,7 +156,7 @@ void RequiredData::InitializeFields(void) {
 
     if (dimensionality == "scalar") {
       auto scalar_field = new mfem::Vector;
-      this->ApplyScalarInitializer(field_enum, initializer,
+      this->ApplyScalarInitializer(field_name, field_enum, initializer,
                                    arguments_for_initializer, parser_m, mesh_m,
                                    *finite_element_space, *scalar_field);
       this->AddScalarField(field_name, field_enum, scalar_field);
@@ -116,7 +166,7 @@ void RequiredData::InitializeFields(void) {
           field_initialization_params["NumberOfRows"].get<int>();
       const auto number_of_columns =
           field_initialization_params["NumberOfColumns"].get<int>();
-      this->ApplyMatrixInitializer(field_enum, initializer,
+      this->ApplyMatrixInitializer(field_name, field_enum, initializer,
                                    arguments_for_initializer, parser_m, mesh_m,
                                    *finite_element_space, number_of_rows,
                                    number_of_columns, *matrix_list);
@@ -169,7 +219,8 @@ void RequiredData::WriteToFile(void) {
 }
 
 void RequiredData::ApplyScalarInitializer(
-    const DataFieldType a_field_enum, const std::string& a_initializer,
+    const std::string& a_field_name, const DataFieldType a_field_enum,
+    const std::string& a_initializer,
     const nlohmann::json& a_initializer_arguments,
     const InputParser& a_full_parser, const Mesh& a_mesh,
     mfem::ParFiniteElementSpace& a_finite_element_space,
@@ -180,23 +231,22 @@ void RequiredData::ApplyScalarInitializer(
     constant::scalar::InitializeData(a_field_enum, a_initializer_arguments,
                                      a_full_parser, a_mesh,
                                      a_finite_element_space, a_field);
+  } else if (a_initializer == "function") {
+    DEBUG_ASSERT(function::scalar::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    DEBUG_ASSERT(initializers_m != nullptr, global_assert{},
+                 DebugLevel::CHEAP{});
+    DEBUG_ASSERT(static_cast<int>(initializers_m->Contains(a_field_name)) > 0,
+                 global_assert{}, DebugLevel::CHEAP{});
+    auto setting_function =
+        initializers_m->GetScalarPositionFunction(a_field_name);
+    function::scalar::InitializeData(
+        a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
+        a_finite_element_space, a_field, setting_function);
   } else if (a_initializer == "attribute_varying") {
     DEBUG_ASSERT(attribute_varying::scalar::SupportedFieldType(a_field_enum),
                  global_assert{}, DebugLevel::CHEAP{});
     attribute_varying::scalar::InitializeData(
-        a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
-        a_finite_element_space, a_field);
-  } else if (a_initializer == "cooled_rod") {
-    DEBUG_ASSERT(cooled_rod::scalar::SupportedFieldType(a_field_enum),
-                 global_assert{}, DebugLevel::CHEAP{});
-    cooled_rod::scalar::InitializeData(a_field_enum, a_initializer_arguments,
-                                       a_full_parser, a_mesh,
-                                       a_finite_element_space, a_field);
-
-  } else if (a_initializer == "quadratic_pulse") {
-    DEBUG_ASSERT(quadratic_pulse::scalar::SupportedFieldType(a_field_enum),
-                 global_assert{}, DebugLevel::CHEAP{});
-    quadratic_pulse::scalar::InitializeData(
         a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
         a_finite_element_space, a_field);
   } else {
@@ -206,7 +256,8 @@ void RequiredData::ApplyScalarInitializer(
 }
 
 void RequiredData::ApplyMatrixInitializer(
-    const DataFieldType a_field_enum, const std::string& a_initializer,
+    const std::string& a_field_name, const DataFieldType a_field_enum,
+    const std::string& a_initializer,
     const nlohmann::json& a_initializer_arguments,
     const InputParser& a_full_parser, const Mesh& a_mesh,
     mfem::ParFiniteElementSpace& a_finite_element_space,
@@ -218,6 +269,19 @@ void RequiredData::ApplyMatrixInitializer(
     constant::matrix::InitializeData(
         a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
         a_finite_element_space, a_number_of_rows, a_number_of_columns, a_field);
+  } else if (a_initializer == "function") {
+    DEBUG_ASSERT(function::matrix::SupportedFieldType(a_field_enum),
+                 global_assert{}, DebugLevel::CHEAP{});
+    DEBUG_ASSERT(initializers_m != nullptr, global_assert{},
+                 DebugLevel::CHEAP{});
+    DEBUG_ASSERT(static_cast<int>(initializers_m->Contains(a_field_name)) > 0,
+                 global_assert{}, DebugLevel::CHEAP{});
+    auto setting_function =
+        initializers_m->GetMatrixPositionFunction(a_field_name);
+    function::matrix::InitializeData(
+        a_field_enum, a_initializer_arguments, a_full_parser, a_mesh,
+        a_finite_element_space, a_number_of_rows, a_number_of_columns, a_field,
+        setting_function);
   } else if (a_initializer == "attribute_varying") {
     DEBUG_ASSERT(attribute_varying::matrix::SupportedFieldType(a_field_enum),
                  global_assert{}, DebugLevel::CHEAP{});
@@ -360,10 +424,10 @@ RequiredData::~RequiredData(void) {
   delete finite_element_collection_m;
 }
 
-SimulationInitializer::SimulationInitializer(int argc, char** argv,
-                                             MPIParallel& a_mpi_session,
-                                             SpdlogLevel a_log_level)
-    : mpi_session_m(a_mpi_session), parser_m() {
+SimulationInitializer::SimulationInitializer(
+    int argc, char** argv, MPIParallel& a_mpi_session,
+    const FunctionInitializers* a_initializers, SpdlogLevel a_log_level)
+    : mpi_session_m(a_mpi_session), initializers_m(a_initializers), parser_m() {
   StartLogger(mpi_session_m, a_log_level);
 
   DEBUG_ASSERT(argc >= 2, global_assert{}, DebugLevel::ALWAYS{},
@@ -378,12 +442,8 @@ SimulationInitializer::SimulationInitializer(int argc, char** argv,
 
   const std::string input_file_name = argv[1];
 
-  // Should develop and construct a RequiredData class here that holds a mesh
-  // and whatever ParGridFunctions need to be filled in by the configuration
-  // initializer. Can then write that to file after being set.
-
   IO file_io(mpi_session_m, "FILEIO");
-  RequiredData required_data(mpi_session_m, parser_m, file_io);
+  RequiredData required_data(mpi_session_m, parser_m, file_io, a_initializers);
 
   if (input_file_name == "help") {
     if (a_mpi_session.IAmRoot()) {

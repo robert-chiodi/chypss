@@ -31,7 +31,7 @@ TEST(Checkpoint, ReproduceLongRunLowOrder) {
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
-  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  chyps::SimulationInitializer(argc, argv, *mpi_session);
   DeleteCommandLineInput(input_char);
 
   // Full length run
@@ -100,7 +100,7 @@ TEST(Checkpoint, ReproduceLongRunHigherOrder) {
   auto input_char = FakeCommandLineInput(init_input_string);
   int argc = static_cast<int>(input_char.size());
   char** argv = input_char.data();
-  chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+  chyps::SimulationInitializer(argc, argv, *mpi_session);
   DeleteCommandLineInput(input_char);
 
   // Full length run

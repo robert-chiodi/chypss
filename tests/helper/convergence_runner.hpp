@@ -29,7 +29,8 @@ template <class SolutionFunctor>
 std::vector<std::array<double, 4>> ConvergenceRunner(
     const std::string& a_input_name,
     const SolutionFunctor& a_analytical_solution_lambda,
-    const int a_number_of_refines, const bool a_print = true) {
+    const int a_number_of_refines, const bool a_print = true,
+    const FunctionInitializers* a_initializers = nullptr) {
   std::vector<std::string> chyps_input_string;
   chyps_input_string.push_back("Executable_name");
   chyps_input_string.push_back(a_input_name);
@@ -52,7 +53,7 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
     auto chyps_input_char = FakeCommandLineInput(chyps_input_string);
     int argc = static_cast<int>(chyps_input_char.size());
     char** argv = chyps_input_char.data();
-    chyps::SimulationInitializer(argc, argv, *mpi_session, SpdlogLevel::OFF);
+    chyps::SimulationInitializer(argc, argv, *mpi_session, a_initializers);
 
     // Perform simulation
     chyps::main(argc, argv, *mpi_session, SpdlogLevel::OFF);
