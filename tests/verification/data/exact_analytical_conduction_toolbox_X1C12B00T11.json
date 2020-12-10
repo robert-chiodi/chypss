@@ -1,0 +1,75 @@
+{
+	"SimulationInitializer": {
+		"out_data": "tests/verification/data/ExactToolboxInit",
+		"FieldInitialization": {
+			"HeatSolver/rho": {
+				"Dimensionality": "scalar",
+				"FieldType": "true_dof",
+				"Initializer": "function",
+				"Arguments": {}
+			},
+			"HeatSolver/cp": {
+				"Dimensionality": "scalar",
+				"FieldType": "true_dof",
+				"Initializer": "function",
+				"Arguments": {}
+			},
+			"HeatSolver/temperature": {
+				"Dimensionality": "scalar",
+				"FieldType": "true_dof",
+				"Initializer": "function",
+				"Arguments":{}
+			},
+			"HeatSolver/Conductivity/kappa": {
+				"Dimensionality": "scalar",
+				"FieldType": "element",
+				"Initializer": "function",
+				"Arguments": {}
+			}
+
+		}
+	},
+	"Simulation": {
+		"in_data": "tests/verification/data/ExactToolboxInit",
+		"out_data": "tests/verification/data/ExactToolboxSolution",
+		"end_time": 0.01,
+		"time_step": 0.001,
+		"use_adios2": false,
+		"use_visit": false,
+		"viz_steps": 100000000000,
+		"output_screen": "off",
+		"write_to_monitor": false
+	},
+	"HeatSolver": {
+		"Conductivity": {
+			"type": "element_varying_scalar"
+		},
+		"order": 2,
+		"time_advancement": 3,
+		"BoundaryConditions": {
+			"temperature": {
+				"bc_default": "HOMOGENEOUS_NEUMANN",
+				"bc_list":{
+					"1":{
+					   "type": "HOMOGENEOUS_DIRICHLET"
+					    }
+				}
+				}
+		}
+	},
+	"Mesh": {
+		"rotation": 0.0,
+		"gen_blx": 0.0,
+		"gen_bly": 0.0,
+		"gen_blz": -1.0,
+		"gen_bux": 3.0,
+		"gen_buy": 0.25,
+		"gen_buz": 1.0,
+		"gen_nx": 12,
+		"gen_ny": 1,
+		"gen_nz": -1,
+		"mesh_file": "generate",
+		"parallel_refine": 0,
+		"serial_refine": 0
+	}
+}

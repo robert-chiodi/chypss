@@ -25,12 +25,20 @@ namespace chyps {
 // Performs uniform refinement and reports errors.
 // Error metrics returned are
 // refinement_level : {sqrt(Nodes), L1, L2, Linf}
+//
+// a_number_of_redundant_dir should be used for
+// one-dimensional problems simulated in 2D and be
+// specified as 1 in this case. In the sim/error loop,
+// the error and number of nodes will be divided by
+// a_number_of_redundant_dir*std::pow(2,r) to reduce
+// the dimensionality.
 template <class SolutionFunctor>
 std::vector<std::array<double, 4>> ConvergenceRunner(
     const std::string& a_input_name,
     const SolutionFunctor& a_analytical_solution_lambda,
     const int a_number_of_refines, const bool a_print = true,
-    const FunctionInitializers* a_initializers = nullptr) {
+    const FunctionInitializers* a_initializers = nullptr,
+    const int a_number_of_redundant_dir = 0) {
   std::vector<std::string> chyps_input_string;
   chyps_input_string.push_back("Executable_name");
   chyps_input_string.push_back(a_input_name);
@@ -45,6 +53,11 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
   const double final_time = input_file["Simulation"]["end_time"].get<double>();
   const std::string& solution_file_name =
       input_file["Simulation"]["out_data"].get<std::string>();
+
+  if (mpi_session->IAmRoot() && a_print) {
+    printf("%16s %16s %16s %16s %16s %16s %16s\n", "Resolution", "L1_err",
+           "L1_conv", "L2_err", "L2_conv", "Linf_err", "Linf_conv");
+  }
 
   std::vector<std::array<double, 4>> error_metrics(a_number_of_refines + 1);
   for (int r = 0; r <= a_number_of_refines; ++r) {
@@ -67,7 +80,7 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
     run_file.GetImmediateBlock("vertices", point_field);
     DEBUG_ASSERT(point_field.size() / 2 == temperature_field.size(),
                  global_assert{}, DebugLevel::CHEAP{});
-    int dimension = 2;
+
     std::vector<uint32_t> nvert(1);
     run_file.GetImmediateBlock("NumOfVertices", {1}, nvert.data());
     int send_temp = static_cast<int>(nvert[0]);
@@ -91,44 +104,33 @@ std::vector<std::array<double, 4>> ConvergenceRunner(
     const double global_linf =
         GlobalLinfDiff(temperature_field, correct_solution, *mpi_session);
 
-    if (dimension == 1) {
-      error_metrics[r][0] = static_cast<double>(total_nodes);
-    } else if (dimension == 2) {
-      error_metrics[r][0] = static_cast<double>(std::sqrt(total_nodes));
-    } else if (dimension == 3) {
-      error_metrics[r][0] = static_cast<double>(std::cbrt(total_nodes));
-    }
-    error_metrics[r][1] = global_l1;
-    error_metrics[r][2] = global_l2;
-    error_metrics[r][3] = global_linf;
+    const double div = a_number_of_redundant_dir * std::pow(2, r);
+    error_metrics[r][0] = div == 0 ? total_nodes : total_nodes / div;
+    error_metrics[r][1] = div == 0 ? global_l1 : global_l1 / div;
+    error_metrics[r][2] = div == 0 ? global_l2 : global_l2 / div;
+    error_metrics[r][3] = div == 0 ? global_linf : global_linf / div;
 
-    DeleteCommandLineInput(chyps_input_char);
-  }
-
-  if (mpi_session->IAmRoot() && a_print) {
-    printf("%16s %16s %16s %16s %16s %16s %16s\n", "Resolution", "L1_err",
-           "L1_conv", "L2_err", "L2_conv", "Linf_err", "Linf_conv");
-    for (int r = 0; r <= a_number_of_refines; ++r) {
+    if (mpi_session->IAmRoot() && a_print) {
       if (r == 0) {
         printf("%16d %16.8E %16s %16.8E %16s %16.8E %16s\n",
                static_cast<int>(error_metrics[r][0]), error_metrics[r][1],
                "N/A", error_metrics[r][2], "N/A", error_metrics[r][3], "N/A");
       } else {
+        // log(0.5) since performing uniform refinement between each stage.
         const double l1_conv =
-            log(error_metrics[r - 1][1] / error_metrics[r][1] /
-                (error_metrics[r - 1][0] / error_metrics[r][0]));
+            log(error_metrics[r][1] / error_metrics[r - 1][1]) / log(0.5);
         const double l2_conv =
-            log(error_metrics[r - 1][2] / error_metrics[r][2] /
-                (error_metrics[r - 1][0] / error_metrics[r][0]));
+            log(error_metrics[r][2] / error_metrics[r - 1][2]) / log(0.5);
         const double linf_conv =
-            log(error_metrics[r - 1][3] / error_metrics[r][3] /
-                (error_metrics[r - 1][0] / error_metrics[r][0]));
+            log(error_metrics[r][3] / error_metrics[r - 1][3]) / log(0.5);
         printf("%16d %16.8E %16.8f %16.8E %16.8f %16.8E %16.8f\n",
                static_cast<int>(error_metrics[r][0]), error_metrics[r][1],
                l1_conv, error_metrics[r][2], l2_conv, error_metrics[r][3],
                linf_conv);
       }
     }
+
+    DeleteCommandLineInput(chyps_input_char);
   }
   return error_metrics;  // Come up with actual enforceable error measure
 }

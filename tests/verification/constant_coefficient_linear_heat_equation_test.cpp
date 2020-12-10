@@ -567,8 +567,9 @@ TEST(ConstantCoefficientLinearHeatEquation, CooledRod) {
   initializers.AddScalarPositionFunction("HeatSolver/temperature",
                                          initial_condition_lambda);
 
-  auto test_result = ConvergenceRunner(
-      file_name, solution_lambda, number_of_refinements, true, &initializers);
+  auto test_result =
+      ConvergenceRunner(file_name, solution_lambda, number_of_refinements, true,
+                        &initializers, 1);
 }
 
 }  // namespace

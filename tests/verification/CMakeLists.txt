@@ -4,4 +4,5 @@ target_sources(test_chyps_verification PRIVATE mpi_session.cpp)
 target_sources(test_chyps_verification PRIVATE checkpoint_test.cpp)
 target_sources(test_chyps_verification PRIVATE dirichlet_test.cpp)
 target_sources(test_chyps_verification PRIVATE constant_coefficient_linear_heat_equation_test.cpp)
+target_sources(test_chyps_verification PRIVATE exact_analytical_toolbox_thermal_test.cpp)
 
