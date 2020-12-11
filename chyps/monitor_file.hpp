@@ -12,6 +12,7 @@
 #define CHYPS_MONITOR_FILE_HPP_
 
 #include <stdio.h>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -38,8 +39,8 @@ class MonitorFile {
   /// \brief Open the file with a_name and setup the header. Store the format to
   /// ensure proper writing of data later.
   MonitorFile(const std::string& a_name,
-              const std::vector<std::string>& a_header,
-              std::vector<FieldType>&& a_format);
+              std::initializer_list<std::string> a_header,
+              std::initializer_list<FieldType> a_format);
 
   /// \brief Remove opy operator.
   MonitorFile(const MonitorFile& a_other) = delete;
@@ -52,6 +53,10 @@ class MonitorFile {
 
   /// \brief Move assignment.
   MonitorFile& operator=(MonitorFile&& a_other);
+
+  /// \brief Set all entries that will be written to file. Data corresponding
+  /// to columns that are formatted as an integer will be cast to int.
+  void SetEntries(std::initializer_list<double> a_data);
 
   /// \brief Set all entries that will be written to file. Data corresponding
   /// to columns that are formatted as an integer will be cast to int.
@@ -83,6 +88,8 @@ class MonitorFile {
  private:
   void InitializeMonitorFile(const std::string& a_name,
                              const std::vector<std::string>& a_header);
+  void InitializeMonitorFile(const std::string& a_name,
+                             std::initializer_list<std::string> a_header);
 
   FILE* monitor_file_m;
   bool updated_m;

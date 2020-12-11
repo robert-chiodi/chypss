@@ -50,6 +50,11 @@ ConductionOperator::ConductionOperator(
       inhomogeneous_neumann_active_m(false),
       tensor_basis(false),
       use_partial_assembly(false) {
+  // Add timers
+  sim_m.GetTimerManager().AddTimer("CO_BC");
+  sim_m.GetTimerManager().AddTimer("CO_Construction");
+  sim_m.GetTimerManager().AddTimer("CO_Solution");
+
   // Only support certain Conductivity types for now.
   DEBUG_ASSERT(
       kappa_m.GetType() == ConductivityType::CONSTANT_SCALAR ||
@@ -86,6 +91,8 @@ ConductionOperator::ConductionOperator(
   T_solver.SetAbsTol(abs_tol);
   T_solver.SetMaxIter(max_iter);
   T_solver.SetPrintLevel(-1);
+
+  sim_m.GetTimerManager().StartTimer("CO_BC");
 
   // Preset boundary arrays
   for (int n = 0; n < static_cast<int>(boundary_marker_m.size()); ++n) {
@@ -186,9 +193,13 @@ ConductionOperator::ConductionOperator(
     this->FinalizeNeumannCondition();
   }
 
+  sim_m.GetTimerManager().StopTimer("CO_BC");
+
   SPDLOG_LOGGER_INFO(
       MAIN_LOG, "Forming system matrices with updated essential True DOF list.",
       number_of_boundary_conditions);
+
+  sim_m.GetTimerManager().StartTimer("CO_Construction");
 
   M = new mfem::ParBilinearForm(&fespace);
   if (use_partial_assembly) {
@@ -247,6 +258,8 @@ ConductionOperator::ConductionOperator(
     K->Finalize();
   }
 
+  sim_m.GetTimerManager().StopTimer("CO_Construction");
+
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Finished constructing ConductionOperator");
 }
 
@@ -255,9 +268,13 @@ void ConductionOperator::Mult(const mfem::Vector& u,
   // Compute:
   //    du_dt = M^{-1}*-K(u)
   // for du_dt
+  sim_m.GetTimerManager().StartTimer("CO_Construction");
   mfem::ParGridFunction tmp_u(&fespace);
   mfem::ParLinearForm tmp_z(&fespace);
   tmp_u.SetFromTrueDofs(u);
+  sim_m.GetTimerManager().StopTimer("CO_Construction");
+
+  sim_m.GetTimerManager().StartTimer("CO_Solution");
   K->Mult(tmp_u, tmp_z);
   tmp_z.Neg();  // z = -z
 
@@ -270,6 +287,7 @@ void ConductionOperator::Mult(const mfem::Vector& u,
   mfem::Vector B;
   M->FormLinearSystem(ess_tdof_list, tmp_du_dt, tmp_z, A, du_dt, B, 0);
   M_solver.Mult(B, du_dt);
+  sim_m.GetTimerManager().StopTimer("CO_Solution");
 }
 
 void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
@@ -278,6 +296,7 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
   //    du_dt = M^{-1}*[-K(u + dt*du_dt)]
   // for du_dt
   if (T == nullptr) {
+    sim_m.GetTimerManager().StartTimer("CO_Construction");
     T = new mfem::ParBilinearForm(&fespace);
 
     if (use_partial_assembly) {
@@ -316,11 +335,17 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
       T_solver.SetOperator(*T_op);
     }
     current_dt = dt;
+    sim_m.GetTimerManager().StopTimer("CO_Construction");
   }
   MFEM_VERIFY(dt == current_dt, "");  // SDIRK methods use the same dt
+
+  sim_m.GetTimerManager().StartTimer("CO_Construction");
   mfem::ParGridFunction tmp_u(&fespace);
   mfem::ParLinearForm tmp_z(&fespace);
   tmp_u.SetFromTrueDofs(u);
+  sim_m.GetTimerManager().StopTimer("CO_Construction");
+
+  sim_m.GetTimerManager().StartTimer("CO_Solution");
   K->Mult(tmp_u, tmp_z);
   tmp_z.Neg();  // z = -z
 
@@ -334,9 +359,11 @@ void ConductionOperator::ImplicitSolve(const double dt, const mfem::Vector& u,
   mfem::Vector B;
   T->FormLinearSystem(ess_tdof_list, tmp_du_dt, tmp_z, A, du_dt, B);
   T_solver.Mult(B, du_dt);
+  sim_m.GetTimerManager().StopTimer("CO_Solution");
 }
 
 void ConductionOperator::SetParameters(const mfem::Vector& u) {
+  sim_m.GetTimerManager().StartTimer("CO_Construction");
   if (kappa_m.CanTimeVary()) {
     delete K;
     // Setup diffusion coefficient
@@ -366,6 +393,7 @@ void ConductionOperator::SetParameters(const mfem::Vector& u) {
   }
   delete T;
   T = nullptr;  // Delete here to be reset on first entrance to SolveImplicit
+  sim_m.GetTimerManager().StopTimer("CO_Construction");
 }
 
 void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
@@ -374,10 +402,15 @@ void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
       boundary_conditions_m.find("temperature") != boundary_conditions_m.end(),
       global_assert{}, DebugLevel::CHEAP{},
       "\"temperature\" not found in supplied boundary conditions.");
+
+  sim_m.GetTimerManager().StartTimer("CO_BC");
+
   const auto& bc_manager = boundary_conditions_m.at("temperature");
+
   if (bc_manager.GetNumberOfTimeVaryingNeumannConditions() == 0) {
     if (bc_manager.GetNumberOfTimeVaryingDirichletConditions() == 0) {
       SPDLOG_LOGGER_INFO(MAIN_LOG, "No time-varying conditions to be updated");
+      sim_m.GetTimerManager().StopTimer("CO_BC");
       return;
     }
   }
@@ -476,6 +509,8 @@ void ConductionOperator::UpdateBoundaryConditions(mfem::Vector& u) {
   if (inhomogeneous_neumann_active_m) {
     this->FinalizeNeumannCondition();
   }
+
+  sim_m.GetTimerManager().StopTimer("CO_BC");
 }
 
 ConductionOperator::~ConductionOperator(void) {

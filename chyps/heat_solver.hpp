@@ -25,6 +25,7 @@
 #include "chyps/io.hpp"
 #include "chyps/mesh.hpp"
 #include "chyps/mfem_visit_collection.hpp"
+#include "chyps/monitor_file.hpp"
 #include "chyps/solver_interface.hpp"
 
 namespace chyps {
@@ -72,6 +73,9 @@ class HeatSolver : public SolverInterface {
 
   void CreateBoundaryConditionManagers(void);
 
+  void CreateMonitorFile(void);
+  void PushDataToMonitorFile(void);
+
   void InitializeBoundaryConditions(void);
 
   void AllocateVariablesAndOperators(void);
@@ -86,6 +90,7 @@ class HeatSolver : public SolverInterface {
 
   bool FileWritingEnabled(void) const;
   bool RestartFileActive(void) const;
+  bool MonitorFileActive(void) const;
 
   InputParser& parser_m;
   Simulation& sim_m;
@@ -101,6 +106,8 @@ class HeatSolver : public SolverInterface {
   mfem::Vector rho_m;
   mfem::Vector cp_m;
   Conductivity* kappa_m;
+  MonitorFile* solution_monitor_m;
+  bool monitor_file_active_m;
   MfemVisItCollection* visit_collection_m;
   std::vector<std::string> precice_write_names_m;
 };

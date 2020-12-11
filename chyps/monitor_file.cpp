@@ -17,6 +17,20 @@
 namespace chyps {
 
 MonitorFile::MonitorFile(const std::string& a_name,
+                         std::initializer_list<std::string> a_header,
+                         std::initializer_list<FieldType> a_format)
+    : monitor_file_m(nullptr),
+      updated_m(false),
+      format_m(a_format),
+      column_width_m(a_header.size()),
+      data_m(a_header.size()) {
+  DEBUG_ASSERT(
+      a_header.size() == format_m.size(), global_assert{}, DebugLevel::CHEAP{},
+      "Supplied header vector and format vector are of different length.");
+  this->InitializeMonitorFile(a_name, a_header);
+}
+
+MonitorFile::MonitorFile(const std::string& a_name,
                          const std::vector<std::string>& a_header,
                          const std::vector<FieldType>& a_format)
     : monitor_file_m(nullptr),
@@ -26,20 +40,6 @@ MonitorFile::MonitorFile(const std::string& a_name,
       data_m(a_header.size()) {
   DEBUG_ASSERT(
       a_header.size() == a_format.size(), global_assert{}, DebugLevel::CHEAP{},
-      "Supplied header vector and format vector are of different length.");
-  this->InitializeMonitorFile(a_name, a_header);
-}
-
-MonitorFile::MonitorFile(const std::string& a_name,
-                         const std::vector<std::string>& a_header,
-                         std::vector<FieldType>&& a_format)
-    : monitor_file_m(nullptr),
-      updated_m(false),
-      format_m(std::move(a_format)),
-      column_width_m(a_header.size()),
-      data_m(a_header.size()) {
-  DEBUG_ASSERT(
-      a_header.size() == format_m.size(), global_assert{}, DebugLevel::CHEAP{},
       "Supplied header vector and format vector are of different length.");
   this->InitializeMonitorFile(a_name, a_header);
 }
@@ -68,11 +68,19 @@ MonitorFile& MonitorFile::operator=(MonitorFile&& a_other) {
   return *this;
 }
 
+void MonitorFile::SetEntries(std::initializer_list<double> a_data) {
+  DEBUG_ASSERT(a_data.size() == data_m.size(), global_assert{},
+               DebugLevel::CHEAP{},
+               "Supplied data and storage of different size.");
+  std::copy(a_data.begin(), a_data.end(), data_m.begin());
+  updated_m = true;
+}
+
 void MonitorFile::SetEntries(const std::vector<double>& a_data) {
   DEBUG_ASSERT(a_data.size() == data_m.size(), global_assert{},
                DebugLevel::CHEAP{},
                "Supplied data and storage of different size.");
-  data_m = a_data;
+  std::copy(a_data.begin(), a_data.end(), data_m.begin());
   updated_m = true;
 }
 
@@ -144,11 +152,29 @@ void MonitorFile::InitializeMonitorFile(
   fprintf(monitor_file_m, "%-*s", MIN_WIDTH, "Iteration");
   fprintf(monitor_file_m, "%-*s", MIN_WIDTH, "Time [s]");
   fprintf(monitor_file_m, "%-*s", MIN_WIDTH, "dt [s]");
-  for (std::size_t n = 0; n < a_header.size(); ++n) {
-    const int width =
-        std::max(MIN_WIDTH, static_cast<int>(a_header[n].size() + 1));
-    column_width_m[n] = width;
-    fprintf(monitor_file_m, "%-*s", width, a_header[n].c_str());
+  auto cw = column_width_m.begin();
+  for (const auto& string : a_header) {
+    const int width = std::max(MIN_WIDTH, static_cast<int>(string.size() + 1));
+    *cw++ = width;
+    fprintf(monitor_file_m, "%-*s", width, string.c_str());
+  }
+  fprintf(monitor_file_m, "\n");
+}
+
+void MonitorFile::InitializeMonitorFile(
+    const std::string& a_name, std::initializer_list<std::string> a_header) {
+  monitor_file_m = fopen(a_name.c_str(), "w");
+  DEBUG_ASSERT(monitor_file_m != nullptr, global_assert{}, DebugLevel::CHEAP{},
+               "Trouble opening file \"" + a_name + "\"");
+
+  fprintf(monitor_file_m, "%-*s", MIN_WIDTH, "Iteration");
+  fprintf(monitor_file_m, "%-*s", MIN_WIDTH, "Time [s]");
+  fprintf(monitor_file_m, "%-*s", MIN_WIDTH, "dt [s]");
+  auto cw = column_width_m.begin();
+  for (const auto& string : a_header) {
+    const int width = std::max(MIN_WIDTH, static_cast<int>(string.size() + 1));
+    *cw++ = width;
+    fprintf(monitor_file_m, "%-*s", width, string.c_str());
   }
   fprintf(monitor_file_m, "\n");
 }

@@ -62,7 +62,8 @@ class TimerManager {
 
   /// \brief Add a timer to be tracked by this manager. The timer will be
   /// interacted with through a_name. The name `a_name` must be unique to
-  /// this TimerManager object.
+  /// this TimerManager object. All timers must be added prior to creating
+  /// a monitor file.
   void AddTimer(const std::string& a_name);
 
   /// \brief Start the timer with a_name.

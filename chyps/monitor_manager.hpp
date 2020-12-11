@@ -75,8 +75,8 @@ class MonitorManager {
   /// `a_format` is a format specifier, marking a column to either use integer
   /// or double numbers.
   MonitorFile* CreateMonitorFile(const std::string& a_name,
-                                 const std::vector<std::string>& a_header,
-                                 std::vector<FieldType>&& a_format);
+                                 std::initializer_list<std::string> a_header,
+                                 std::initializer_list<FieldType> a_format);
 
   /// \brief Write the current MonitorFile::line_m stored in each
   /// MonitorFile to disk.

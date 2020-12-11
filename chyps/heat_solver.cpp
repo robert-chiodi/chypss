@@ -35,28 +35,26 @@ HeatSolver::HeatSolver(InputParser& a_parser, Simulation& a_simulation)
       rho_m(),
       cp_m(),
       kappa_m(nullptr),
-      visit_collection_m(nullptr) {
+      solution_monitor_m(nullptr),
+      monitor_file_active_m(false),
+      visit_collection_m(nullptr),
+      precice_write_names_m() {
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Constructing HeatSolver object.");
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Gathering options of HeatSolver class.");
   this->GatherOptions();
   this->CreateBoundaryConditionManagers();
 }
 
-void HeatSolver::CreateBoundaryConditionManagers(void) {
-  boundary_conditions_m.emplace(std::make_pair(
-      "temperature",
-      BoundaryConditionManager(parser_m,
-                               "HeatSolver/BoundaryConditions/temperature")));
-}
-
 void HeatSolver::Initialize(void) {
   // Construct mesh, allocate and construct operators, and perform all setup for
   // time advancement
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Initializing HeatSolver class.");
+  this->CreateMonitorFile();
   this->InitializeBoundaryConditions();
   this->AllocateVariablesAndOperators();
   this->SetODESolver();
   this->RegisterFieldsForIO();
+  this->PushDataToMonitorFile();
 }
 
 double HeatSolver::AdjustTimeStep(const double a_proposed_dt) const {
@@ -74,6 +72,7 @@ double HeatSolver::Advance(const double a_time, const double a_time_step) {
   this->UpdateBoundaryConditions(temperature_m);
   operator_m->SetParameters(temperature_m);
   ode_solver_m->Step(temperature_m, time, taken_time_step);
+  this->PushDataToMonitorFile();
   SPDLOG_LOGGER_INFO(MAIN_LOG,
                      "Advanced solution from time {:8.6E} to time {:8.6E}",
                      a_time, time);
@@ -185,6 +184,64 @@ void HeatSolver::GatherOptions(void) {
   ConductionOperator::GatherOptions(parser_m);
 
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Add all options to parser.");
+}
+
+void HeatSolver::CreateBoundaryConditionManagers(void) {
+  boundary_conditions_m.emplace(std::make_pair(
+      "temperature",
+      BoundaryConditionManager(parser_m,
+                               "HeatSolver/BoundaryConditions/temperature")));
+}
+
+void HeatSolver::CreateMonitorFile(void) {
+  if (sim_m.GetMPI().IAmRoot()) {
+    solution_monitor_m = sim_m.GetMonitorManager().CreateMonitorFile(
+        "heat_solver",
+        {"MIN_T", "MAX_T", "MIN_RHO", "MAX_RHO", "MIN_CP", "MAX_CP"},
+        {FieldType::DOUBLE, FieldType::DOUBLE, FieldType::DOUBLE,
+         FieldType::DOUBLE, FieldType::DOUBLE, FieldType::DOUBLE});
+  }
+  // Inform all processors if monitor file is active.
+  monitor_file_active_m = solution_monitor_m != nullptr;
+  int bool_as_int = monitor_file_active_m ? 1 : 0;
+  MPI_Bcast(&bool_as_int, 1, MPI_INT, sim_m.GetMPI().GetRootRank(),
+            sim_m.GetMPI().GetComm());
+  monitor_file_active_m = bool_as_int == 1;
+}
+
+void HeatSolver::PushDataToMonitorFile(void) {
+  if (!this->MonitorFileActive()) {
+    return;
+  }
+
+  // 0 - MIN_TEMPERATURE
+  // 1 - MAX_TEMPERATURE
+  // 2 - MIN_RHO
+  // 3 - MAX_RHO
+  // 4 - MIN_CP
+  // 5 - MAX_CP
+  std::array<double, 6> minmax_values;
+  minmax_values[0] = temperature_m.Min();
+  minmax_values[1] = rho_m.Min();
+  minmax_values[2] = cp_m.Min();
+  minmax_values[3] = temperature_m.Max();
+  minmax_values[4] = rho_m.Max();
+  minmax_values[5] = cp_m.Max();
+
+  std::array<double, 6> global_minmax_values;
+  MPI_Reduce(minmax_values.data(), global_minmax_values.data(), 3, MPI_DOUBLE,
+             MPI_MIN, sim_m.GetMPI().GetRootRank(), sim_m.GetMPI().GetComm());
+
+  MPI_Reduce(minmax_values.data() + 3, global_minmax_values.data() + 3, 3,
+             MPI_DOUBLE, MPI_MAX, sim_m.GetMPI().GetRootRank(),
+             sim_m.GetMPI().GetComm());
+
+  if (sim_m.GetMPI().IAmRoot()) {
+    solution_monitor_m->SetEntries(
+        {global_minmax_values[0], global_minmax_values[3],
+         global_minmax_values[1], global_minmax_values[4],
+         global_minmax_values[2], global_minmax_values[5]});
+  }
 }
 
 void HeatSolver::SetODESolver(void) {
@@ -444,5 +501,7 @@ bool HeatSolver::FileWritingEnabled(void) const {
 bool HeatSolver::RestartFileActive(void) const {
   return sim_m.GetIO().IsReadModeActive();
 }
+
+bool HeatSolver::MonitorFileActive(void) const { return monitor_file_active_m; }
 
 }  // namespace chyps

@@ -49,20 +49,24 @@ MonitorFile* MonitorManager::CreateMonitorFile(
     const std::string& a_name, const std::vector<std::string>& a_header,
     const std::vector<FieldType>& a_format) {
   if (this->IsOn()) {
-    auto format_copy = a_format;
-    return CreateMonitorFile(a_name, a_header, std::move(format_copy));
+    auto insert_location = file_list_m.emplace(
+        a_name,
+        MonitorFile(directory_base_m + '/' + a_name, a_header, a_format));
+    DEBUG_ASSERT(insert_location.second, global_assert{}, DebugLevel::CHEAP{},
+                 "Monitor file with name \"" + a_name + "\" already added.");
+    return &(insert_location.first->second);
   } else {
     return nullptr;
   }
 }
 
 MonitorFile* MonitorManager::CreateMonitorFile(
-    const std::string& a_name, const std::vector<std::string>& a_header,
-    std::vector<FieldType>&& a_format) {
+    const std::string& a_name, std::initializer_list<std::string> a_header,
+    std::initializer_list<FieldType> a_format) {
   if (this->IsOn()) {
-    auto insert_location =
-        file_list_m.emplace(a_name, MonitorFile(directory_base_m + '/' + a_name,
-                                                a_header, std::move(a_format)));
+    auto insert_location = file_list_m.emplace(
+        a_name,
+        MonitorFile(directory_base_m + '/' + a_name, a_header, a_format));
     DEBUG_ASSERT(insert_location.second, global_assert{}, DebugLevel::CHEAP{},
                  "Monitor file with name \"" + a_name + "\" already added.");
     return &(insert_location.first->second);
