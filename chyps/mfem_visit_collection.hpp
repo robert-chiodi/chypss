@@ -32,6 +32,7 @@ class MfemVisItCollection {
  public:
   MfemVisItCollection(const MPI_Comm& a_mpi_comm,
                       const std::string& a_collection_name,
+                      const std::string& a_collection_prefix,
                       mfem::ParMesh& a_mesh);
 
   void RegisterField(const std::string& a_name,

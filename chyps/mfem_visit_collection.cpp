@@ -17,9 +17,11 @@ namespace chyps {
 
 MfemVisItCollection::MfemVisItCollection(const MPI_Comm& a_mpi_comm,
                                          const std::string& a_collection_name,
+                                         const std::string& a_collection_prefix,
                                          mfem::ParMesh& a_mesh)
     : visit_collection_m(a_mpi_comm, a_collection_name, &a_mesh),
       name_data_map_m() {
+  visit_collection_m.SetPrefixPath(a_collection_prefix);
   SPDLOG_LOGGER_INFO(MAIN_LOG, "Made new VisIt collection: {}",
                      a_collection_name);
 }
@@ -27,7 +29,6 @@ MfemVisItCollection::MfemVisItCollection(const MPI_Comm& a_mpi_comm,
 void MfemVisItCollection::RegisterField(
     const std::string& a_name, mfem::ParFiniteElementSpace* a_element_space) {
   auto grid_function = new mfem::ParGridFunction(a_element_space);
-  // FIXME : Make this an exception
   DEBUG_ASSERT(name_data_map_m.find(a_name) == name_data_map_m.end(),
                global_assert{}, DebugLevel::CHEAP{},
                "Field with name \"" + a_name + "\" already registered");

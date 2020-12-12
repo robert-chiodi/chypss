@@ -225,6 +225,8 @@ void Simulation::GatherOptions(void) {
   parser_m.AddOption(
       "Simulation/use_visit",
       "Save data files for VisIt (visit.llnl.gov) visualization.", false);
+  parser_m.AddOption("Simulation/visit_directory",
+                     "Directory to export VisIt files to.", "Visit/");
 
   parser_m.AddOption("Simulation/viz_steps", "Visualize every n-th timestep.",
                      5);

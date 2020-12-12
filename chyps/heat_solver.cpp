@@ -372,7 +372,9 @@ void HeatSolver::RegisterFieldsForIO(void) {
   if (parser_m["Simulation/use_visit"].get<bool>()) {
     SPDLOG_LOGGER_INFO(MAIN_LOG, "Registering fields for export via VisIt");
     visit_collection_m = new MfemVisItCollection(
-        sim_m.GetMPI().GetComm(), "HeatSolver", sim_m.GetMesh().GetMfemMesh());
+        sim_m.GetMPI().GetComm(), "HeatSolver",
+        parser_m["Simulation/visit_directory"].get<std::string>(),
+        sim_m.GetMesh().GetMfemMesh());
     visit_collection_m->RegisterField("temperature", element_space_m);
     visit_collection_m->RegisterField("rho", element_space_m);
     visit_collection_m->RegisterField("cp", element_space_m);
